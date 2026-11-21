@@ -10,6 +10,8 @@ import type {
   StaffCertificate,
   StaffOffice,
   AppState,
+  CitizenAccount,
+  SignUpCountry,
   AssistantAnswers,
   Bilingual,
   Case,
@@ -37,7 +39,7 @@ export const FOOTER_DISCLAIMER: Bilingual = {
 }
 export const SIMULATED_LABEL: Bilingual = { en: 'Simulated', es: 'Simulado' }
 export const POLICY_PROPOSAL_LABEL: Bilingual = { en: 'Policy proposal', es: 'Propuesta normativa' }
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
 /* ------------------------------------------------------------- key rule */
 
@@ -846,6 +848,77 @@ const BACKGROUND: BackgroundSeed[] = [
 
 const both = (s: string): Bilingual => ({ en: s, es: s })
 
+/* ------------------------------------------------------- citizen accounts */
+
+/**
+ * Tiny deterministic hash (FNV-1a, 32-bit, hex) so the store never keeps passwords in plain text.
+ * DEMO ONLY: this is not a secure password hash. Never reuse a real password in the prototype.
+ */
+export function demoHash(input: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
+
+/** Normalises a typed document number for sign-in (case and spaces don't matter). */
+export const normaliseDocNumber = (s: string) => s.trim().toUpperCase().replace(/\s+/g, '')
+
+/**
+ * Saved demo accounts for the 8 library personas: sign in with the document number + this password.
+ * These credentials are documented ONLY in the README for the team. They must never be rendered in the UI.
+ */
+export const DEMO_ACCOUNT_PASSWORDS: Record<string, string> = {
+  giulia: 'giulia-demo',
+  daniel: 'daniel-demo',
+  rafael: 'rafael-demo',
+  noah: 'noah-demo',
+  yusuf: 'yusuf-demo',
+  deepfake: 'ivo-demo',
+  fakedoc: 'hana-demo',
+  linwei: 'linwei-demo',
+}
+
+export const PASSWORD_MIN_LENGTH = 8
+export const SIGNUP_MIN_AGE = 18
+
+/** Countries offered in sign-up (fictional applicants only). Group decides the route assistant defaults. */
+export const SIGNUP_COUNTRIES: SignUpCountry[] = [
+  { name: { en: 'Spain', es: 'España' }, nationality: 'Spanish', group: 'spanish' },
+  { name: { en: 'Italy', es: 'Italia' }, nationality: 'Italian', group: 'eu' },
+  { name: { en: 'France', es: 'Francia' }, nationality: 'French', group: 'eu' },
+  { name: { en: 'Germany', es: 'Alemania' }, nationality: 'German', group: 'eu' },
+  { name: { en: 'Portugal', es: 'Portugal' }, nationality: 'Portuguese', group: 'eu' },
+  { name: { en: 'Poland', es: 'Polonia' }, nationality: 'Polish', group: 'eu' },
+  { name: { en: 'Romania', es: 'Rumanía' }, nationality: 'Romanian', group: 'eu' },
+  { name: { en: 'Netherlands', es: 'Países Bajos' }, nationality: 'Dutch', group: 'eu' },
+  { name: { en: 'Morocco', es: 'Marruecos' }, nationality: 'Moroccan', group: 'non_eu' },
+  { name: { en: 'Colombia', es: 'Colombia' }, nationality: 'Colombian', group: 'non_eu' },
+  { name: { en: 'Venezuela', es: 'Venezuela' }, nationality: 'Venezuelan', group: 'non_eu' },
+  { name: { en: 'Argentina', es: 'Argentina' }, nationality: 'Argentine', group: 'non_eu' },
+  { name: { en: 'Mexico', es: 'México' }, nationality: 'Mexican', group: 'non_eu' },
+  { name: { en: 'United States', es: 'Estados Unidos' }, nationality: 'American', group: 'non_eu' },
+  { name: { en: 'United Kingdom', es: 'Reino Unido' }, nationality: 'British', group: 'non_eu' },
+  { name: { en: 'China', es: 'China' }, nationality: 'Chinese', group: 'non_eu' },
+  { name: { en: 'India', es: 'India' }, nationality: 'Indian', group: 'non_eu' },
+  { name: { en: 'Ukraine', es: 'Ucrania' }, nationality: 'Ukrainian', group: 'non_eu' },
+  { name: { en: 'Nigeria', es: 'Nigeria' }, nationality: 'Nigerian', group: 'non_eu' },
+  { name: { en: 'Other country outside the EU', es: 'Otro país fuera de la UE' }, nationality: 'Non-EU national', group: 'non_eu' },
+]
+
+/** Which documents a sign-up may choose, by nationality group (DNI only for Spaniards, EU eID only for EU). */
+export const SIGNUP_DOCUMENTS: Record<SignUpCountry['group'], DocumentType[]> = {
+  spanish: ['DNI', 'PASSPORT'],
+  eu: ['EU_EID', 'PASSPORT', 'TIE'],
+  non_eu: ['PASSPORT', 'TIE', 'NIE_PAPER', 'RED_CARD'],
+}
+
+function libraryAccount(c: { id: string; document: IdentityDocument }, at: string): CitizenAccount {
+  return { caseId: c.id, documentNumber: c.document.number, passwordHash: demoHash(DEMO_ACCOUNT_PASSWORDS[c.id]), createdAt: at, origin: 'library' }
+}
+
 /**
  * Builds the initial state. Deterministic for a given `now`.
  * Library cases start as 'draft' (the citizen runs them). Background cases start mid-flow.
@@ -924,6 +997,9 @@ export function buildSeedState(now: Date = new Date()): AppState {
     }
   }
 
+  const accounts: Record<string, CitizenAccount> = {}
+  for (const c of CASE_LIBRARY) accounts[c.id] = libraryAccount(c, iso(0))
+
   return {
     version: STATE_VERSION,
     cases,
@@ -931,6 +1007,7 @@ export function buildSeedState(now: Date = new Date()): AppState {
     lang: 'en',
     officerId: null,
     activeCitizenCaseId: null,
+    accounts,
     officerProfiles: {},
   }
 }

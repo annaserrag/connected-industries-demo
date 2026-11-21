@@ -11,7 +11,7 @@ import { KEY_RULE, SERVICE_NAME, STAFF_CERTIFICATES, STAFF_CREDENTIAL_LABELS } f
 import { PATHS } from '@/contract/api'
 import { actions, ClaveRuleError, useClave } from '@/core/store'
 import { isCertificateExpired } from '@/core/staff'
-import { LangToggle, LogoGlyph, cn } from '@/ui'
+import { HomeLink, LangToggle, LogoGlyph, cn } from '@/ui'
 import { C, S } from './copy'
 import { fill, formatDate, useLang, useTr } from './lib'
 import { Btn, Sim } from './components/ui'
@@ -251,13 +251,13 @@ export function SignIn() {
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-70" style={{ background: 'radial-gradient(60rem 30rem at 15% 0%, color-mix(in oklab, var(--color-brand) 40%, transparent), transparent 60%), radial-gradient(50rem 30rem at 100% 100%, color-mix(in oklab, var(--color-sim) 35%, transparent), transparent 60%)' }} />
 
       <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-5 py-5 sm:px-8">
-        <Link to={PATHS.landing} className="flex items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+        <HomeLink className="gap-3 rounded-xl focus-visible:ring-2 focus-visible:ring-white/70">
           <LogoGlyph size={40} />
           <span className="leading-tight">
             <span className="block text-[17px] font-semibold tracking-tight">{SERVICE_NAME}</span>
             <span className="block text-[12px] text-white/70">{tr(S.staffAccess)}</span>
           </span>
-        </Link>
+        </HomeLink>
         <span className="ml-auto flex items-center gap-3"><Sim /><LangToggle tone="stage" /></span>
       </header>
 

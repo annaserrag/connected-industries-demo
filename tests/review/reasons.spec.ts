@@ -3,7 +3,7 @@
  * officer preview == what the citizen sees (EN and ES), for every reason, via the real UI.
  */
 import { test, expect } from '@playwright/test'
-import { BASE } from './helpers'
+import { BASE, signInAs } from './helpers'
 
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
 
@@ -58,6 +58,7 @@ test('3 every reason: officer preview equals citizen view (EN + ES)', async ({ b
     await dlg.getByRole('button', { name: 'Confirm refusal' }).click()
     await expect(dlg).toBeHidden()
 
+    await signInAs(officer, id)
     await citizen.goto(`${BASE}/#/citizen/case/${id}`)
     await citizen.getByRole('button', { name: 'English' }).click()
     const box = citizen.getByTestId('refusal-reason')

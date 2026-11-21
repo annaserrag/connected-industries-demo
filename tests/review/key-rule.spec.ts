@@ -2,7 +2,7 @@
  * CHECK 4 — key rule at runtime (window.__clave, ?debug=1) + citizen sees reason + appeal in every refusal path.
  */
 import { test, expect, type Page } from '@playwright/test'
-import { BASE, attachConsole, shot, type Problems } from './helpers'
+import { BASE, attachConsole, shot, signInAs, type Problems } from './helpers'
 
 const D = `${BASE}/?debug=1`
 
@@ -202,11 +202,13 @@ test.describe('4. Key rule', () => {
     const dlg = officer.getByRole('dialog')
     await dlg.getByRole('radio', { name: /Data mismatch/ }).click()
     await dlg.getByRole('button', { name: /Confirm/ }).click()
+    await signInAs(officer, 'daniel')
     await citizen.goto(`${BASE}/#/citizen/case/daniel`)
     await expect(citizen.getByTestId('refusal-reason')).toContainText('Your name or date of birth is different')
     await expect(citizen.getByRole('button', { name: 'Appeal' })).toBeVisible()
     // refuse during need_info
     await officer.evaluate(() => { const k = window.__clave!; k.actions.officerRequestInfo('noah', 'Send proof of guardianship please.'); k.actions.officerRefuse('noah', 'data_mismatch') })
+    await signInAs(officer, 'noah')
     await citizen.goto(`${BASE}/#/citizen/case/noah`)
     await expect(citizen.getByTestId('refusal-reason')).toBeVisible()
     await expect(citizen.getByRole('button', { name: 'Appeal' })).toBeVisible()

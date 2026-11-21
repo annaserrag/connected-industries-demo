@@ -249,6 +249,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, Bilingual> = {
   appeal_filed: b('Appeal filed', 'Recurso presentado'),
   correction_submitted: b('Correction submitted', 'Corrección enviada'),
   video_call_booked: b('Video call booked', 'Videollamada reservada'),
+  account_created: b('Account created', 'Cuenta creada'),
   staff_signed_in: b('Staff signed in', 'Acceso de personal'),
   staff_access_denied: b('Staff access denied', 'Acceso de personal denegado'),
   staff_profile_completed: b('Job details confirmed', 'Datos del puesto confirmados'),

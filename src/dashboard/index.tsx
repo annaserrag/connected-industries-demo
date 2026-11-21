@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import { FlaskConical, Gavel, ShieldCheck } from 'lucide-react'
 import { KEY_RULE, POLICY_PROPOSALS, POLICY_PROPOSAL_LABEL, SIMULATED_INDICATORS } from '@/contract/seed'
-import { LangToggle, cn } from '@/ui'
+import { HomeLink, LangToggle, Logo, cn } from '@/ui'
 import { COPY } from './copy'
 import { isEmbed, useLang, useTr } from './components/hooks'
 import { SectionHeading } from './components/parts'
@@ -77,9 +77,10 @@ export function DashboardPage() {
         {!embed && (
           <header className="mb-6 sm:mb-8">
             <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">{tr(COPY.eyebrow)}</p>
+              <HomeLink><Logo size="sm" /></HomeLink>
               <LangToggle />
             </div>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.14em] text-brand">{tr(COPY.eyebrow)}</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-[2.75rem] sm:leading-[1.1]" style={{ fontFamily: 'var(--font-display, inherit)' }}>
               {tr(COPY.title)}
             </h1>

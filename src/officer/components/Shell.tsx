@@ -1,12 +1,12 @@
 /* Officer console chrome: left nav + top bar. */
 import type { ReactNode } from 'react'
-import { NavLink, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { Inbox, History, LayoutDashboard, LogOut, FileStack, Rows3, UserRound } from 'lucide-react'
 import { OFFICERS, SERVICE_NAME, STAFF_OFFICES } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { actions, useClave } from '@/core/store'
 import { officerQueue } from '@/core/selectors'
-import { Avatar, LangToggle, LogoGlyph, cn } from '@/ui'
+import { Avatar, HomeLink, LangToggle, LogoGlyph, cn } from '@/ui'
 import { C } from '../copy'
 import { postLabel } from '../ProfileForm'
 import { useLang, useTr } from '../lib'
@@ -15,13 +15,13 @@ import { Kbd, LiveDot } from './ui'
 function Brand() {
   const tr = useTr()
   return (
-    <Link to={PATHS.officer} className="flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+    <HomeLink className="gap-2.5 focus-visible:ring-2 focus-visible:ring-white/60">
       <LogoGlyph size={36} />
       <span className="leading-tight">
         <span className="block text-[15px] font-semibold tracking-tight text-white">{SERVICE_NAME}</span>
-        <span className="block text-[11px] font-medium text-white/55">{tr(C.appName)}</span>
+        <span className="block text-[11px] font-medium text-white/70">{tr(C.appName)}</span>
       </span>
-    </Link>
+    </HomeLink>
   )
 }
 
@@ -105,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className={cn('flex min-w-0 flex-1 flex-col', embed && 'h-dvh overflow-y-auto')}>
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-line bg-surface/85 px-6 backdrop-blur">
-          <div className="flex items-center gap-3 lg:hidden"><span className="font-semibold">{SERVICE_NAME}</span></div>
+          <HomeLink className="shrink-0 lg:hidden"><span className="font-semibold">{SERVICE_NAME}</span></HomeLink>
           <nav className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 lg:hidden" aria-label={tr(C.navSection)}>
             {([
               [PATHS.officer, C.navQueue, true],

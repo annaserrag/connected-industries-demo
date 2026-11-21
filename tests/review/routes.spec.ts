@@ -4,7 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
-import { BASE, attachConsole, shot, staffCertificateSignIn, watch, type Problems } from './helpers'
+import { BASE, SHOTS, attachConsole, citizenSignIn, shot, staffCertificateSignIn, watch, type Problems } from './helpers'
 
 const FOOT_EN = 'Student prototype — not an official Government of Spain service.'
 const FOOT_ES = 'Prototipo de estudiantes — no es un servicio oficial del Gobierno de España.'
@@ -99,9 +99,9 @@ test.describe('Routes sweep', () => {
         }
       }
     }
-    fs.mkdirSync('/tmp/review-shots', { recursive: true })
-    fs.writeFileSync('/tmp/review-shots/routes.json', JSON.stringify({ rows, problems }, null, 2))
-    fs.writeFileSync('/tmp/review-shots/number-inventory.json', JSON.stringify(inventory, null, 2))
+    fs.mkdirSync(SHOTS, { recursive: true })
+    fs.writeFileSync(SHOTS + '/routes.json', JSON.stringify({ rows, problems }, null, 2))
+    fs.writeFileSync(SHOTS + '/number-inventory.json', JSON.stringify(inventory, null, 2))
     expect(problems.external, 'external requests').toEqual([])
     expect(problems.console, 'console errors/warnings').toEqual([])
     await context.close()
@@ -140,8 +140,7 @@ test.describe('Routes sweep', () => {
     const citizen = await context.newPage(); await citizen.setViewportSize({ width: 390, height: 844 })
     const found: Record<string, boolean> = {}
     // eIDAS (route A): Giulia answers "Yes" to having her eID
-    await citizen.goto(`${BASE}/#/citizen`)
-    await citizen.getByTestId('persona-giulia').click()
+    await citizenSignIn(citizen, 'giulia')
     await citizen.getByRole('button', { name: 'Next', exact: true }).click()
     await citizen.getByRole('button', { name: 'Next', exact: true }).click()
     await citizen.locator('input[name="hasEuEid"][value="yes"]').check({ force: true })
@@ -160,10 +159,7 @@ test.describe('Routes sweep', () => {
     await citizen.getByRole('button', { name: 'Go to my status' }).click({ timeout: 20_000 })
     found.statusChecks = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
     // chip + face (route B)
-    await citizen.getByTestId('persona-daniel').waitFor({ state: 'detached' }).catch(() => undefined)
-    await citizen.goto(`${BASE}/#/citizen`)
-    await citizen.getByRole('button', { name: /Giulia/ }).first().click() // header switch identity
-    await citizen.getByTestId('persona-daniel').click()
+    await citizenSignIn(citizen, 'daniel') // signs Giulia out first, then Daniel in
     while (!(await citizen.getByRole('button', { name: 'See my route' }).isVisible())) {
       await citizen.getByRole('button', { name: 'Next', exact: true }).click(); await citizen.waitForTimeout(300)
     }

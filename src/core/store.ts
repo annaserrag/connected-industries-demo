@@ -18,6 +18,7 @@ import {
 } from '@/contract/seed'
 import { checksForCase, decide, deriveFlags, OFFICER_VIDEO_DONE, riskOf, runCheck } from './engine'
 import { seedHistory } from './history'
+import { createAccountActions, resetSignUpCase } from './accounts'
 import { createStaffActions } from './staff'
 
 export class ClaveRuleError extends Error {
@@ -479,17 +480,19 @@ export const actions: ClaveActions = {
   },
   resetCase(caseId) {
     const c = getCase(caseId)
-    if (c.origin !== 'library') throw new ClaveRuleError('Only library cases can be reset.')
+    if (c.origin === 'background') throw new ClaveRuleError('Only library and sign-up cases can be reset.')
     runs.delete(caseId)
     const s = useClave.getState()
     const fresh = buildSeedState(new Date())
     commit({
       ...s,
-      cases: { ...s.cases, [caseId]: resetLibraryCase(c, fresh) },
-      audit: [...s.audit.filter(e => e.caseId !== caseId), audit(caseId, SYSTEM_ACTOR, 'demo_reset', `Case ${caseId} reset to draft.`)],
+      cases: { ...s.cases, [caseId]: c.origin === 'signup' ? resetSignUpCase(c) : resetLibraryCase(c, fresh) },
+      audit: [...s.audit.filter(e => e.caseId !== caseId || e.action === 'account_created'), audit(caseId, SYSTEM_ACTOR, 'demo_reset', `Case ${caseId} reset to draft.`)],
     }, caseId, 'demo_reset')
   },
 
+  /* ---- citizen accounts (src/core/accounts.ts) ---- */
+  ...createAccountActions({ get: () => useClave.getState(), commit, audit }),
   /* ---- staff access (src/core/staff.ts) ---- */
   ...createStaffActions({ get: () => useClave.getState(), commit, audit, fail: m => { throw new ClaveRuleError(m) } }),
 }

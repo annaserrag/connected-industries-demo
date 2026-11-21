@@ -6,7 +6,7 @@
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test'
 import { C } from '../src/citizen/copy'
-import { CITIZEN_MESSAGES, KEY_RULE, REJECTION_REASONS } from '../src/contract/seed'
+import { CASE_LIBRARY, CITIZEN_MESSAGES, DEMO_ACCOUNT_PASSWORDS, KEY_RULE, REJECTION_REASONS } from '../src/contract/seed'
 import type { Lang, RejectionReasonId } from '../src/contract/types'
 
 const SHOTS = process.env.CITIZEN_SHOTS ?? '/tmp/citizen-shots'
@@ -39,7 +39,7 @@ async function openCitizen(ctx: BrowserContext, lang: Lang, errors: string[]) {
     const c = window.__clave!
     c.setEngineSpeed(0.35)
     c.actions.resetDemo()
-    c.actions.setActiveCitizenCase(null)
+    c.actions.citizenSignOut()
     c.actions.setLang(lang)
   }, lang)
   await page.goto('/#/citizen')
@@ -63,7 +63,11 @@ async function runPersona(citizen: Page, officer: Page, plan: Plan, lang: Lang) 
   const tag = `${lang}-${plan.id}`
   await citizen.bringToFront()
 
-  await citizen.getByTestId(`persona-${plan.id}`).click()
+  // sign in with the persona's saved demo account (credentials live only in the README)
+  const seed = CASE_LIBRARY.find(c => c.id === plan.id)!
+  await citizen.getByTestId('signin-doc').fill(seed.document.number)
+  await citizen.getByTestId('signin-password').fill(DEMO_ACCOUNT_PASSWORDS[plan.id])
+  await citizen.getByTestId('signin-form').getByRole('button', { name: tr(C.signInCta), exact: true }).click()
   await expect(citizen).toHaveURL(new RegExp(`/citizen/start/${plan.id}`))
   if (plan.id === 'giulia' || plan.id === 'rafael') await shot(citizen, `${tag}-01-assistant`)
 
@@ -174,14 +178,17 @@ async function runPersona(citizen: Page, officer: Page, plan: Plan, lang: Lang) 
     }
   }
 
-  // back to the identity list
-  await citizen.getByRole('button', { name: new RegExp(tr(C.switchIdentity)) }).click()
-  await expect(citizen.getByTestId(`persona-${plan.id}`)).toBeVisible()
+  // sign out: back to the sign-in screen
+  await citizen.getByRole('button', { name: new RegExp(`^${tr(C.signOut)}`) }).click()
+  await expect(citizen).toHaveURL(/#\/citizen$/)
+  await expect(citizen.getByTestId('signin-form')).toHaveCount(1)
+  await expect(citizen.getByTestId('signin-form')).toBeVisible()
+  await expect(citizen.getByText(seed.persona.name)).toHaveCount(0)
 }
 
 for (const lang of ['en', 'es'] as const) {
   test(`citizen flow: all library personas (${lang})`, async ({ browser }) => {
-    test.setTimeout(240_000)
+    test.setTimeout(420_000)
     const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
     const errors: string[] = []
     const citizen = await openCitizen(ctx, lang, errors)

@@ -3,7 +3,7 @@ import * as Tabs from '@radix-ui/react-tabs'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Building, CalendarClock, Check, Clock, FileText, KeyRound, Scale, ShieldCheck, Smartphone, Timer, UserRound } from 'lucide-react'
 import type { Bilingual } from '@/contract/types'
-import { LangToggle, SimulatedBadge, cn } from '@/ui'
+import { HomeLink, LangToggle, SimulatedBadge, cn } from '@/ui'
 import { KEY_RULE, REFERENCE_FIGURES, REGISTRATION_AUTHORITIES, ROUTES, ROUTE_ORDER } from '@/contract/seed'
 import { C } from './copy'
 import { LogoMark, RouteCode, Wordmark } from './components/basics'
@@ -43,8 +43,10 @@ export function LandingPage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_45%_at_85%_0%,var(--color-brand-soft),transparent_70%),radial-gradient(40%_35%_at_0%_60%,var(--color-sim-soft),transparent_70%)]" />
 
       <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-8">
-        <LogoMark size={32} />
-        <Wordmark className="text-lg" />
+        <HomeLink>
+          <LogoMark size={32} />
+          <Wordmark className="text-lg" />
+        </HomeLink>
         <nav className="ml-auto flex items-center gap-1 text-sm" aria-label={tr(b('Language', 'Idioma'))}>
           <LangToggle />
         </nav>

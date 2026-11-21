@@ -306,7 +306,7 @@ export interface Guardian {
   route: RouteId
 }
 
-export type CaseOrigin = 'library' | 'background'
+export type CaseOrigin = 'library' | 'background' | 'signup'
 
 export interface Case {
   id: string
@@ -371,6 +371,7 @@ export type AuditAction =
   | 'appeal_filed'
   | 'correction_submitted'
   | 'video_call_booked'
+  | 'account_created'
   | 'staff_signed_in'
   | 'staff_access_denied'
   | 'staff_profile_completed'
@@ -429,6 +430,48 @@ export interface SimulatedIndicator {
   simulated: true
 }
 
+/* ------------------------------------------------------- citizen accounts */
+
+/**
+ * A citizen's sign-in to the platform. One account = one application (case) in this prototype.
+ * The 8 library personas have saved accounts (credentials only in the README, never in the UI).
+ */
+export interface CitizenAccount {
+  /** Same id as the case it owns. */
+  caseId: string
+  /** Sign-in identifier: the case's document number (always "DEMO-…"). */
+  documentNumber: string
+  /** demoHash(password). Demo only, not a secure password store. */
+  passwordHash: string
+  createdAt: string
+  origin: 'library' | 'signup'
+}
+
+export type NationalityGroup = AssistantAnswers['nationalityGroup']
+
+export interface SignUpCountry {
+  /** English short name, also used as the persona's nationality adjective source. */
+  name: Bilingual
+  /** Nationality adjective shown on the case, e.g. "Italian". */
+  nationality: string
+  group: NationalityGroup
+}
+
+export interface SignUpInput {
+  fullName: string
+  /** ISO date (YYYY-MM-DD). */
+  dateOfBirth: string
+  /** Index into SIGNUP_COUNTRIES. */
+  countryIndex: number
+  documentType: DocumentType
+  password: string
+}
+
+export type SignInResult = { ok: true; caseId: string } | { ok: false; reason: 'invalid_credentials' }
+export type SignUpResult =
+  | { ok: true; caseId: string; documentNumber: string }
+  | { ok: false; reason: 'underage' | 'invalid_name' | 'weak_password' | 'invalid_document_for_country' }
+
 /* ------------------------------------------------------------ app state */
 
 export interface AppState {
@@ -440,6 +483,8 @@ export interface AppState {
   officerId: string | null
   /** Officer job profiles, keyed by officerId (filled the first time each officer signs in). */
   officerProfiles: Record<string, OfficerProfile>
-  /** Case the citizen view currently has open, or null. */
+  /** Case of the signed-in citizen (the citizen session), or null when signed out. */
   activeCitizenCaseId: string | null
+  /** Citizen accounts, keyed by caseId. */
+  accounts: Record<string, CitizenAccount>
 }

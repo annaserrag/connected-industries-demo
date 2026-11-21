@@ -7,6 +7,9 @@
  *  - UI kit        : implemented by Design (src/ui/index.ts), used by Citizen/Officer/Dashboard.
  */
 import type {
+  SignInResult,
+  SignUpInput,
+  SignUpResult,
   OfficerProfileInput,
   PriorityTier,
   StaffSignInResult,
@@ -69,6 +72,17 @@ export interface ClaveActions {
   /** Red-card / Fallback: officer completes the simulated video call (sets officer_video = pass). */
   officerCompleteVideoCall(caseId: string): void
 
+  /* ---- citizen accounts (branch feature/citizen-accounts) ---- */
+  /** Sign in with document number (case/spaces ignored) + password. On success sets activeCitizenCaseId. */
+  citizenSignIn(documentNumber: string, password: string): SignInResult
+  /**
+   * Create an account + a new draft application (origin 'signup'). Assigns a fake "DEMO-…" document number,
+   * generated initials/hue, presetAnswers from the country group, and an empty simulation script (every check
+   * passes by default). Signs the new citizen in. Audits 'account_created'.
+   */
+  citizenSignUp(input: SignUpInput): SignUpResult
+  /** Ends the citizen session (activeCitizenCaseId = null). */
+  citizenSignOut(): void
   /* ---- staff access (branch feature/staff-console) ---- */
   /**
    * Simulated certificate sign-in. Expired → not_authorised/expired. No officerId → not_authorised/not_staff.
