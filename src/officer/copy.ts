@@ -245,6 +245,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, Bilingual> = {
   appeal_filed: b('Appeal filed', 'Recurso presentado'),
   correction_submitted: b('Correction submitted', 'Corrección enviada'),
   video_call_booked: b('Video call booked', 'Videollamada reservada'),
+  account_created: b('Account created', 'Cuenta creada'),
   demo_reset: b('Demo reset', 'Demo reiniciada'),
 }
 
