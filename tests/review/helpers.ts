@@ -1,7 +1,37 @@
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
 
-export const BASE = 'http://localhost:4180'
-export const SHOTS = '/tmp/review-shots'
+/** Override with REVIEW_BASE / REVIEW_SHOTS to run a second copy on another port (defaults unchanged). */
+export const BASE = process.env.REVIEW_BASE ?? 'http://localhost:4180'
+export const SHOTS = process.env.REVIEW_SHOTS ?? '/tmp/review-shots'
+
+/** Saved demo accounts of the library personas (documented only in the README, never shown in the app). */
+export const DEMO_LOGINS: Record<string, { doc: string; password: string; name: string }> = {
+  giulia: { doc: 'DEMO-P-IT-482913', password: 'giulia-demo', name: 'Giulia Ferraro' },
+  daniel: { doc: 'DEMO-TIE-Y0042719-K', password: 'daniel-demo', name: 'Daniel Mwangi' },
+  rafael: { doc: 'DEMO-TIE-X0019583-R', password: 'rafael-demo', name: 'Rafael Medina' },
+  noah: { doc: 'DEMO-P-DE-C01X58', password: 'noah-demo', name: 'Noah Becker' },
+  yusuf: { doc: 'DEMO-RC-0117-H', password: 'yusuf-demo', name: 'Yusuf Haddad' },
+  deepfake: { doc: 'DEMO-P-BG-391027', password: 'ivo-demo', name: 'Ivo Petrov (claimed)' },
+  fakedoc: { doc: 'DEMO-P-HR-005521', password: 'hana-demo', name: 'Hana Kovač (claimed)' },
+  linwei: { doc: 'DEMO-TIE-Z0088104-W', password: 'linwei-demo', name: 'Lin Wei' },
+}
+
+/** Citizen: open /citizen, sign out if someone is signed in, then sign in through the form as persona `id`. */
+export async function citizenSignIn(citizen: Page, id: string) {
+  await citizen.goto(`${BASE}/#/citizen`)
+  const form = citizen.getByTestId('signin-form')
+  const signOut = citizen.getByTestId('citizen-signout')
+  await expect(form.or(signOut).first()).toBeVisible()
+  if (await signOut.isVisible().catch(() => false)) {
+    await signOut.click()
+    await expect(citizen).toHaveURL(/#\/citizen$/)
+  }
+  await expect(form).toHaveCount(1)
+  await citizen.getByTestId('signin-doc').fill(DEMO_LOGINS[id].doc)
+  await citizen.getByTestId('signin-password').fill(DEMO_LOGINS[id].password)
+  await form.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(citizen).toHaveURL(new RegExp(`#/citizen/(start|verify|case)/${id}`))
+}
 
 export interface Problems {
   console: string[]
@@ -51,8 +81,7 @@ export async function officerSignIn(officer: Page) {
 
 /** Citizen: pick persona and go through the route assistant with preset answers. Returns the recommended-route text. */
 export async function citizenAssistant(citizen: Page, id: string, opts?: { assisted?: boolean }) {
-  await citizen.goto(`${BASE}/#/citizen`)
-  await citizen.getByTestId(`persona-${id}`).click()
+  await citizenSignIn(citizen, id)
   for (let i = 0; i < 6; i++) {
     const see = citizen.getByRole('button', { name: 'See my route' })
     if (await see.isVisible().catch(() => false)) break
@@ -120,3 +149,9 @@ export async function shot(page: Page, name: string) {
 }
 
 export const state = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('getyourclave.state.v1') || 'null'))
+
+/** Sign a persona in through the store action (page must expose window.__clave, i.e. ?debug=1). Synced to every tab. */
+export async function signInAs(page: Page, id: string) {
+  const ok = await page.evaluate(([d, p]) => window.__clave!.actions.citizenSignIn(d, p).ok, [DEMO_LOGINS[id].doc, DEMO_LOGINS[id].password] as const)
+  expect(ok, `sign in as ${id}`).toBe(true)
+}

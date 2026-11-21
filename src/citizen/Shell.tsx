@@ -1,10 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowRight, Laptop, UserRound } from 'lucide-react'
-import { LangToggle, PhoneFrame, cn } from '@/ui'
+import { ArrowRight, Laptop, LogOut } from 'lucide-react'
+import { Avatar, LangToggle, PhoneFrame, cn } from '@/ui'
 import { actions, useClave } from '@/core/store'
 import type { Case } from '@/contract/types'
-import { C } from './copy'
+import { C, fill } from './copy'
 import { LogoMark, Wordmark } from './components/basics'
 import { useEmbed, useGo, useMedia, useTr, withEmbed } from './hooks'
 
@@ -39,15 +39,17 @@ function Header() {
           <button
             type="button"
             onClick={() => {
-              safe(() => actions.setActiveCitizenCase(null))
-              go('/citizen')
+              safe(() => actions.citizenSignOut())
+              go('/citizen', { replace: true })
             }}
-            className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
-            aria-label={`${tr(C.switchIdentity)} (${active.persona.name})`}
-            title={tr(C.switchIdentity)}
+            className="flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface pl-1 pr-2.5 text-xs font-semibold text-muted transition hover:border-brand/40 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+            aria-label={fill(tr(C.signOutOf), { name: active.persona.name })}
+            title={fill(tr(C.signOutOf), { name: active.persona.name })}
+            data-testid="citizen-signout"
           >
-            <UserRound size={14} aria-hidden />
-            <span className="max-w-[88px] truncate">{active.persona.name.split(' ')[0]}</span>
+            <Avatar initials={active.persona.initials} hue={active.persona.hue} size={22} />
+            <LogOut size={13} aria-hidden />
+            <span>{tr(C.signOut)}</span>
           </button>
         )}
         <LangToggle />

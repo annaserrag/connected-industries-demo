@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Check, ChevronDown, Clapperboard, Laptop, LayoutDashboard, RotateCcw, Smartphone, Users, Video } from 'lucide-react'
-import { CASE_LIBRARY } from '@/contract/seed'
+import { Clapperboard, Laptop, LayoutDashboard, RotateCcw, Smartphone, Video } from 'lucide-react'
 import { actions, useClave } from '@/core/store'
-import { Avatar, Button, Kbd, LiveDot, PolicyBadge, StatusPill } from './primitives'
+import { Avatar, Button, Kbd, LiveDot } from './primitives'
 import { Dialog, DialogClose } from './forms'
 import { LangToggle, LaptopFrame, Logo, PhoneStatusBar } from './layout'
 import { toast } from './feedback'
@@ -69,88 +68,6 @@ function StageLabel({ icon, children, right }: { icon: ReactNode; children: Reac
   )
 }
 
-/** Case library popover: the 8 personas with avatar, profile, scenario, demo beat and live status. */
-function CaseLibrary({ activeId, onPick }: { activeId: string | null; onPick: (id: string) => void }) {
-  const tr = useTr()
-  const cases = useClave(s => s.cases)
-  const [open, setOpen] = useState(false)
-  const reduce = useReducedMotion()
-  const active = CASE_LIBRARY.find(c => c.id === activeId)
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="group inline-flex h-11 max-w-[340px] items-center gap-2.5 rounded-[14px] bg-white/[0.06] py-1 pr-3 pl-1.5 text-left ring-1 ring-white/10 transition-colors hover:bg-white/[0.1]"
-          aria-label={tr('Choose a case from the library', 'Elegir un caso de la biblioteca')}
-        >
-          {active ? <Avatar initials={active.persona.initials} hue={active.persona.hue} size={32} /> : <span className="grid size-8 place-items-center rounded-full bg-white/10 text-stage-ink"><Users className="size-4" aria-hidden /></span>}
-          <span className="min-w-0">
-            <span className="block text-[11px] leading-tight font-semibold tracking-wide text-stage-muted uppercase">{tr('Case library', 'Biblioteca de casos')}</span>
-            <span className="block truncate text-sm leading-tight font-semibold text-stage-ink">{active ? active.persona.name : tr('Pick a persona', 'Elige un perfil')}</span>
-          </span>
-          <ChevronDown className="size-4 shrink-0 text-stage-muted transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content sideOffset={10} align="start" collisionPadding={16} className="z-50 outline-none">
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={SPRING}
-            className="w-[min(860px,calc(100vw-32px))] rounded-[22px] bg-surface p-3 shadow-pop"
-          >
-            <div className="flex items-center justify-between px-2 pt-1 pb-3">
-              <div>
-                <p className="text-[15px] font-semibold text-ink">{tr('Case library', 'Biblioteca de casos')}</p>
-                <p className="text-[13px] text-muted">{tr('Picking a case opens it on the phone and resets it to the start.', 'Al elegir un caso se abre en el móvil y vuelve al inicio.')}</p>
-              </div>
-              <span className="text-xs font-semibold text-muted">{CASE_LIBRARY.length} {tr('personas · all fictional', 'perfiles · todos ficticios')}</span>
-            </div>
-            <ul className="scroll-quiet grid max-h-[min(70vh,620px)] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-              {CASE_LIBRARY.map((c, i) => {
-                const live = cases[c.id]
-                const on = c.id === activeId
-                return (
-                  <motion.li key={c.id} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: i * 0.03 }}>
-                    <button
-                      type="button"
-                      onClick={() => { onPick(c.id); setOpen(false) }}
-                      aria-pressed={on}
-                      className={cn(
-                        'flex h-full w-full gap-3 rounded-[16px] p-3.5 text-left transition-[background-color,box-shadow]',
-                        on ? 'bg-brand-soft ring-2 ring-brand' : 'bg-canvas hover:bg-surface-2',
-                      )}
-                    >
-                      <Avatar initials={c.persona.initials} hue={c.persona.hue} size={44} />
-                      <span className="min-w-0 flex-1 space-y-1">
-                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-[15px] font-semibold text-ink">{c.persona.name}</span>
-                          <span className="text-xs text-muted">{c.persona.age} · {c.persona.nationality}</span>
-                          {on && <Check className="ml-auto size-4 text-brand" aria-label={tr('Selected', 'Seleccionado')} />}
-                        </span>
-                        <span className="block text-[13px] font-medium text-ink/80">{tr(c.persona.profile)}</span>
-                        <span className="line-clamp-2 block text-[13px] leading-snug text-muted">{tr(c.scenario)}</span>
-                        <span className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="inline-flex h-6 items-center gap-1 rounded-full bg-ink px-2.5 text-[11px] font-semibold text-white">
-                            <Clapperboard className="size-3" aria-hidden />{tr(c.demoBeat)}
-                          </span>
-                          {c.policyProposal && <PolicyBadge />}
-                          {live && <StatusPill status={live.status} />}
-                        </span>
-                      </span>
-                    </button>
-                  </motion.li>
-                )
-              })}
-            </ul>
-          </motion.div>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
-}
-
 /** Segmented control on the dark stage. */
 function StageSegment<T extends string>({ value, onChange, options, label }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: string; icon: ReactNode }[]; label: string
@@ -188,7 +105,7 @@ function RecordHint() {
           <p className="mb-3 text-[15px] font-semibold">{tr('Recording the launch video', 'Grabar el vídeo de lanzamiento')}</p>
           <ol className="list-decimal space-y-2 pl-4 leading-snug text-ink/90 marker:font-semibold marker:text-brand">
             <li>{tr('Reset all demo data before each take.', 'Restablece todos los datos antes de cada toma.')}</li>
-            <li>{tr('Pick the persona for the beat from the case library.', 'Elige el perfil de la escena en la biblioteca de casos.')}</li>
+            <li>{tr('On the phone, sign in with the team demo account for the beat, or create a new account.', 'En el móvil, entra con la cuenta de demo del equipo para la escena o crea una cuenta nueva.')}</li>
             <li>{tr('Tap through the phone on the left; the laptop on the right updates live.', 'Avanza en el móvil de la izquierda; el portátil de la derecha se actualiza en directo.')}</li>
             <li>{tr('Switch to the dashboard for the closing numbers (simulated).', 'Cambia al panel para las cifras finales (simuladas).')}</li>
           </ol>
@@ -206,12 +123,11 @@ function RecordHint() {
 export function DemoPanel() {
   const tr = useTr()
   const reduce = useReducedMotion()
-  const activeId = useClave(s => s.activeCitizenCaseId)
+  const active = useClave(s => (s.activeCitizenCaseId ? s.cases[s.activeCitizenCaseId] : undefined))
   const [right, setRight] = useState<'officer' | 'dashboard'>('officer')
   const [confirm, setConfirm] = useState(false)
   const [phoneKey, setPhoneKey] = useState(0)
   const [stageRef, stage] = useSize<HTMLDivElement>()
-  const active = CASE_LIBRARY.find(c => c.id === activeId)
 
   useEffect(() => {
     const prev = document.title
@@ -228,17 +144,6 @@ export function DemoPanel() {
   const phoneW = PHONE.w * ps + phoneBezel
   const ls = Math.max(0.3, Math.min(1, (stage.w - phoneW - gap - laptopChrome.w - 16) / LAPTOP.w, (avH - laptopChrome.h) / LAPTOP.h))
 
-  const pick = (id: string) => {
-    try {
-      actions.resetCase(id)
-      actions.setActiveCitizenCase(id)
-      setPhoneKey(k => k + 1)
-      const c = CASE_LIBRARY.find(x => x.id === id)
-      toast.success(tr('Case ready', 'Caso listo'), { description: c ? `${c.persona.name} · ${tr(c.demoBeat)}` : undefined })
-    } catch (e) {
-      toast.error(tr('Could not open the case', 'No se pudo abrir el caso'), { description: String((e as Error).message ?? e) })
-    }
-  }
   const resetAll = () => {
     try {
       actions.resetDemo()
@@ -260,8 +165,6 @@ export function DemoPanel() {
         <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/[0.08] px-3 text-xs font-bold tracking-wide text-stage-ink uppercase ring-1 ring-white/10">
           <Clapperboard className="size-3.5" aria-hidden />{tr('Demo mode', 'Modo demo')}
         </span>
-        <div className="mx-1 hidden h-7 w-px bg-stage-line md:block" />
-        <CaseLibrary activeId={activeId} onPick={pick} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <StageSegment
             label={tr('Right screen', 'Pantalla derecha')}
@@ -293,13 +196,18 @@ export function DemoPanel() {
             <motion.p
               key={active.id}
               initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              className="min-w-0 truncate text-stage-muted"
+              className="flex min-w-0 items-center gap-2 truncate text-stage-muted"
+              data-testid="stage-signed-in"
             >
               <span aria-hidden className="mx-2 text-stage-line">|</span>
-              <span className="font-semibold text-stage-ink">{active.persona.name}</span> — {tr(active.scenario)}
+              <Avatar initials={active.persona.initials} hue={active.persona.hue} size={22} />
+              <span>{tr('Signed in on the phone:', 'Sesión iniciada en el móvil:')} <span className="font-semibold text-stage-ink">{active.persona.name}</span></span>
             </motion.p>
           ) : (
-            <motion.p key="none" className="text-stage-muted"><span aria-hidden className="mx-2 text-stage-line">|</span>{tr('Pick a case from the library to begin.', 'Elige un caso de la biblioteca para empezar.')}</motion.p>
+            <motion.p key="none" className="text-stage-muted" data-testid="stage-signed-out">
+              <span aria-hidden className="mx-2 text-stage-line">|</span>
+              {tr('On the phone, sign in or create an account to begin.', 'En el móvil, entra o crea una cuenta para empezar.')}
+            </motion.p>
           )}
         </AnimatePresence>
       </div>
@@ -340,7 +248,7 @@ export function DemoPanel() {
       <Dialog
         open={confirm} onOpenChange={setConfirm} tone="danger" size="sm"
         title={tr('Reset all demo data?', '¿Restablecer todos los datos?')}
-        description={tr('Every case goes back to its starting point and the audit trail is cleared, in every open tab.', 'Todos los casos vuelven al inicio y se vacía el registro de auditoría, en todas las pestañas abiertas.')}
+        description={tr('Every case goes back to its starting point, accounts created on the phone are removed, the phone is signed out and the audit trail is cleared, in every open tab.', 'Todos los casos vuelven al inicio, se borran las cuentas creadas en el móvil, se cierra la sesión del móvil y se vacía el registro de auditoría, en todas las pestañas abiertas.')}
         footer={<>
           <DialogClose asChild><Button variant="secondary">{tr('Cancel', 'Cancelar')}</Button></DialogClose>
           <Button variant="danger" icon={<RotateCcw className="size-4" aria-hidden />} onClick={resetAll}>{tr('Reset everything', 'Restablecer todo')}</Button>

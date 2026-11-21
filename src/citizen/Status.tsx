@@ -485,7 +485,7 @@ export function StatusPage() {
         <CheckList expected={expectedChecks(c)} results={c.checks} running={engineRunning} compact />
       </section>
 
-      {c.origin === 'library' && (
+      {c.origin !== 'background' && (
         <div className="flex justify-center">
           <button
             type="button"
