@@ -160,8 +160,8 @@ export function deriveFlags(c: Case, checks: CheckResult[]): Flag[] {
   }
   if (isPolicyProposal(c)) {
     flags.push(flag('policy_proposal_route', 'medium', {
-      en: 'Document excluded under current rules; handled under our policy proposal by an officer video call',
-      es: 'Documento excluido con las normas actuales; se tramita con nuestra propuesta normativa por videollamada con una persona funcionaria',
+      en: 'Document without a chip: identity is confirmed by an officer on a video call',
+      es: 'Documento sin chip: una persona funcionaria confirma la identidad por videollamada',
     }))
   }
   if (c.attempt >= 2) {
