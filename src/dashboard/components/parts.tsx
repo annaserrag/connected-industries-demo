@@ -1,17 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { animate, useReducedMotion } from 'framer-motion'
 import { Table2 } from 'lucide-react'
-import { SimulatedBadge, cn } from '@/ui'
+import { cn } from '@/ui'
 import { COPY } from '../copy'
 import { useTr } from './hooks'
 
-/** The "Simulated" pill, tagged so tests can find it on every simulated card. */
+/** Formerly the "Simulated" pill; the public statistics page no longer labels cards (the About page discloses it). */
 export function Sim() {
-  return (
-    <span data-testid="sim-badge" className="inline-flex shrink-0">
-      <SimulatedBadge />
-    </span>
-  )
+  return null
 }
 
 /** Animated number. Renders the final value immediately for reduced motion and for assistive tech. */
@@ -53,13 +49,13 @@ export interface TableSpec {
 
 export function DataTable({ spec, id, visible }: { spec: TableSpec; id: string; visible: boolean }) {
   return (
-    <div id={id} className={cn(visible ? 'mt-4 overflow-x-auto rounded-lg border border-line' : 'sr-only')}>
+    <div id={id} className={cn(visible ? 'mt-4 overflow-x-auto rounded-[2px] border border-line' : 'sr-only')}>
       <table className="w-full border-collapse text-left text-sm">
         <caption className={cn(visible ? 'px-3 pt-3 pb-1 text-left text-xs font-medium text-muted' : '')}>{spec.caption}</caption>
         <thead>
           <tr className="border-b border-line bg-surface-2">
             {spec.columns.map((c, i) => (
-              <th key={c} scope="col" className={cn('px-3 py-2 font-semibold text-ink', i > 0 && 'text-right')}>{c}</th>
+              <th key={c} scope="col" className={cn('px-3 py-2 font-bold text-ink', i > 0 && 'text-right')}>{c}</th>
             ))}
           </tr>
         </thead>
@@ -111,10 +107,10 @@ export function ChartCard({
     <section
       data-testid="chart-card"
       aria-labelledby={titleId}
-      className={cn('flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-6', className)}
+      className={cn('flex flex-col rounded-[2px] border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-6', className)}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 id={titleId} className="text-base font-semibold leading-snug text-ink sm:text-[17px]">{title}</h3>
+        <h3 id={titleId} className="text-base font-bold leading-snug text-ink sm:text-[17px]">{title}</h3>
         <Sim />
       </div>
       <p className="mt-1.5 text-sm leading-relaxed text-muted">{takeaway}</p>
@@ -169,7 +165,7 @@ export function SectionHeading({ id, title, aside, children }: { id: string; tit
   return (
     <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-3xl">
-        <h2 id={id} className="text-xl font-semibold tracking-tight text-ink sm:text-2xl" style={{ fontFamily: 'var(--font-display, inherit)' }}>
+        <h2 id={id} className="text-xl font-bold tracking-tight text-ink sm:text-2xl" style={{ fontFamily: 'var(--font-display, inherit)' }}>
           {title}
         </h2>
         {children && <p className="mt-1.5 text-sm leading-relaxed text-muted sm:text-[15px]">{children}</p>}

@@ -8,14 +8,13 @@ import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { priorityOf, relativeTime } from '@/core/selectors'
 import { documentOf, DOCUMENT_ORDER } from '@/core/console'
-import { Avatar, PolicyBadge, RouteBadge, StatusPill, cn } from '@/ui'
+import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, S } from './copy'
 import { useLang, useTick, useTr } from './lib'
 import { TierTag } from './Queue'
-import { DemoLiveBadge } from './StaffDashboard'
-import { isPolicyDoc } from './Documents'
+import { LiveBadge } from './StaffDashboard'
 
-const selCls = 'h-9 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand'
+const selCls = 'h-9 rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand'
 
 export function ApplicationsPage() {
   const tr = useTr()
@@ -47,9 +46,9 @@ export function ApplicationsPage() {
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-6 xl:px-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(S.allTitle)}</h1>
+        <h1 className="font-display text-[28px] font-bold text-ink">{tr(S.allTitle)}</h1>
         <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{all.length}</span>
-        <DemoLiveBadge />
+        <LiveBadge />
       </div>
       <p className="mt-1 max-w-2xl text-sm text-muted">{tr(S.allSubtitle)}</p>
 
@@ -62,7 +61,7 @@ export function ApplicationsPage() {
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder={tr(S.searchPh)}
-            className="h-10 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-sm text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-brand"
+            className="h-10 w-full rounded-[2px] border border-line bg-surface pr-3 pl-9 text-sm text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-brand"
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-muted">
@@ -97,21 +96,21 @@ export function ApplicationsPage() {
           </select>
         </label>
         {filtersOn && (
-          <button type="button" onClick={clear} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand">
+          <button type="button" onClick={clear} className="inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1.5 text-sm font-medium text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand">
             <FilterX className="size-4" aria-hidden />{tr(C.clearFilters)}
           </button>
         )}
         <span className="ml-auto text-sm text-muted tabular-nums" aria-live="polite" data-testid="apps-count">{rows.length} / {all.length} {tr(S.shown)}</span>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="mt-3 overflow-hidden rounded-[4px] border border-line bg-surface">
         {rows.length === 0 ? (
           <div className="grid place-items-center px-6 py-14 text-center">
             <p className="font-semibold text-ink">{tr(S.noMatch)}</p>
             <button type="button" onClick={clear} className="mt-2 text-sm font-semibold text-brand hover:underline">{tr(C.clearFilters)}</button>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-280px)] overflow-auto">
+          <div className="relative max-h-[calc(100vh-280px)] overflow-auto">
             <table className="w-full min-w-[1000px] border-collapse text-left text-sm" data-testid="apps-table">
               <caption className="sr-only">{tr(S.allTitle)}</caption>
               <thead className="sticky top-0 z-10">
@@ -142,7 +141,7 @@ export function ApplicationsPage() {
                       <td className="px-3 py-2.5"><StatusPill status={c.status} /></td>
                       <td className="px-3 py-2.5">{c.route ? <RouteBadge route={c.route} compact /> : <span className="text-muted">—</span>}</td>
                       <td className="px-3 py-2.5">
-                        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink">{tr(DOCUMENTS[d].label).split(' (')[0]}{isPolicyDoc(d) && <PolicyBadge />}</span>
+                        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink">{tr(DOCUMENTS[d].label).split(' (')[0]}</span>
                         <span className="block font-mono text-[11px] text-muted">{c.document.number}</span>
                       </td>
                       <td className="px-3 py-2.5 text-[13px] text-ink">{c.level === 'none' ? tr(C.levelNone) : tr(LEVEL_LABELS[c.level])}</td>

@@ -11,7 +11,7 @@ import { useClave } from '@/core/store'
 import { relativeTime } from '@/core/selectors'
 import { Avatar, cn } from '@/ui'
 import { ACTOR_LABEL, AUDIT_ACTION_LABEL, C } from './copy'
-import { auditToCsv, downloadText, formatDateTime, formatTime, useLang, useTick, useTr } from './lib'
+import { auditToCsv, downloadText, formatDateTime, formatTime, useLang, useTick, useTr, actorName } from './lib'
 import { TOASTER_ID } from './live'
 import { Btn } from './components/ui'
 
@@ -38,7 +38,7 @@ export function ActorChip({ e }: { e: AuditEvent }) {
         <Icon className="size-3.5" aria-hidden />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-medium">{e.actor.name}</span>
+        <span className="block truncate text-[13px] font-medium">{actorName(e.actor)}</span>
         <span className="block text-[11px] text-muted">{tr(ACTOR_LABEL[e.actor.kind])}</span>
       </span>
     </span>
@@ -75,7 +75,7 @@ export function AuditTimeline({ events, compact }: { events: AuditEvent[]; compa
               <div className="min-w-0 flex-1 text-sm">
                 <p className="flex flex-wrap items-baseline gap-x-2">
                   <span className={cn('font-semibold', actionTone(e.action))}>{tr(AUDIT_ACTION_LABEL[e.action])}</span>
-                  <span className="text-xs text-muted">{e.actor.name} · <time dateTime={e.at}>{formatTime(e.at, lang)}</time></span>
+                  <span className="text-xs text-muted">{actorName(e.actor)} · <time dateTime={e.at}>{formatTime(e.at, lang)}</time></span>
                 </p>
                 <p className="text-[13px] text-muted">{e.detail}</p>
                 {e.reasonId && <p className="text-[12px] font-medium text-danger">{tr(C.reason)}: {tr(REJECTION_REASONS[e.reasonId].officerLabel)}</p>}
@@ -128,7 +128,7 @@ export function AuditPage() {
     <div className="mx-auto max-w-[1440px] px-6 py-6 xl:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-3 text-[26px] font-semibold tracking-tight">{tr(C.auditTitle)}<span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{audit.length}</span></h1>
+          <h1 className="flex items-center gap-3 font-display text-[28px] font-bold">{tr(C.auditTitle)}<span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{audit.length}</span></h1>
           <p className="mt-1 text-sm text-muted">{tr(C.auditSubtitle)}</p>
         </div>
         <Btn variant="primary" onClick={exportCsv} disabled={rows.length === 0}><Download className="size-4" aria-hidden />{tr(C.exportCsv)}</Btn>
@@ -137,18 +137,18 @@ export function AuditPage() {
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-muted">
           <span>{tr(C.filterCase)}</span>
-          <select value={caseF} onChange={e => setF('case', e.target.value)} className="h-9 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <select value={caseF} onChange={e => setF('case', e.target.value)} className="h-9 rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <option value="all">{tr(C.allCases)}</option>
             {caseIds.map(id => <option key={id} value={id}>{cases[id]?.persona.name ?? id}</option>)}
             {caseF !== 'all' && !caseIds.includes(caseF) && <option value={caseF}>{cases[caseF]?.persona.name ?? caseF}</option>}
           </select>
         </label>
-        <div role="group" aria-label={tr(C.filterActor)} className="inline-flex rounded-xl border border-line bg-surface p-1">
+        <div role="group" aria-label={tr(C.filterActor)} className="inline-flex max-w-full flex-wrap rounded-[2px] border border-line bg-surface p-1">
           {(['all', 'system', 'officer', 'citizen'] as const).map(k => {
             const Icon = k === 'all' ? History : ACTOR_ICON[k]
             return (
               <button key={k} type="button" aria-pressed={actorF === k} onClick={() => setF('actor', k)}
-                className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand', actorF === k ? 'bg-ink text-white' : 'text-muted hover:text-ink')}>
+                className={cn('flex items-center gap-1.5 rounded-[2px] px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand', actorF === k ? 'bg-ink text-white' : 'text-muted hover:text-ink')}>
                 <Icon className="size-3.5" aria-hidden />
                 {k === 'all' ? tr(C.allActors) : tr(ACTOR_LABEL[k])}
                 <span className={cn('rounded-full px-1.5 text-[11px] tabular-nums', actorF === k ? 'bg-white/20' : 'bg-surface-2')}>{k === 'all' ? audit.length : counts[k]}</span>
@@ -164,15 +164,15 @@ export function AuditPage() {
         <span className="ml-auto text-sm text-muted tabular-nums" aria-live="polite">{rows.length} {tr(C.events)}</span>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="mt-3 overflow-hidden rounded-[4px] border border-line bg-surface">
         {rows.length === 0 ? (
           <div className="grid place-items-center px-6 py-16 text-center">
-            <span className="grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted"><History className="size-7" aria-hidden /></span>
+            <span className="grid size-14 place-items-center rounded-[4px] bg-surface-2 text-muted"><History className="size-7" aria-hidden /></span>
             <p className="mt-4 text-lg font-semibold">{tr(C.noAudit)}</p>
             <p className="mt-1 max-w-md text-sm text-muted">{tr(C.noAuditBody)}</p>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-260px)] overflow-auto">
+          <div className="relative max-h-[calc(100vh-260px)] overflow-auto">
             <table className="w-full min-w-[1040px] table-fixed border-collapse text-left text-sm">
               <colgroup>
                 <col className="w-[11%]" /><col className="w-[15%]" /><col className="w-[12%]" /><col className="w-[14%]" /><col /><col className="w-[16%]" /><col className="w-[11%]" />

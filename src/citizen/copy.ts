@@ -10,7 +10,6 @@ const b = (en: string, es: string): Bilingual => ({ en, es })
 export const C = {
   /* ---------- shell ---------- */
   appName: b('Get your Cl@ve', 'Get your Cl@ve'),
-  citizenView: b('Citizen view', 'Vista ciudadana'),
   home: b('Home', 'Inicio'),
   back: b('Back', 'Atrás'),
   next: b('Next', 'Siguiente'),
@@ -18,11 +17,6 @@ export const C = {
   close: b('Close', 'Cerrar'),
   cancel: b('Cancel', 'Cancelar'),
   updatedJustNow: b('Updated just now', 'Actualizado ahora mismo'),
-  sideCaption: b(
-    'This is the citizen’s phone. Open the officer view in another tab: the same case updates live in both.',
-    'Este es el móvil de la persona solicitante. Abre la vista de funcionario en otra pestaña: el mismo caso se actualiza en directo en las dos.',
-  ),
-  openOfficer: b('Open officer view', 'Abrir vista de funcionario'),
   skipToContent: b('Skip to content', 'Saltar al contenido'),
 
   /* ---------- landing ---------- */
@@ -50,34 +44,26 @@ export const C = {
     'Una plataforma, cuatro vías: eID de la UE, chip del pasaporte o TIE + cara, videollamada con DNI o videollamada con una persona funcionaria.',
   ),
   figuresTitle: b('Cl@ve in numbers', 'Cl@ve en cifras'),
-  figuresNote: b('Real published figures, with year and source.', 'Cifras reales publicadas, con año y fuente.'),
+  figuresNote: b('Published figures, with year and source.', 'Cifras publicadas, con año y fuente.'),
   sourceLabel: b('Source', 'Fuente'),
   keyRuleTitle: b('The key rule', 'La regla clave'),
   routesTitle: b('Four routes, one platform', 'Cuatro vías, una plataforma'),
   dashboardLink: b('Indicators dashboard', 'Panel de indicadores'),
-  demoLink: b('Demo mode', 'Modo demo'),
-  studentPrototype: b('IE University · Smart Cities & E-Government · student concept', 'IE University · Smart Cities & E-Government · concepto de estudiantes'),
 
   /* ---------- sign in / create account ---------- */
-  welcomeTitle: b('Your Cl@ve starts here', 'Tu Cl@ve empieza aquí'),
-  welcomeBody: b(
-    'Sign in to follow your application, or create an account to start one. Same steps for everyone, Spanish or not.',
-    'Entra para seguir tu solicitud o crea una cuenta para empezarla. Los mismos pasos para todo el mundo, seas o no de España.',
-  ),
+  welcomeTitle: b('Sign in to Get your Cl@ve', 'Accede a Get your Cl@ve'),
+  welcomeBody: b('Choose how to continue', 'Elige cómo continuar'),
   accountModes: b('Sign in or create an account', 'Entrar o crear una cuenta'),
   tabSignIn: b('Sign in', 'Entrar'),
   tabSignUp: b('Create account', 'Crear cuenta'),
-  docNumber: b('Document number', 'Número de documento'),
-  docNumberHint: b('The DEMO-… number you got when you created your account.', 'El número DEMO-… que recibiste al crear tu cuenta.'),
+  docNumber: b('Applicant number', 'Número de solicitante'),
+  docNumberHint: b('The number you received when you created your account.', 'El número que recibiste al crear tu cuenta.'),
   password: b('Password', 'Contraseña'),
   showPassword: b('Show password', 'Mostrar contraseña'),
   hidePassword: b('Hide password', 'Ocultar contraseña'),
   signInCta: b('Sign in', 'Entrar'),
   signingIn: b('Signing in…', 'Entrando…'),
-  invalidCredentials: b(
-    'We couldn’t sign you in with that document number and password. Check both and try again.',
-    'No hemos podido entrar con ese número de documento y esa contraseña. Revisa ambos e inténtalo de nuevo.',
-  ),
+  invalidCredentials: b('We couldn’t sign you in with that applicant number and password. Check both and try again.', 'No hemos podido acceder con ese número de solicitante y esa contraseña. Revisa ambos e inténtalo de nuevo.'),
   noAccountYet: b('No account yet?', '¿Aún no tienes cuenta?'),
   createOne: b('Create one in two minutes', 'Créala en dos minutos'),
   haveAccount: b('Already have an account?', '¿Ya tienes cuenta?'),
@@ -98,11 +84,11 @@ export const C = {
   documentType: b('Which document do you have?', '¿Qué documento tienes?'),
   documentTypeFirst: b('Choose your nationality first: we show the documents that fit it.', 'Elige primero tu nacionalidad: te mostramos los documentos que encajan.'),
   newPassword: b('Create a password', 'Crea una contraseña'),
-  newPasswordHint: b('At least {n} characters. Don’t reuse a real password.', 'Al menos {n} caracteres. No reutilices una contraseña real.'),
+  newPasswordHint: b('At least {n} characters. Don’t reuse a password from another website.', 'Al menos {n} caracteres. No reutilices una contraseña de otra web.'),
   confirmPassword: b('Repeat the password', 'Repite la contraseña'),
   createAccountCta: b('Create account', 'Crear cuenta'),
   fixFields: b('Please check the highlighted fields.', 'Revisa los campos marcados.'),
-  errDocNumberRequired: b('Enter your document number.', 'Escribe tu número de documento.'),
+  errDocNumberRequired: b('Enter your applicant number.', 'Escribe tu número de solicitante.'),
   errPasswordRequired: b('Enter your password.', 'Escribe tu contraseña.'),
   errName: b('Write your first name and surname (letters only, up to 80 characters).', 'Escribe tu nombre y apellido (solo letras, hasta 80 caracteres).'),
   errDobRequired: b('Enter your date of birth.', 'Escribe tu fecha de nacimiento.'),
@@ -117,31 +103,38 @@ export const C = {
   errWeakPassword: b('Use at least {n} characters.', 'Usa al menos {n} caracteres.'),
   errMismatch: b('The passwords don’t match.', 'Las contraseñas no coinciden.'),
   errGeneric: b('Something went wrong. Please try again.', 'Algo no ha ido bien. Inténtalo de nuevo.'),
-  protoTitle: b('This is a prototype', 'Esto es un prototipo'),
-  protoBody: b(
-    'Don’t use a real password and never type a real document number: when you create an account, we assign you a demo number.',
-    'No uses una contraseña real y nunca escribas un número de documento real: al crear tu cuenta te asignamos un número de demo.',
-  ),
-  realDocNote: b(
-    'Your Cl@ve is checked against your real document later, in the verification step (chip, face or eID). In this prototype that step is simulated.',
-    'Tu Cl@ve se comprueba con tu documento real más adelante, en el paso de verificación (chip, cara o eID). En este prototipo ese paso es simulado.',
-  ),
-  fictional: b('All people and documents are fictional.', 'Todas las personas y documentos son ficticios.'),
+  protoTitle: b('Keep your password safe', 'Protege tu contraseña'),
+  protoBody: b('Get your Cl@ve will never ask for your password by phone, email or text message.', 'Get your Cl@ve nunca te pedirá tu contraseña por teléfono, correo electrónico o SMS.'),
+  realDocNote: b('You confirm your identity with your document in the next steps: chip and face check, digital ID or a video call.', 'Confirmas tu identidad con tu documento en los siguientes pasos: chip y comprobación facial, identidad digital o videollamada.'),
+  fictional: b('Never use a password you use on other websites.', 'No uses una contraseña que utilices en otras webs.'),
   // after sign-up
   accountCreated: b('Account created', 'Cuenta creada'),
-  accountCreatedBody: b('Welcome, {name}. This is your sign-in number: keep it, you need it to come back.', 'Te damos la bienvenida, {name}. Este es tu número para entrar: guárdalo, lo necesitas para volver.'),
-  yourSignInNumber: b('Your sign-in number', 'Tu número para entrar'),
+  accountCreatedBody: b('Welcome, {name}. This is your applicant number: keep it, you need it with your password to sign in.', 'Te damos la bienvenida, {name}. Este es tu número de solicitante: guárdalo, lo necesitas junto con tu contraseña para acceder.'),
+  yourSignInNumber: b('Your applicant number', 'Tu número de solicitante'),
   copy: b('Copy', 'Copiar'),
   copied: b('Copied', 'Copiado'),
-  copyNumber: b('Copy sign-in number', 'Copiar número para entrar'),
-  demoNumberNote: b('A demo number, not a real document number.', 'Un número de demo, no un número de documento real.'),
+  copyNumber: b('Copy applicant number', 'Copiar número de solicitante'),
+  demoNumberNote: b('Write it down or save it somewhere safe.', 'Anótalo o guárdalo en un lugar seguro.'),
   nextStepsTitle: b('What comes next', 'Qué viene ahora'),
   nextSteps: [
     b('A few questions to find your fastest route', 'Unas preguntas para encontrar tu vía más rápida'),
-    b('Verification with your real document (simulated here)', 'Verificación con tu documento real (aquí simulada)'),
+    b('Verify your identity with your document, from your phone', 'Verifica tu identidad con tu documento, desde tu móvil'),
     b('Follow your status live until you have Cl@ve', 'Sigue tu estado en directo hasta tener Cl@ve'),
   ],
   startApplication: b('Find my route', 'Buscar mi vía'),
+
+  methodsLabel: b('Ways to continue', 'Formas de continuar'),
+  methodSignInTitle: b('Applicant number and password', 'Número de solicitante y contraseña'),
+  methodSignInBody: b('If you have already applied, follow your application.', 'Si ya lo has solicitado, sigue tu solicitud.'),
+  methodSignInCta: b('Access with your applicant number', 'Acceder con tu número de solicitante'),
+  methodSignUpTitle: b('Create an account', 'Crear una cuenta'),
+  methodSignUpBody: b('First time? Apply for Cl@ve from your phone, with no appointment.', '¿Primera vez? Solicita Cl@ve desde tu móvil, sin cita.'),
+  methodSignUpCta: b('Create your account', 'Crear tu cuenta'),
+  methodTagNew: b('New', 'Nuevo'),
+  signInPlaceholder: b('e.g. {example} / passport number', 'p. ej. {example} / número de pasaporte'),
+  whatIsClave: b('What is Cl@ve?', '¿Qué es Cl@ve?'),
+  needHelp: b('Need help?', '¿Necesitas ayuda?'),
+  helpLink: b('Who can apply and which documents you need', 'Quién puede solicitarla y qué documentos necesitas'),
 
   /* ---------- assistant ---------- */
   hello: b('Hi', 'Hola'),
@@ -168,10 +161,6 @@ export const C = {
   hideOtherRoutes: b('Hide the other routes', 'Ocultar las otras vías'),
   confirmRoute: b('Continue with this route', 'Continuar con esta vía'),
   changeAnswers: b('Change my answers', 'Cambiar mis respuestas'),
-  policyRouteNote: b(
-    'This is a proposed rule change, not a current rule:',
-    'Esto es una propuesta de cambio normativo, no una norma actual:',
-  ),
   guardianNote: b(
     'You are a minor, so {guardian} ({relation}) signs in first with her own eID and confirms you.',
     'Eres menor, así que {guardian} ({relation}) entra primero con su propio eID y te confirma.',
@@ -181,10 +170,7 @@ export const C = {
 
   /* ---------- verification ---------- */
   consentWhat: b('What we will check', 'Qué vamos a comprobar'),
-  consentFine: b(
-    'You can withdraw your consent at any time. No real data is used in this prototype.',
-    'Puedes retirar tu consentimiento en cualquier momento. En este prototipo no se usan datos reales.',
-  ),
+  consentFine: b('You can withdraw your consent at any time.', 'Puedes retirar tu consentimiento en cualquier momento.'),
   stepLabel: b('Step {n} of {total}', 'Paso {n} de {total}'),
   // Route A
   redirecting: b('You are being redirected to your country’s eID', 'Te estamos redirigiendo a la identidad digital de tu país'),
@@ -198,7 +184,6 @@ export const C = {
   sharedFields: b('Name · Date of birth · Unique identifier', 'Nombre · Fecha de nacimiento · Identificador único'),
   approveSignIn: b('Approve sign-in', 'Aprobar acceso'),
   returning: b('Identity confirmed. Returning to Get your Cl@ve…', 'Identidad confirmada. Volviendo a Get your Cl@ve…'),
-  neutralNote: b('Neutral mock-up of a national eID screen: no real logos, no real login.', 'Maqueta neutra de una pantalla de eID nacional: sin logos ni acceso reales.'),
   // Guardian
   guardianTitle: b('First, {guardian} signs in', 'Primero entra {guardian}'),
   guardianBody: b(
@@ -223,7 +208,6 @@ export const C = {
   faceTurn: b('Turn your head slowly', 'Gira la cabeza despacio'),
   faceHold: b('Hold still…', 'No te muevas…'),
   faceDone: b('Face captured', 'Cara capturada'),
-  noCameraNote: b('No camera is used: this is an animation.', 'No se usa la cámara: es una animación.'),
   // Route C
   dniTitle: b('DNI video call', 'Videollamada con DNI'),
   dniBody: b("Today's video identification, kept as it is.", 'La videoidentificación actual, sin cambios.'),
@@ -273,6 +257,7 @@ export const C = {
     ifNeeded: b('Only if needed', 'Solo si hace falta'),
     notReached: b('Not applicable', 'No aplica'),
   },
+  progressTitle: b('Progress', 'Seguimiento'),
   checksTitle: b('Every check we did', 'Cada comprobación que hicimos'),
   levelTitle: b('Your access level', 'Tu nivel de acceso'),
   levelNone: b('No level yet', 'Aún sin nivel'),
@@ -322,11 +307,7 @@ export const C = {
   correctSuggestion: b('I updated my padrón at the town hall with my new address.', 'He actualizado mi padrón en el ayuntamiento con mi nueva dirección.'),
   sendCorrection: b('Check again', 'Volver a comprobar'),
   bookVideoCall: b('Book a video call', 'Reservar videollamada'),
-  bookedSimNote: b('Booking is simulated in this prototype.', 'La reserva es simulada en este prototipo.'),
-  appealNotAvailable: b(
-    'This appeal could not be registered in the prototype yet. Your basic level is kept.',
-    'Este recurso aún no se puede registrar en el prototipo. Conservas el nivel básico.',
-  ),
+  appealNotAvailable: b('This appeal could not be registered right now. Your basic level is kept.', 'Este recurso no se ha podido registrar ahora. Conservas el nivel básico.'),
   writeSomething: b('Please write a few words first.', 'Escribe unas palabras primero.'),
 } as const
 

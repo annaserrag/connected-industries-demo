@@ -20,3 +20,5 @@ html:has(.ofc-embed), html:has(.ofc-embed) body { overflow: hidden; height: 100%
 @media (prefers-reduced-motion: reduce) {
   .ofc-kpi-flash { animation: none; outline: 2px solid var(--color-success); outline-offset: -2px }
 }
+/* Console phone drawer slides in from the left. */
+@keyframes ofc-slide { from { transform: translateX(-100%) } to { transform: translateX(0) } }

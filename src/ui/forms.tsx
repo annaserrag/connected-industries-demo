@@ -27,8 +27,8 @@ export const Dialog = ({ open, onOpenChange, trigger, title, description, childr
         <RD.Overlay className="fixed inset-0 z-50 bg-[#0d1014]/45 backdrop-blur-[3px] data-[state=open]:animate-[fade-in_180ms_ease-out]" />
         <RD.Content
           className={cn(
-            'fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92dvh] w-full overflow-y-auto rounded-t-[24px] bg-surface p-6 shadow-pop outline-none',
-            'sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:rounded-[22px]',
+            'fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92dvh] w-full overflow-y-auto rounded-t-[4px] border-t-4 border-brand bg-surface p-6 shadow-pop outline-none',
+            'sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:rounded-[2px]',
             { sm: 'sm:max-w-[400px]', md: 'sm:max-w-[480px]', lg: 'sm:max-w-[640px]' }[size],
             className,
           )}
@@ -39,17 +39,17 @@ export const Dialog = ({ open, onOpenChange, trigger, title, description, childr
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={SPRING}
           >
-            {tone === 'danger' && <span aria-hidden className="absolute inset-x-0 top-0 h-1 rounded-t-[22px] bg-danger" />}
+            {tone === 'danger' && <span aria-hidden className="absolute inset-x-0 -top-1 h-1 bg-danger" />}
             <div className="mb-4 flex items-start justify-between gap-4">
               <div className="space-y-1.5">
-                <RD.Title className="text-lg leading-snug font-semibold tracking-[-0.01em] text-ink">{title}</RD.Title>
+                <RD.Title className="font-display text-[20px] leading-snug font-bold text-ink">{title}</RD.Title>
                 {description ? (
                   <RD.Description className="text-sm leading-relaxed text-muted">{description}</RD.Description>
                 ) : (
                   <RD.Description className="sr-only">{typeof title === 'string' ? title : ''}</RD.Description>
                 )}
               </div>
-              <RD.Close className="-mt-1 -mr-2 grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink" aria-label={tr('Close', 'Cerrar')}>
+              <RD.Close className="-mt-1 -mr-2 grid size-9 shrink-0 place-items-center rounded-[2px] text-muted hover:bg-surface-2 hover:text-ink" aria-label={tr('Close', 'Cerrar')}>
                 <X className="size-[18px]" aria-hidden />
               </RD.Close>
             </div>
@@ -78,8 +78,8 @@ export const Select = ({ value, onValueChange, options, placeholder, label, clas
       id={id}
       aria-label={label}
       className={cn(
-        'inline-flex h-12 w-full items-center justify-between gap-2 rounded-field bg-surface px-4 text-left text-[15px] text-ink',
-        'ring-1 ring-inset ring-line-strong/70 hover:ring-line-strong data-[placeholder]:text-muted',
+        'inline-flex h-12 w-full items-center justify-between gap-2 rounded-field border border-line-strong bg-surface px-4 text-left text-[16px] text-ink',
+        'hover:border-ink data-[placeholder]:text-muted',
         className,
       )}
     >
@@ -87,12 +87,12 @@ export const Select = ({ value, onValueChange, options, placeholder, label, clas
       <RS.Icon><ChevronDown className="size-4 text-muted" aria-hidden /></RS.Icon>
     </RS.Trigger>
     <RS.Portal>
-      <RS.Content position="popper" sideOffset={6} className="z-[60] max-h-[min(360px,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[14px] bg-surface p-1.5 shadow-pop">
+      <RS.Content position="popper" sideOffset={6} className="z-[60] max-h-[min(360px,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[2px] bg-surface p-1 shadow-pop">
         <RS.Viewport>
           {options.map(o => (
             <RS.Item
               key={o.value} value={o.value} disabled={o.disabled}
-              className="relative flex cursor-pointer flex-col rounded-[10px] py-2.5 pr-9 pl-3 text-[15px] text-ink outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-brand-soft"
+              className="relative flex cursor-pointer flex-col rounded-[2px] py-2.5 pr-9 pl-3 text-[15px] text-ink outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-brand-soft"
             >
               <RS.ItemText>{o.label}</RS.ItemText>
               {o.description && <span className="text-xs text-muted">{o.description}</span>}
@@ -141,19 +141,19 @@ export const RadioCards = ({ value, onValueChange, options, label, columns = 1, 
             <RG.Item
               value={o.value} disabled={o.disabled}
               className={cn(
-                'group relative flex w-full items-center gap-3.5 rounded-[16px] bg-surface p-4 text-left transition-[box-shadow,background-color] duration-150',
-                'min-h-[64px] shadow-card hover:shadow-raised disabled:opacity-50',
-                on && 'bg-brand-soft/60 shadow-none ring-2 ring-brand',
+                'group relative flex w-full items-center gap-3.5 rounded-[2px] border bg-surface p-4 text-left transition-colors duration-150',
+                'min-h-[64px] border-line-strong hover:border-brand disabled:opacity-50',
+                on && 'border-brand bg-brand-soft shadow-[inset_0_0_0_1px_var(--color-brand)]',
               )}
             >
               {o.icon && (
-                <span className={cn('grid size-11 shrink-0 place-items-center rounded-[12px] transition-colors [&_svg]:size-[22px]', on ? 'bg-brand text-brand-ink' : 'bg-surface-2 text-ink')} aria-hidden>
+                <span className={cn('grid size-11 shrink-0 place-items-center rounded-[2px] transition-colors [&_svg]:size-[22px]', on ? 'bg-brand text-brand-ink' : 'bg-brand-soft text-brand')} aria-hidden>
                   {o.icon}
                 </span>
               )}
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-[15px] leading-snug font-semibold text-ink">{o.label}</span>
+                  <span className="text-[16px] leading-snug font-bold text-ink">{o.label}</span>
                   {o.badge}
                 </span>
                 {o.description && <span className="mt-0.5 block text-[13px] leading-snug text-muted">{o.description}</span>}
@@ -201,16 +201,16 @@ export const Field = ({ label, hint, error, htmlFor, children, className, requir
   label: ReactNode; hint?: ReactNode; error?: ReactNode; htmlFor?: string; children: ReactNode; className?: string; required?: boolean
 }) => (
   <div className={cn('space-y-1.5', className)}>
-    <label htmlFor={htmlFor} className="block text-sm font-semibold text-ink">
+    <label htmlFor={htmlFor} className="block text-[15px] font-bold text-ink">
       {label}{required && <span className="text-danger" aria-hidden> *</span>}
     </label>
     {children}
-    {hint && !error && <p className="text-xs leading-snug text-muted">{hint}</p>}
-    {error && <p role="alert" className="flex items-center gap-1 text-xs font-semibold text-danger"><X className="size-3.5" aria-hidden />{error}</p>}
+    {hint && !error && <p className="text-[13px] leading-snug text-muted">{hint}</p>}
+    {error && <p role="alert" className="flex items-center gap-1 text-[13px] font-bold text-danger"><X className="size-3.5" aria-hidden />{error}</p>}
   </div>
 )
 
-const fieldCls = 'w-full rounded-field bg-surface px-4 text-[15px] text-ink placeholder:text-muted/80 ring-1 ring-inset ring-line-strong/70 hover:ring-line-strong focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none aria-[invalid=true]:ring-danger'
+const fieldCls = 'w-full rounded-field border border-line-strong bg-surface px-4 text-[16px] text-ink placeholder:text-muted/80 hover:border-ink focus-visible:border-brand focus-visible:shadow-[inset_0_0_0_1px_var(--color-brand)] focus-visible:outline-2 focus-visible:outline-offset-2 aria-[invalid=true]:border-danger aria-[invalid=true]:shadow-[inset_0_0_0_1px_var(--color-danger)]'
 
 /** Text input styled to the tokens. */
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {

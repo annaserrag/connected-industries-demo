@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   citizenAssistant, citizenChipAndFace, citizenConsent, citizenToStatus, officerOpenFromQueue, officerRefuse,
-  officerSignIn, shot, SHOTS, state, twoViews,
+  officerSignIn, shot, SHOTS, state, twoViews, BASE, DEMO_LOGINS,
 } from './helpers'
 import fs from 'node:fs'
 
@@ -57,13 +57,17 @@ test.describe('1. E2E per case', () => {
     const rec = await citizenAssistant(citizen, 'daniel')
     expect(rec).toContain('Passport or TIE chip + face check')
     await citizenConsent(citizen)
-    await expect(citizen.getByTestId('tie-assumption')).toContainText('pending confirmation')
     await citizenChipAndFace(citizen)
     await citizenToStatus(citizen)
     await officerOpenFromQueue(officer, 'Daniel Mwangi')
     await decide(officer, /Grant advanced level/)
     await expect(citizen.getByTestId('levels')).toContainText('Advanced level granted', { timeout: 10_000 })
     await shot(citizen, '1b-daniel-citizen')
+    // the TIE-chip assumption is never claimed as fact: it is disclosed as pending confirmation on /about
+    const about = await context.newPage()
+    await about.goto(`${BASE}/#/about`)
+    await expect(about.getByTestId('about-page')).toContainText('the TIE chip can be read by a phone (pending confirmation)')
+    await about.close()
     expect(loads).toEqual({ citizen: 1, officer: 1 })
     all.daniel = problems
     expect(problems.console, "console errors/warnings").toEqual([])
@@ -131,19 +135,18 @@ test.describe('1. E2E per case', () => {
     await context.close()
   })
 
-  test('1e Yusuf (red card): marked Policy proposal, video call, officer approves', async ({ browser }) => {
+  test('1e Yusuf (red card): shown as a normal route, video call, officer approves', async ({ browser }) => {
     const { citizen, officer, problems, loads, context } = await twoViews(browser)
     await officerSignIn(officer)
     const rec = await citizenAssistant(citizen, 'yusuf')
     expect(rec).toContain('Video call with an officer, then office')
-    expect(rec).toContain('Policy proposal')
+    expect(rec).not.toMatch(/Simulated|Demo/)
     await citizenConsent(citizen)
-    await expect(citizen.getByText('Policy proposal').first()).toBeVisible()
     await citizen.getByRole('button', { name: 'Book this time' }).click()
     await citizen.getByRole('button', { name: 'Send for checks' }).click()
     await citizenToStatus(citizen)
     await officerOpenFromQueue(officer, 'Yusuf Haddad')
-    await expect(officer.getByText('Policy proposal').first()).toBeVisible()
+    await expect(officer.getByText('Policy proposal', { exact: true })).toHaveCount(0) // no badge: policy routes look like any other route
     await shot(officer, '1e-yusuf-officer-policy')
     await expect(officer.getByRole('button', { name: /Grant basic level/ })).toBeDisabled()
     await officer.getByRole('button', { name: 'Start video call' }).click()
@@ -169,7 +172,7 @@ test.describe('1. E2E per case', () => {
     expect(s.cases.deepfake.level).toBe('none')
     expect(s.cases.deepfake.decisions).toHaveLength(0)
     expect(s.cases.deepfake.risk).toBe('high')
-    await officerOpenFromQueue(officer, 'Ivo Petrov (claimed)')
+    await officerOpenFromQueue(officer, DEMO_LOGINS.deepfake.name)
     await expect(officer.getByText(/Liveness 0\.22 is below the 0\.85 minimum/).first()).toBeVisible()
     await officerRefuse(officer, 'Liveness failed')
     await expect(citizen.getByTestId('refusal-reason')).toContainText('We could not confirm that a real person was in front of the camera.', { timeout: 10_000 })
@@ -182,7 +185,7 @@ test.describe('1. E2E per case', () => {
     await citizen.getByRole('button', { name: 'Appeal' }).click()
     await citizen.getByRole('dialog').getByRole('textbox').fill('That was really me.')
     await citizen.getByRole('button', { name: 'Send appeal' }).click()
-    await officerOpenFromQueue(officer, 'Ivo Petrov (claimed)')
+    await officerOpenFromQueue(officer, DEMO_LOGINS.deepfake.name)
     await expect(officer.getByText('That was really me.').first()).toBeVisible()
     expect(loads).toEqual({ citizen: 1, officer: 1 })
     all.deepfake = problems
@@ -202,7 +205,7 @@ test.describe('1. E2E per case', () => {
     expect(s.cases.fakedoc.checks.find((c: { id: string }) => c.id === 'chip_signature').outcome).toBe('fail')
     expect(s.cases.fakedoc.flags.map((f: { code: string }) => f.code)).toContain('chip_signature_failed')
     expect(s.cases.fakedoc.level).toBe('none')
-    await officerOpenFromQueue(officer, 'Hana Kovač (claimed)')
+    await officerOpenFromQueue(officer, DEMO_LOGINS.fakedoc.name)
     await expect(officer.getByText(/Chip signature failed/).first()).toBeVisible()
     await shot(officer, '1g-fakedoc-officer-case')
     await officerRefuse(officer, 'Chip signature invalid')

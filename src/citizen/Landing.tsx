@@ -1,219 +1,150 @@
-import { Link, useSearchParams } from 'react-router-dom'
-import * as Tabs from '@radix-ui/react-tabs'
-import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, BadgeCheck, Building, CalendarClock, Check, Clock, FileText, KeyRound, Scale, ShieldCheck, Smartphone, Timer, UserRound } from 'lucide-react'
+/**
+ * Home page in the clave.gob.es style: grey title band (H1 + subtitle + primary action), role cards
+ * (citizen / registration-office staff) like carpetaciudadana.gob.es, a row of four info cards linking to Help,
+ * and "Cl@ve in numbers" with the real reference figures (year + source).
+ */
+import { Link } from 'react-router-dom'
+import { ArrowRight, BadgeCheck, ChevronRight, LogIn, Smartphone } from 'lucide-react'
 import type { Bilingual } from '@/contract/types'
-import { HomeLink, LangToggle, SimulatedBadge, cn } from '@/ui'
-import { KEY_RULE, REFERENCE_FIGURES, REGISTRATION_AUTHORITIES, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { GovHeader, Illustration, InfoCard } from '@/ui'
+import { KEY_RULE, REFERENCE_FIGURES } from '@/contract/seed'
 import { C } from './copy'
-import { LogoMark, RouteCode, Wordmark } from './components/basics'
-import { useReduced, useTr } from './hooks'
+import { useTr } from './hooks'
 
 const FIGURE_IDS = ['users', 'eidas', 'online']
 
 const b = (en: string, es: string): Bilingual => ({ en, es })
 /** Landing-only copy (the rest of the citizen copy lives in ./copy). */
 const L = {
-  modes: b('How do you want to start?', '¿Cómo quieres empezar?'),
-  tabApply: b('Apply', 'Solicitar'),
-  tabStaff: b('Staff access', 'Acceso para personal'),
-  apply: b('Apply', 'Solicitar'),
-  applySub: b('From your phone, no appointment', 'Desde tu móvil, sin cita'),
-  applyPoints: [b('Any document you live in Spain with', 'Con el documento con el que vives en España'), b('Minutes, not weeks', 'Minutos, no semanas'), b('Already applied? Follow it here', '¿Ya lo pediste? Síguelo aquí')],
-  staffTitle: b('For registration staff', 'Para el personal de registro'),
-  staffBody: b(
-    'For staff of bodies enabled as Cl@ve registration authorities, such as the Tax Agency, Social Security, SEPE or a Government Delegation. Sign in with your work certificate or DNIe; access opens only if your organisation has authorised you.',
-    'Para el personal de organismos habilitados como autoridades de registro de Cl@ve, como la Agencia Tributaria, la Seguridad Social, el SEPE o una Delegación del Gobierno. Entra con tu certificado de empleado público o tu DNIe; solo accedes si tu organismo te ha autorizado.',
+  title: b('Get your Cl@ve from your phone', 'Obtén tu Cl@ve desde tu móvil'),
+  subtitle: b(
+    'Register in Cl@ve with any document you live in Spain with, no appointment needed. The same steps and the same time for everyone, Spanish or not.',
+    'Regístrate en Cl@ve con cualquier documento con el que vivas en España, sin cita previa. Los mismos pasos y el mismo tiempo para todo el mundo, seas o no de España.',
   ),
-  staffCta: b('Sign in with your certificate', 'Entrar con tu certificado'),
-  staffNote: b('No accounts are created here. Organisation names appear as text only.', 'Aquí no se crean cuentas. Los nombres de organismos aparecen solo como texto.'),
+  apply: b('Apply', 'Solicitar'),
+  alreadyApplied: b('Already applied?', '¿Ya lo has solicitado?'),
+  signIn: b('Sign in', 'Accede'),
+  modes: b('Choose how you access', 'Elige cómo accedes'),
+  citizenTitle: b('Citizen', 'Ciudadanía'),
+  citizenBody: b('Apply for Cl@ve or follow your application.', 'Solicita Cl@ve o sigue tu solicitud.'),
+  staffTitle: b('Staff of a registration office', 'Personal de una oficina de registro'),
+  staffBody: b(
+    'Review applications with your electronic certificate or staff account. Only for authorised staff.',
+    'Revisa solicitudes con tu certificado electrónico o tu cuenta de personal. Solo para personal autorizado.',
+  ),
+  access: b('Access', 'Acceder'),
+  infoTitle: b('Find out more', 'Más información'),
+  cards: [
+    { s: 'what', ill: 'id-card', t: b('What is Get your Cl@ve', 'Qué es Get your Cl@ve'), d: b('Your digital key to online public services, now open to everyone living in Spain.', 'Tu llave digital para los servicios públicos en línea, ahora abierta a todas las personas que viven en España.') },
+    { s: 'who', ill: 'people', t: b('Who can apply', 'Quién puede solicitarla'), d: b('Spaniards, EU citizens and non-EU residents. Minors with a parent or guardian.', 'Españoles, ciudadanía de la UE y residentes de fuera de la UE. Menores con su madre, padre o tutor.') },
+    { s: 'documents', ill: 'documents', t: b('Documents accepted', 'Documentos admitidos'), d: b('DNI, EU eID, passport, TIE, NIE paper certificate or red card.', 'DNI, eID de la UE, pasaporte, TIE, certificado de NIE en papel o tarjeta roja.') },
+    { s: 'how', ill: 'phone-steps', t: b('How it works', 'Cómo funciona'), d: b('Create your account, verify your identity from your phone and follow your status.', 'Crea tu cuenta, verifica tu identidad desde el móvil y sigue el estado.') },
+  ] as const,
+  rule: b('Every decision has a reason', 'Cada resolución tiene un motivo'),
+}
+
+function RoleCard({ to, title, body, icon, testId, illustration }: {
+  to: string; title: string; body: string; icon: React.ReactNode; testId: string; illustration: 'citizen' | 'office'
+}) {
+  const { tr } = useTr()
+  return (
+    <Link
+      to={to}
+      data-testid={testId}
+      className="group flex items-center gap-4 rounded-[12px] border-2 border-brand bg-surface p-4 transition-colors hover:bg-brand-soft sm:p-5"
+    >
+      <span className="hidden w-[92px] shrink-0 sm:block"><Illustration name={illustration} /></span>
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-brand sm:hidden">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[19px] leading-snug font-extrabold text-brand-strong">{title}</span>
+        <span className="mt-1 block text-[15px] leading-snug text-muted">{body}</span>
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-1 text-[15px] font-bold text-brand underline underline-offset-[3px] group-hover:text-brand-strong">
+        <span className="hidden sm:inline">{tr(L.access)}</span><ChevronRight size={20} aria-hidden />
+      </span>
+    </Link>
+  )
 }
 
 export function LandingPage() {
   const { tr } = useTr()
-  const reduced = useReduced()
-  const rise = (d = 0) => (reduced ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: d, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] as const } })
   const figures = REFERENCE_FIGURES.filter(f => FIGURE_IDS.includes(f.id))
-  const [params, setParams] = useSearchParams()
-  const mode = params.get('access') === 'staff' ? 'staff' : 'apply'
-  const setMode = (m: string) => setParams(m === 'staff' ? { access: 'staff' } : {}, { replace: true })
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-canvas text-ink">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_45%_at_85%_0%,var(--color-brand-soft),transparent_70%),radial-gradient(40%_35%_at_0%_60%,var(--color-sim-soft),transparent_70%)]" />
+    <div className="flex min-h-dvh flex-col bg-canvas text-ink" data-testid="landing">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:font-bold">
+        {tr(C.skipToContent)}
+      </a>
+      <GovHeader />
 
-      <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-8">
-        <HomeLink>
-          <LogoMark size={32} />
-          <Wordmark className="text-lg" />
-        </HomeLink>
-        <nav className="ml-auto flex items-center gap-1 text-sm" aria-label={tr(b('Language', 'Idioma'))}>
-          <LangToggle />
-        </nav>
-      </header>
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
+        {/* title band */}
+        <section className="bg-band" aria-labelledby="landing-title">
+          <div className="mx-auto grid max-w-[1200px] items-center gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.2fr_1fr]">
+            <div>
+              <h1 id="landing-title" className="font-display text-[30px] leading-[1.2] font-bold text-ink sm:text-[40px]">{tr(L.title)}</h1>
+              <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed text-muted sm:text-[18px]">{tr(L.subtitle)}</p>
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
+                <Link
+                  to="/citizen?mode=signup"
+                  data-testid="landing-apply"
+                  className="inline-flex h-13 items-center gap-2.5 rounded-[2px] border-2 border-brand bg-brand px-7 text-[17px] font-bold text-brand-ink transition-colors hover:border-brand-strong hover:bg-brand-strong"
+                >
+                  <Smartphone size={20} aria-hidden />{tr(L.apply)}<ArrowRight size={18} aria-hidden />
+                </Link>
+                <p className="text-[16px] text-ink">
+                  {tr(L.alreadyApplied)}{' '}
+                  <Link to="/citizen" className="gov-link inline-flex items-center gap-1" data-testid="landing-signin">
+                    <LogIn size={16} aria-hidden />{tr(L.signIn)}
+                  </Link>
+                </p>
+              </div>
+            </div>
 
-      <main className="relative mx-auto max-w-6xl px-4 pb-16 sm:px-8">
-        <section className="grid items-center gap-10 pt-6 lg:grid-cols-[1.15fr_1fr] lg:pt-14">
-          <div>
-            <motion.p {...rise(0)} className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-brand ring-1 ring-brand/20">
-              <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-brand/60 motion-reduce:animate-none" /><span className="relative size-2 rounded-full bg-brand" /></span>
-              {tr(C.launchEyebrow)}
-            </motion.p>
-            <motion.h1 {...rise(0.05)} className="mt-5 font-display text-[44px] font-semibold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
-              {tr(C.heroTitle1)}<br />
-              <span className="bg-gradient-to-r from-brand to-sim bg-clip-text text-transparent">{tr(C.heroTitle2)}</span>
-            </motion.h1>
-            <motion.p {...rise(0.1)} className="mt-5 max-w-xl text-lg leading-relaxed text-muted">{tr(C.heroBody)}</motion.p>
-
-            <motion.div {...rise(0.15)} className="mt-8 max-w-xl">
-              <Tabs.Root value={mode} onValueChange={setMode}>
-                <Tabs.List aria-label={tr(L.modes)} className="relative inline-flex rounded-full bg-surface p-1 ring-1 ring-line" data-testid="landing-tabs">
-                  {([['apply', L.tabApply, Smartphone], ['staff', L.tabStaff, BadgeCheck]] as const).map(([v, label, Icon]) => (
-                    <Tabs.Trigger
-                      key={v}
-                      value={v}
-                      data-testid={`landing-tab-${v}`}
-                      className="relative inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold text-muted outline-none transition-colors hover:text-ink focus-visible:ring-4 focus-visible:ring-brand/30 data-[state=active]:text-surface"
-                    >
-                      {mode === v && (
-                        <motion.span layoutId="landing-tab-pill" transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-full bg-ink" aria-hidden />
-                      )}
-                      <Icon size={16} aria-hidden className="relative" />
-                      <span className="relative">{tr(label)}</span>
-                    </Tabs.Trigger>
-                  ))}
-                </Tabs.List>
-
-                <AnimatePresence mode="wait" initial={false}>
-                  {mode === 'apply' ? (
-                    <Tabs.Content key="apply" value="apply" forceMount asChild>
-                      <motion.div initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.2 }} tabIndex={-1} className="mt-4 outline-none">
-                        <Link
-                          to="/citizen"
-                          data-testid="landing-citizen"
-                          className="group relative flex items-center gap-4 overflow-hidden rounded-3xl bg-brand p-5 text-brand-ink shadow-[0_18px_40px_-18px_var(--color-brand)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/40 motion-reduce:transition-none sm:p-6"
-                        >
-                          <span aria-hidden className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-white/15 blur-2xl" />
-                          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/15"><Smartphone size={26} aria-hidden /></span>
-                          <span className="relative min-w-0 flex-1">
-                            <span className="block text-[28px] leading-none font-semibold tracking-tight sm:text-3xl">{tr(L.apply)}</span>
-                            <span className="mt-1.5 block text-[15px] text-white/85">{tr(L.applySub)}</span>
-                          </span>
-                          <span className="relative grid size-11 shrink-0 place-items-center rounded-full bg-white text-brand transition group-hover:translate-x-1 motion-reduce:transition-none"><ArrowRight size={20} aria-hidden /></span>
-                        </Link>
-                        <ul className="mt-4 grid gap-2 text-sm text-muted sm:grid-cols-3">
-                          {L.applyPoints.map((p, i) => (
-                            <li key={i} className="flex items-start gap-1.5"><Check size={15} className="mt-0.5 shrink-0 text-success" aria-hidden />{tr(p)}</li>
-                          ))}
-                        </ul>
-                      </motion.div>
-                    </Tabs.Content>
-                  ) : (
-                    <Tabs.Content key="staff" value="staff" forceMount asChild>
-                      <motion.div initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.2 }} tabIndex={-1} className="mt-4 rounded-3xl bg-ink p-5 text-surface outline-none sm:p-6" data-testid="landing-staff-panel">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="grid size-10 place-items-center rounded-xl bg-white/10"><ShieldCheck size={20} aria-hidden /></span>
-                          <h2 className="text-xl font-semibold tracking-tight text-white">{tr(L.staffTitle)}</h2>
-                          <span className="ml-auto"><SimulatedBadge /></span>
-                        </div>
-                        <p className="mt-3 text-[15px] leading-relaxed text-white/80">{tr(L.staffBody)}</p>
-                        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={tr(b('Registration authorities (examples)', 'Autoridades de registro (ejemplos)'))}>
-                          {REGISTRATION_AUTHORITIES.map(a => (
-                            <li key={a.id} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">{a.short}</li>
-                          ))}
-                        </ul>
-                        <Link
-                          to="/officer"
-                          data-testid="landing-officer"
-                          className="group mt-5 inline-flex h-12 items-center gap-2.5 rounded-xl bg-white px-5 text-[15px] font-semibold text-ink outline-none transition hover:bg-white/90 focus-visible:ring-4 focus-visible:ring-white/50"
-                        >
-                          <KeyRound size={18} aria-hidden />{tr(L.staffCta)}
-                          <ArrowRight size={16} aria-hidden className="transition group-hover:translate-x-0.5 motion-reduce:transition-none" />
-                        </Link>
-                        <p className="mt-3 text-[12.5px] text-white/70">{tr(L.staffNote)}</p>
-                      </motion.div>
-                    </Tabs.Content>
-                  )}
-                </AnimatePresence>
-              </Tabs.Root>
-            </motion.div>
+            {/* role cards */}
+            <div role="group" aria-label={tr(L.modes)} className="grid gap-3" data-testid="landing-tabs">
+              <RoleCard to="/citizen" testId="landing-citizen" title={tr(L.citizenTitle)} body={tr(L.citizenBody)} icon={<Smartphone size={22} aria-hidden />} illustration="citizen" />
+              <RoleCard to="/officer" testId="landing-officer" title={tr(L.staffTitle)} body={tr(L.staffBody)} icon={<BadgeCheck size={22} aria-hidden />} illustration="office" />
+            </div>
           </div>
-
-          {/* before / after */}
-          <motion.div {...rise(0.2)} className="grid gap-3" aria-label={`${tr(C.todayLabel)} / ${tr(C.nowLabel)}`}>
-            <div className="rounded-3xl bg-surface p-5 ring-1 ring-line">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted">{tr(C.todayLabel)}</p>
-              <ol className="mt-3 flex flex-wrap items-center gap-2">
-                {C.todaySteps.map((s, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted">
-                      {[<Building key="b" size={14} aria-hidden />, <FileText key="f" size={14} aria-hidden />, <CalendarClock key="c" size={14} aria-hidden />, <Clock key="w" size={14} aria-hidden />][i]}
-                      <span className="line-through decoration-danger/60 decoration-2">{tr(s)}</span>
-                    </span>
-                    {i < C.todaySteps.length - 1 && <span aria-hidden className="text-line">→</span>}
-                  </li>
-                ))}
-              </ol>
-              <p className="mt-3 text-[13px] leading-snug text-muted">{tr(C.todayNote)}</p>
-            </div>
-            <div className="relative overflow-hidden rounded-3xl bg-ink p-5 text-surface">
-              <div aria-hidden className="absolute -right-10 -top-10 size-40 rounded-full bg-brand/40 blur-3xl" />
-              <p className="relative text-xs font-bold uppercase tracking-wider text-white/60">{tr(C.nowLabel)}</p>
-              <ol className="relative mt-3 flex flex-wrap items-center gap-2">
-                {C.nowSteps.map((s, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-base font-semibold text-white">
-                      {i === 0 ? <Smartphone size={16} aria-hidden /> : <Timer size={16} aria-hidden />}{tr(s)}
-                    </span>
-                    {i === 0 && <span aria-hidden className="text-white/40">→</span>}
-                  </li>
-                ))}
-              </ol>
-              <p className="relative mt-3 text-[13px] leading-snug text-white/70">{tr(C.nowNote)}</p>
-            </div>
-          </motion.div>
         </section>
 
-        {/* routes */}
-        <section aria-labelledby="routes-title" className="mt-16">
-          <h2 id="routes-title" className="font-display text-2xl font-semibold tracking-tight">{tr(C.routesTitle)}</h2>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {ROUTE_ORDER.map(r => (
-              <li key={r} className="rounded-3xl bg-surface p-4 ring-1 ring-line">
-                <RouteCode code={ROUTES[r].code} className="shrink-0 self-start" />
-                <p className="mt-2 font-semibold leading-snug">{tr(ROUTES[r].name)}</p>
-                <p className="mt-1 text-[13px] leading-snug text-muted">{tr(ROUTES[r].forWhom)}</p>
+        {/* info cards */}
+        <section aria-labelledby="info-title" className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-14">
+          <h2 id="info-title" className="font-display text-[24px] font-bold sm:text-[28px]">{tr(L.infoTitle)}</h2>
+          <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {L.cards.map(c => (
+              <li key={c.s}>
+                <InfoCard to={`/help?s=${c.s}`} illustration={c.ill} title={tr(c.t)} description={tr(c.d)} testId={`info-${c.s}`} />
               </li>
             ))}
           </ul>
-          <p className="mt-4 flex max-w-3xl gap-2 text-sm text-muted">
-            <Scale size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-            <span><strong className="text-ink">{tr(C.keyRuleTitle)}:</strong> {tr(KEY_RULE)}</span>
-          </p>
+          <div className="mt-8 flex gap-3 rounded-[2px] border-l-4 border-brand bg-brand-soft p-4 text-[16px] leading-relaxed sm:p-5">
+            <BadgeCheck size={22} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+            <p><strong>{tr(L.rule)}.</strong> {tr(KEY_RULE)}</p>
+          </div>
         </section>
 
         {/* reference figures */}
-        <section aria-labelledby="figures-title" className="mt-14">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <h2 id="figures-title" className="font-display text-2xl font-semibold tracking-tight">{tr(C.figuresTitle)}</h2>
-            <p className="text-sm text-muted">{tr(C.figuresNote)}</p>
+        <section aria-labelledby="figures-title" className="border-t border-line bg-band">
+          <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-14">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 id="figures-title" className="font-display text-[24px] font-bold sm:text-[28px]">{tr(C.figuresTitle)}</h2>
+              <p className="text-[15px] text-muted">{tr(C.figuresNote)}</p>
+            </div>
+            <ul className="mt-6 grid gap-5 sm:grid-cols-3">
+              {figures.map(f => (
+                <li key={f.id} className="rounded-card border border-line border-t-4 border-t-brand bg-surface p-5" data-testid={`figure-${f.id}`}>
+                  <p className="font-display text-[28px] font-bold text-ink tabular-nums">{f.value}</p>
+                  <p className="mt-1 text-[16px] leading-snug text-ink">{tr(f.label)}</p>
+                  <p className="mt-3 text-[14px] text-muted">
+                    {f.year} · {tr(C.sourceLabel)}: <span title={f.sourceUrl}>{f.source}</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-3">
-            {figures.map(f => (
-              <li key={f.id} className={cn('rounded-3xl bg-surface p-5 ring-1 ring-line')} data-testid={`figure-${f.id}`}>
-                <p className="font-display text-3xl font-semibold tracking-tight text-ink tabular-nums">{f.value}</p>
-                <p className="mt-1 text-sm leading-snug text-ink">{tr(f.label)}</p>
-                <p className="mt-3 text-xs text-muted">
-                  {f.year} · {tr(C.sourceLabel)}: <span title={f.sourceUrl}>{f.source}</span>
-                </p>
-              </li>
-            ))}
-          </ul>
         </section>
-
-        <p className="mt-12 flex items-center justify-center gap-2 text-center text-xs text-muted">
-          <UserRound size={13} aria-hidden /> {tr(C.studentPrototype)}
-        </p>
       </main>
     </div>
   )

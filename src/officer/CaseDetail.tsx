@@ -4,18 +4,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, Baby, Ban, BadgeCheck, CalendarClock, ChevronRight, CircleAlert, FileText, Fingerprint, HandHelping,
-  History, Landmark, ListChecks, MessageSquareText, ScanFace, Scale, Smartphone, Sparkles, Undo2,
+  History, ListChecks, MessageSquareText, ScanFace, Scale, Smartphone, Sparkles, Undo2,
 } from 'lucide-react'
 import type { Case, CheckResult } from '@/contract/types'
-import { CHECKS, DOCUMENTS, ENGINE, LEVEL_LABELS, POLICY_PROPOSALS, REJECTION_REASONS, ROUTES } from '@/contract/seed'
+import { CHECKS, DOCUMENTS, ENGINE, LEVEL_LABELS, REJECTION_REASONS, ROUTES } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { caseAudit, officerQueue, relativeTime } from '@/core/selectors'
-import { Avatar, PolicyBadge, RouteBadge, StatusPill, cn } from '@/ui'
+import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, DECISION_LABEL, OUTCOME_LABEL } from './copy'
 import { effectiveOutcome, formatDate, formatDateTime, isExpired, RISK_RANK, SCORED, useHotkeys, useLang, useTick, useTr } from './lib'
 import { useLive } from './live'
-import { CheckIcon, Kbd, Panel, RiskTag, ScoreBar, Sim } from './components/ui'
+import { CheckIcon, Kbd, Panel, RiskTag, ScoreBar } from './components/ui'
 import { FaceArt } from './components/FaceArt'
 import { DecisionPanel } from './DecisionPanel'
 import { AuditTimeline } from './Audit'
@@ -58,7 +58,7 @@ export function CaseDetailPage() {
     <div className="mx-auto max-w-[1440px] px-6 py-5 xl:px-8">
       {/* Breadcrumb */}
       <div className="flex items-center justify-between gap-4">
-        <Link to={PATHS.officer} className="inline-flex items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-brand">
+        <Link to={PATHS.officer} className="inline-flex items-center gap-1.5 rounded-[2px] py-1 text-sm font-medium text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-brand">
           <ArrowLeft className="size-4" aria-hidden />{tr(C.backToQueue)}<Kbd className="ml-1">Esc</Kbd>
         </Link>
         {idx !== -1 && (
@@ -74,16 +74,16 @@ export function CaseDetailPage() {
         key={c.id}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn('mt-3 rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(16,16,20,0.04)]', flashed.has(c.id) && 'ofc-flash')}
+        className={cn('mt-3 rounded-[4px] border border-line bg-surface p-5', flashed.has(c.id) && 'ofc-flash')}
       >
         <div className="flex flex-wrap items-start gap-5">
-          <Avatar initials={c.persona.initials} hue={c.persona.hue} size={64} />
+          <span className="hidden sm:block"><Avatar initials={c.persona.initials} hue={c.persona.hue} size={64} /></span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{c.persona.name}</h1>
+              <h1 className="font-display text-[22px] font-bold sm:text-[26px]">{c.persona.name}</h1>
               <RiskTag risk={c.risk} />
               <StatusPill status={c.status} />
-              {c.policyProposal && <PolicyBadge />}
+              
             </div>
             <p className="mt-0.5 text-sm text-muted">{tr(c.persona.profile)}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
@@ -96,7 +96,7 @@ export function CaseDetailPage() {
               </span>
             </div>
           </div>
-          <span className="font-mono text-xs text-muted">{tr(C.caseId)} {c.id}</span>
+          <span className="hidden font-mono text-xs text-muted sm:inline">{tr(C.caseId)} {c.id}</span>
         </div>
         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 text-sm md:grid-cols-4 xl:grid-cols-7">
           {[
@@ -125,7 +125,6 @@ export function CaseDetailPage() {
             title={tr(C.aiFlagged)}
             icon={<Sparkles className="size-4" />}
             hint={tr(C.aiFlaggedHint)}
-            action={<Sim />}
             tone={c.risk === 'high' ? 'danger' : c.risk === 'medium' ? 'warning' : 'default'}
           >
             {flags.length === 0 ? (
@@ -139,7 +138,7 @@ export function CaseDetailPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
                     className={cn(
-                      'flex items-start gap-3 rounded-xl border p-3',
+                      'flex items-start gap-3 rounded-[2px] border p-3',
                       f.severity === 'high' ? 'border-danger/25 bg-danger-soft/50' : f.severity === 'medium' ? 'border-warning/25 bg-warning-soft/50' : 'border-line bg-canvas/60',
                     )}
                   >
@@ -156,7 +155,7 @@ export function CaseDetailPage() {
             <Evidence c={c} />
           </div>
 
-          <Panel id="checks" title={tr(C.checksTitle)} icon={<ListChecks className="size-4" />} hint={tr(C.checksHint)} action={<Sim />}>
+          <Panel id="checks" title={tr(C.checksTitle)} icon={<ListChecks className="size-4" />} hint={tr(C.checksHint)}>
             {c.checks.length === 0 ? (
               <p className="text-sm text-muted">{tr(C.noChecks)}</p>
             ) : (
@@ -178,8 +177,8 @@ export function CaseDetailPage() {
                     const bad = d.outcome === 'refused' || d.outcome === 'revoked'
                     const Icon = d.outcome === 'refused' ? Ban : d.outcome === 'revoked' ? Undo2 : BadgeCheck
                     return (
-                      <li key={i} className="flex gap-3 rounded-xl border border-line p-3">
-                        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg', bad ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success')}><Icon className="size-4" aria-hidden /></span>
+                      <li key={i} className="flex gap-3 rounded-[2px] border border-line p-3">
+                        <span className={cn('grid size-8 shrink-0 place-items-center rounded-[2px]', bad ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success')}><Icon className="size-4" aria-hidden /></span>
                         <div className="min-w-0 flex-1 text-sm">
                           <p className="font-semibold">{tr(DECISION_LABEL[d.outcome])}</p>
                           <p className="text-xs text-muted">{d.by.kind === 'system' ? tr({ en: 'Verification engine (automatic)', es: 'Motor de verificación (automático)' }) : d.by.name} · {formatDateTime(d.at, lang)}</p>
@@ -242,9 +241,9 @@ function Evidence({ c }: { c: Case }) {
   const spoof = live ? live.outcome === 'fail' || (live.score !== undefined && live.score < ENGINE.livenessMin) : false
 
   return (
-    <Panel id="evidence" title={tr(C.evidence)} icon={<ScanFace className="size-4" />} hint={tr(C.evidenceHint)} action={<Sim />} tone={spoof ? 'danger' : 'default'}>
+    <Panel id="evidence" title={tr(C.evidence)} icon={<ScanFace className="size-4" />} hint={tr(C.evidenceHint)} tone={spoof ? 'danger' : 'default'}>
       {!hasChip && !live ? (
-        <div className="flex items-start gap-3 rounded-xl bg-canvas p-4 text-sm text-muted">
+        <div className="flex items-start gap-3 rounded-[2px] bg-canvas p-4 text-sm text-muted">
           <FileText className="mt-0.5 size-5 shrink-0" aria-hidden />
           <p>{c.route === 'A' ? tr({ en: 'Identity confirmed by the citizen’s own EU eID through eIDAS: no chip photo or face capture on this route.', es: 'Identidad confirmada por el eID de la UE de la persona vía eIDAS: en esta vía no hay foto de chip ni captura facial.' }) : c.route === 'C' ? tr({ en: 'Today’s DNI video identification: evidence stays with the existing service.', es: 'Videoidentificación con DNI actual: las pruebas quedan en el servicio existente.' }) : tr(C.noChipPhoto)}</p>
         </div>
@@ -252,7 +251,7 @@ function Evidence({ c }: { c: Case }) {
         <>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <figure>
-              <div className="overflow-hidden rounded-xl ring-1 ring-line">
+              <div className="overflow-hidden rounded-[2px] ring-1 ring-line">
                 <FaceArt hue={c.persona.hue} initials={c.persona.initials} variant={hasChip ? 'chip' : 'empty'} label={tr(C.chipPhoto)} className="text-muted" />
               </div>
               <figcaption className="mt-1.5 flex items-center gap-1 text-xs font-medium text-muted"><Fingerprint className="size-3.5" aria-hidden />{tr(C.chipPhoto)}</figcaption>
@@ -267,7 +266,7 @@ function Evidence({ c }: { c: Case }) {
               )}
             </div>
             <figure>
-              <div className={cn('overflow-hidden rounded-xl ring-1', spoof ? 'ring-2 ring-danger' : 'ring-line')}>
+              <div className={cn('overflow-hidden rounded-[2px] ring-1', spoof ? 'ring-2 ring-danger' : 'ring-line')}>
                 <FaceArt
                   hue={c.persona.hue}
                   initials={c.persona.initials}
@@ -281,7 +280,7 @@ function Evidence({ c }: { c: Case }) {
             </figure>
           </div>
           {spoof ? (
-            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-4 rounded-xl bg-danger p-3.5 text-white" role="alert">
+            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-4 rounded-[2px] bg-danger p-3.5 text-white" role="alert">
               <p className="flex items-center gap-2 text-sm font-bold"><CircleAlert className="size-4" aria-hidden />{tr(C.livenessFailedBig)}</p>
               <p className="mt-1 text-[13px] text-white/90">{tr(C.matchesButNotLive)}</p>
               {live && <p className="mt-1.5 text-xs text-white/80">{tr(live.detail)}</p>}
@@ -301,18 +300,6 @@ function ContextPanels({ c }: { c: Case }) {
   const lang = useLang()
   const blocks: React.ReactNode[] = []
 
-  if (c.policyProposal) {
-    blocks.push(
-      <Panel key="policy" id="policy" title={tr(C.policyTitle)} icon={<Landmark className="size-4" />} action={<PolicyBadge />} tone="warning">
-        <p className="text-sm text-ink">{tr(C.policyBody)}</p>
-        <ol className="mt-3 space-y-2">
-          {POLICY_PROPOSALS.map((p, i) => (
-            <li key={i} className="flex gap-2.5 text-sm"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-warning-soft text-[11px] font-bold text-warning">{i + 1}</span>{tr(p)}</li>
-          ))}
-        </ol>
-      </Panel>,
-    )
-  }
   if (c.videoCallSlot) {
     const when = new Date(c.videoCallSlot).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
     blocks.push(
@@ -328,7 +315,7 @@ function ContextPanels({ c }: { c: Case }) {
           <div><dt className="text-xs text-muted">{tr(C.helper)}</dt><dd className="font-semibold">{c.assisted.helperName} <span className="font-normal text-muted">({tr(c.assisted.relation)})</span></dd></div>
           <div><dt className="text-xs text-muted">{tr(C.deviceOwner)}</dt><dd className="font-semibold">{c.assisted.deviceOwner}</dd></div>
         </dl>
-        <p className="mt-3 rounded-xl bg-info-soft p-3 text-[13px] text-info">{tr(C.assistedBody)}</p>
+        <p className="mt-3 rounded-[2px] bg-info-soft p-3 text-[13px] text-info">{tr(C.assistedBody)}</p>
       </Panel>,
     )
   }
@@ -349,12 +336,12 @@ function ContextPanels({ c }: { c: Case }) {
     blocks.push(
       <Panel key="info" id="info" title={tr(C.infoRequestTitle)} icon={<MessageSquareText className="size-4" />}>
         <div className="space-y-3">
-          <div className="max-w-[90%] rounded-2xl rounded-tl-sm bg-surface-2 p-3 text-sm">
+          <div className="max-w-[90%] rounded-[4px] rounded-tl-sm bg-surface-2 p-3 text-sm">
             <p>{ir.message}</p>
             <p className="mt-1 text-[11px] text-muted">{tr(C.askedBy)} {ir.by.name} · {formatDateTime(ir.at, lang)}</p>
           </div>
           {ir.response ? (
-            <div className="ml-auto max-w-[90%] rounded-2xl rounded-tr-sm bg-brand p-3 text-sm text-white">
+            <div className="ml-auto max-w-[90%] rounded-[4px] rounded-tr-sm bg-brand p-3 text-sm text-white">
               <p className="text-[11px] font-semibold text-white/75">{tr(C.citizenResponse)}</p>
               <p className="mt-0.5">{ir.response.text}</p>
               <p className="mt-1 text-[11px] text-white/70">{c.persona.name} · {formatDateTime(ir.response.at, lang)}</p>

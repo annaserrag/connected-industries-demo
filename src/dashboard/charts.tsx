@@ -31,13 +31,13 @@ const preLaunchLast = D.weeks[D.launchWeekIndex - 1]
 type TipRow = { name: string; value: string; color: string; dashed?: boolean }
 function TipBox({ title, rows }: { title: string; rows: TipRow[] }) {
   return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-lg">
-      <p className="mb-1 font-semibold text-ink">{title}</p>
+    <div className="rounded-[2px] border border-line bg-surface px-3 py-2 text-sm shadow-lg">
+      <p className="mb-1 font-bold text-ink">{title}</p>
       {rows.map(r => (
         <p key={r.name} className="flex items-center gap-2 text-ink">
           <span aria-hidden="true" className="inline-block h-0.5 w-3 rounded" style={{ background: r.color }} />
           <span className="text-muted">{r.name}</span>
-          <span className="ml-auto pl-3 font-semibold tabular-nums">{r.value}</span>
+          <span className="ml-auto pl-3 font-bold tabular-nums">{r.value}</span>
         </p>
       ))}
     </div>
@@ -268,7 +268,7 @@ export function CorrectedChart() {
       legend={
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-4xl font-semibold tracking-tight text-ink tabular-nums">{f.pct1(pct)}</p>
+            <p className="text-4xl font-bold tracking-tight text-ink tabular-nums">{f.pct1(pct)}</p>
             <p className="text-sm text-muted">
               {f.num(correctedAndApproved)} {tr(COPY.kpiCorrectedOf)} {f.num(total)} {tr(COPY.kpiCorrectedRejections)}
             </p>
@@ -403,7 +403,7 @@ export function AppealsChart() {
       summary={`${tr(COPY.appealsFiled)}: ${f.num(A.filed)}. ${rows.map(r => `${r.label}: ${r.display}`).join('. ')}.`}
       legend={
         <p className="text-sm text-muted">
-          <span className="text-2xl font-semibold text-ink tabular-nums">{f.num(A.filed)}</span> {tr(COPY.appealsFiled).toLowerCase()}
+          <span className="text-2xl font-bold text-ink tabular-nums">{f.num(A.filed)}</span> {tr(COPY.appealsFiled).toLowerCase()}
         </p>
       }
       table={{

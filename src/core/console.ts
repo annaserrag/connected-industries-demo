@@ -1,7 +1,7 @@
 /**
  * Selectors for the staff console (dashboard, by-document view, all applications).
  * Everything is computed from the shared store, so it updates live when the citizen tab acts.
- * The cases are SIMULATED demo data: label the numbers "Demo data · live" wherever shown.
+ * Computed live from the cases in the shared store.
  */
 import type { AppState, AuditAction, AuditEvent, Case, DocumentType, PriorityTier, RouteId } from '@/contract/types'
 import { DOCUMENTS, ROUTE_ORDER } from '@/contract/seed'

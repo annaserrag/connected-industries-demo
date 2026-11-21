@@ -202,3 +202,8 @@ export function useFlash(value: unknown, ms = 1600): boolean {
   }, [key, ms])
   return on
 }
+
+/** Actor name for display: the engine is shown by its role, without the internal "(simulated)" tag. */
+export function actorName(a: { kind: string; name: string }): string {
+  return a.name.replace(/\s*\((simulated|simulado)\)\s*/i, '').trim()
+}

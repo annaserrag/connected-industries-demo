@@ -2,11 +2,11 @@ import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactN
 import { Slot } from '@radix-ui/react-slot'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  AlertTriangle, ArrowUpRight, CheckCircle2, CircleDashed, CircleDot, FlaskConical, Inbox, Landmark,
-  Loader2, ScrollText, ShieldAlert, ShieldCheck, Shield, XCircle, MessageSquareMore,
+  AlertTriangle, ArrowUpRight, CheckCircle2, CircleDashed, CircleDot, Inbox, Landmark,
+  Loader2, ShieldAlert, ShieldCheck, Shield, XCircle, MessageSquareMore,
 } from 'lucide-react'
 import type { RiskLevel, RouteId, StatusId } from '@/contract/types'
-import { POLICY_PROPOSAL_LABEL, ROUTES, SIMULATED_LABEL, STATUSES } from '@/contract/seed'
+import { ROUTES, STATUSES } from '@/contract/seed'
 import { cn, useTr, SPRING_POP } from './utils'
 
 /* ------------------------------------------------------------------ Button */
@@ -29,16 +29,19 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 const btnVariant: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-brand-ink shadow-brand hover:bg-brand-strong',
-  secondary: 'bg-surface text-ink shadow-card hover:bg-surface-2',
-  ghost: 'text-ink hover:bg-ink/[0.05]',
-  danger: 'bg-danger text-white shadow-[0_6px_16px_-6px_rgb(176_36_28/0.55)] hover:bg-[#951d16]',
-  soft: 'bg-brand-soft text-brand hover:bg-brand-tint/70',
+  /** Solid orange, white text (clave.gob.es primary). */
+  primary: 'bg-brand text-brand-ink border-2 border-brand hover:bg-brand-strong hover:border-brand-strong',
+  /** Outlined orange (clave.gob.es "Rechazar todas"). */
+  secondary: 'bg-surface text-brand border-2 border-brand hover:bg-brand-soft hover:text-brand-strong hover:border-brand-strong',
+  ghost: 'text-brand underline underline-offset-[3px] decoration-1 hover:decoration-2 hover:text-brand-strong',
+  danger: 'bg-danger text-white border-2 border-danger hover:bg-[#951d16] hover:border-[#951d16]',
+  /** Light-orange pill fill, dark text (Cl@ve gateway "Access …" buttons). */
+  soft: 'bg-brand-tint text-ink border-2 border-transparent hover:bg-brand-tint-hover',
 }
 const btnSize: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-sm gap-1.5 rounded-[10px]',
-  md: 'h-11 px-4 text-[15px] gap-2 rounded-[12px]',
-  lg: 'h-14 px-6 text-base gap-2.5 rounded-[14px]',
+  sm: 'h-9 px-3 text-sm gap-1.5 rounded-[2px]',
+  md: 'h-11 px-5 text-[15px] gap-2 rounded-[2px]',
+  lg: 'h-13 px-6 text-base gap-2.5 rounded-[2px]',
 }
 
 /** Button with primary / secondary / ghost / danger / soft variants; supports `asChild`, `loading`, icons. */
@@ -48,8 +51,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 ) {
   const Comp = asChild ? Slot : 'button'
   const cls = cn(
-    'relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold tracking-[-0.005em]',
-    'transition-[background-color,box-shadow,transform,color] duration-150 ease-out active:scale-[0.98]',
+    'relative inline-flex select-none items-center justify-center whitespace-nowrap font-bold',
+    'transition-[background-color,border-color,color] duration-150 ease-out',
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     btnVariant[variant], btnSize[size], block && 'w-full', className,
   )
@@ -67,12 +70,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 type Box = { className?: string; children?: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, 'className' | 'children'>
 
-/** Surface card: white, 18px radius, layered hairline shadow. `interactive` adds hover lift. */
+/** Surface card: white, square corners (2px), 1px light border. `interactive` darkens the border on hover. */
 export const Card = ({ className, children, interactive, ...p }: Box & { interactive?: boolean }) => (
   <div
     className={cn(
-      'rounded-card bg-surface shadow-card',
-      interactive && 'transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-raised',
+      'rounded-card border border-line bg-surface',
+      interactive && 'transition-colors duration-150 hover:border-line-strong',
       className,
     )}
     {...p}
@@ -86,7 +89,7 @@ export const CardHeader = ({ className, children, ...p }: Box) => (
 )
 /** Card title (h3, semibold). */
 export const CardTitle = ({ className, children }: { className?: string; children?: ReactNode }) => (
-  <h3 className={cn('text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink', className)}>{children}</h3>
+  <h3 className={cn('text-[18px] font-bold leading-snug text-ink', className)}>{children}</h3>
 )
 /** Muted description under a CardTitle. */
 export const CardDescription = ({ className, children }: { className?: string; children?: ReactNode }) => (
@@ -105,11 +108,11 @@ export const CardFooter = ({ className, children, ...p }: Box) => (
 
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 const toneCls: Record<Tone | 'sim' | 'brand', string> = {
-  neutral: 'bg-surface-2 text-muted ring-ink/8',
-  info: 'bg-info-soft text-info ring-info/15',
-  success: 'bg-success-soft text-success ring-success/15',
-  warning: 'bg-warning-soft text-warning ring-warning/15',
-  danger: 'bg-danger-soft text-danger ring-danger/15',
+  neutral: 'bg-surface-2 text-muted ring-line-strong/50',
+  info: 'bg-info-soft text-info ring-info/30',
+  success: 'bg-success-soft text-success ring-success/30',
+  warning: 'bg-warning-soft text-warning ring-warning/30',
+  danger: 'bg-danger-soft text-danger ring-danger/30',
   sim: 'bg-sim-soft text-sim ring-sim/20',
   brand: 'bg-brand text-brand-ink ring-transparent',
 }
@@ -120,7 +123,7 @@ export const Badge = ({ tone = 'neutral', children, className, icon, size = 'sm'
 }) => (
   <span
     className={cn(
-      'inline-flex shrink-0 items-center gap-1 rounded-full font-semibold ring-1 ring-inset whitespace-nowrap',
+      'inline-flex shrink-0 items-center gap-1 rounded-[2px] font-bold ring-1 ring-inset whitespace-nowrap',
       size === 'sm' ? 'h-6 px-2.5 text-xs' : 'h-7 px-3 text-[13px]',
       '[&_svg]:size-3.5',
       toneCls[tone], className,
@@ -131,32 +134,14 @@ export const Badge = ({ tone = 'neutral', children, className, icon, size = 'sm'
   </span>
 )
 
-/** The "Simulated" pill (violet, flask icon). Put it on every simulated thing. */
-export const SimulatedBadge = ({ label, className }: { label?: string; className?: string }) => {
-  const tr = useTr()
-  return (
-    <span
-      className={cn(
-        'inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset whitespace-nowrap',
-        toneCls.sim, className,
-      )}
-      title={tr('Nothing here is real: this check is simulated for the prototype.', 'Nada de esto es real: esta comprobación está simulada para el prototipo.')}
-    >
-      <FlaskConical className="size-3.5" aria-hidden />
-      {label ?? tr(SIMULATED_LABEL)}
-    </span>
-  )
-}
+/**
+ * Kept for API compatibility, renders nothing: the public platform shows no "Simulated" labels.
+ * What is simulated is disclosed once, on the About page (/about).
+ */
+export const SimulatedBadge = (_props: { label?: string; className?: string }) => null
 
-/** The "Policy proposal" pill (warning tone, scroll icon) for the red-card route and rule changes. */
-export const PolicyBadge = ({ className }: { className?: string }) => {
-  const tr = useTr()
-  return (
-    <Badge tone="warning" icon={<ScrollText aria-hidden />} className={className}>
-      {tr(POLICY_PROPOSAL_LABEL)}
-    </Badge>
-  )
-}
+/** Kept for API compatibility, renders nothing. Policy proposals are listed on the About page. */
+export const PolicyBadge = (_props: { className?: string }) => null
 
 const statusMeta: Record<StatusId | 'draft', { tone: Tone; icon: ReactNode }> = {
   draft: { tone: 'neutral', icon: <CircleDashed aria-hidden /> },
@@ -203,10 +188,10 @@ export const RouteBadge = ({ route, compact, className }: { route: RouteId; comp
   const r = ROUTES[route]
   return (
     <span
-      className={cn('inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-soft py-0.5 pr-2.5 pl-0.5 text-xs font-semibold text-brand ring-1 ring-inset ring-brand/15', compact && 'pr-0.5', className)}
+      className={cn('inline-flex max-w-full items-center gap-1.5 rounded-[2px] bg-brand-soft py-0.5 pr-2.5 pl-0.5 text-xs font-bold text-brand-strong ring-1 ring-inset ring-brand/40', compact && 'pr-0.5', className)}
       title={tr(r.name)}
     >
-      <span className={cn('grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-brand-ink', route === 'FALLBACK' && 'px-2')}>
+      <span className={cn('grid h-5 min-w-5 place-items-center rounded-[1px] bg-brand px-1.5 text-[11px] font-bold text-brand-ink', route === 'FALLBACK' && 'px-2')}>
         {route === 'FALLBACK' ? tr('Fallback', 'Alternativa') : r.code}
       </span>
       {!compact && <span className="truncate">{tr(r.name)}</span>}
@@ -250,7 +235,7 @@ export const Spinner = ({ size = 16, className, label }: { size?: number; classN
 
 /** Keyboard key hint. */
 export const Kbd = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <kbd className={cn('inline-grid h-5 min-w-5 place-items-center rounded-[6px] border border-line bg-surface px-1.5 font-sans text-[11px] font-semibold text-muted shadow-[inset_0_-1px_0_var(--color-line)]', className)}>
+  <kbd className={cn('inline-grid h-5 min-w-5 place-items-center rounded-[2px] border border-line bg-surface px-1.5 font-sans text-[11px] font-semibold text-muted shadow-[inset_0_-1px_0_var(--color-line)]', className)}>
     {children}
   </kbd>
 )
@@ -259,8 +244,8 @@ export const Kbd = ({ children, className }: { children: ReactNode; className?: 
 export const Skeleton = ({ className }: { className?: string }) => (
   <div
     aria-hidden
-    className={cn('animate-shimmer rounded-[10px] bg-[length:200%_100%]', className)}
-    style={{ backgroundImage: 'linear-gradient(90deg, var(--color-surface-2) 0%, #faf8f4 50%, var(--color-surface-2) 100%)' }}
+    className={cn('animate-shimmer rounded-[2px] bg-[length:200%_100%]', className)}
+    style={{ backgroundImage: 'linear-gradient(90deg, var(--color-surface-2) 0%, #ffffff 50%, var(--color-surface-2) 100%)' }}
   />
 )
 
@@ -294,15 +279,15 @@ export const Callout = ({ tone = 'info', title, children, icon, className }: {
 }) => {
   const defaultIcon = {
     neutral: <CircleDot aria-hidden />, info: <Landmark aria-hidden />, success: <CheckCircle2 aria-hidden />,
-    warning: <AlertTriangle aria-hidden />, danger: <XCircle aria-hidden />, sim: <FlaskConical aria-hidden />,
+    warning: <AlertTriangle aria-hidden />, danger: <XCircle aria-hidden />, sim: <CircleDot aria-hidden />,
   }[tone]
-  const bg = { neutral: 'bg-surface-2', info: 'bg-info-soft', success: 'bg-success-soft', warning: 'bg-warning-soft', danger: 'bg-danger-soft', sim: 'bg-sim-soft' }[tone]
-  const fg = { neutral: 'text-muted', info: 'text-info', success: 'text-success', warning: 'text-warning', danger: 'text-danger', sim: 'text-sim' }[tone]
+  const bg = { neutral: 'bg-surface-2 border-line-strong', info: 'bg-brand-soft border-brand', success: 'bg-success-soft border-success', warning: 'bg-warning-soft border-warning', danger: 'bg-danger-soft border-danger', sim: 'bg-surface-2 border-line-strong' }[tone]
+  const fg = { neutral: 'text-muted', info: 'text-brand-strong', success: 'text-success', warning: 'text-warning', danger: 'text-danger', sim: 'text-muted' }[tone]
   return (
-    <div className={cn('flex gap-3 rounded-[14px] p-4 text-sm leading-relaxed text-ink', bg, className)}>
+    <div className={cn('flex gap-3 rounded-[2px] border-l-4 p-4 text-[15px] leading-relaxed text-ink', bg, className)}>
       <span className={cn('mt-0.5 shrink-0 [&_svg]:size-[18px]', fg)}>{icon ?? defaultIcon}</span>
       <div className="min-w-0 space-y-1">
-        {title && <p className={cn('font-semibold', fg)}>{title}</p>}
+        {title && <p className={cn('font-bold', fg)}>{title}</p>}
         {children && <div className="text-ink/90">{children}</div>}
       </div>
     </div>
@@ -311,7 +296,7 @@ export const Callout = ({ tone = 'info', title, children, icon, className }: {
 
 /** External-looking text link styled with the accent (for "learn more"). */
 export const TextLink = ({ className, children, ...p }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-  <a className={cn('inline-flex items-center gap-0.5 font-semibold text-brand underline decoration-brand/30 underline-offset-[3px] hover:decoration-brand', className)} {...p}>
+  <a className={cn('gov-link inline-flex items-center gap-0.5', className)} {...p}>
     {children}
     <ArrowUpRight className="size-3.5" aria-hidden />
   </a>

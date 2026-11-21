@@ -1,5 +1,11 @@
-@import "@fontsource-variable/inter/index.css";
-@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource/nunito-sans/400.css";
+@import "@fontsource/nunito-sans/400-italic.css";
+@import "@fontsource/nunito-sans/600.css";
+@import "@fontsource/nunito-sans/700.css";
+@import "@fontsource/nunito-sans/800.css";
+@import "@fontsource/merriweather/400.css";
+@import "@fontsource/merriweather/700.css";
+@import "@fontsource/merriweather/900.css";
 @import "tailwindcss";
 @import "./ui/tokens.css";
 
@@ -10,19 +16,18 @@
     background: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "cv11", "ss01", "ss03";
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   ::selection { background: var(--color-brand-tint); color: var(--color-ink); }
 
-  /* Visible focus ring on everything focusable (WCAG 2.4.7) */
+  /* Visible focus ring on everything focusable (WCAG 2.4.7): dark ring, ≥ 3:1 on white, grey and orange */
   :focus-visible {
-    outline: 2.5px solid var(--color-brand);
+    outline: 3px solid var(--color-ink);
     outline-offset: 2px;
-    border-radius: 6px;
   }
-  .on-dark :focus-visible, .on-dark:focus-visible { outline-color: #9db4ff; }
+  .on-dark :focus-visible, .on-dark:focus-visible { outline-color: #ffd7bf; }
 
   h1, h2, h3, h4 { text-wrap: balance; }
   p { text-wrap: pretty; }
@@ -34,6 +39,16 @@
 @utility scroll-quiet {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-ink) 18%, transparent) transparent;
+}
+
+/* Underlined orange link, like clave.gob.es */
+@utility gov-link {
+  color: var(--color-brand);
+  font-weight: 700;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  &:hover { color: var(--color-brand-strong); text-decoration-thickness: 2px; }
 }
 
 /* Reduced motion: kill large motion and CSS animation everywhere */
@@ -48,6 +63,6 @@
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-/* Embed mode (demo-stage iframes): keep scrolling, hide the scrollbar chrome so recordings look clean. */
+/* Embed mode (?embed=1): keep scrolling, hide the scrollbar chrome. */
 html[data-embed], html[data-embed] * { scrollbar-width: none; }
 html[data-embed] ::-webkit-scrollbar { display: none; }

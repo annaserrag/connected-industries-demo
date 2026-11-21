@@ -4,7 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
-import { BASE, SHOTS, shot } from './helpers'
+import { BASE, DEMO_LOGINS, SHOTS, STAFF, shot } from './helpers'
 
 /** Describe the focused element and whether a focus indicator is visible (outline or box-shadow ring). */
 async function focusInfo(page: Page) {
@@ -132,7 +132,13 @@ test.describe('5. Accessibility', () => {
     const log: unknown[] = []
     await page.goto(`${BASE}/#/`)
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await tabTo(page, /^Apply\s+From your phone/i, log)
+    // the landing leads with Apply; Giulia already has an account, so she takes the "Sign in" link next to it
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab')
+      log.push(await focusInfo(page))
+      if (await page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'landing-signin')) break
+    }
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('landing-signin')
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/#\/citizen/)
     // sign in with the keyboard only (saved demo account; credentials are only in the README)
@@ -142,10 +148,10 @@ test.describe('5. Accessibility', () => {
       if (await page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'signin-doc')) break
     }
     expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('signin-doc')
-    await page.keyboard.type('demo-p-it-482913')
+    await page.keyboard.type(DEMO_LOGINS.giulia.doc.toLowerCase())
     await page.keyboard.press('Tab')
     log.push(await focusInfo(page))
-    await page.keyboard.type('giulia-demo')
+    await page.keyboard.type(DEMO_LOGINS.giulia.password)
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/#\/citizen\/start\/giulia/)
     // assistant: arrow keys on radios, then Next with keyboard
@@ -173,19 +179,22 @@ test.describe('5. Accessibility', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     const log: unknown[] = []
     await page.goto(`${BASE}/#/officer`)
-    // Certificate sign-in by keyboard: open the picker, pick Laura's valid certificate, sign in,
-    // then complete the first-time job details form.
-    await tabTo(page, /Sign in with your electronic certificate/, log)
+    // Certificate sign-in by keyboard, like the gateway: "Access with certificate" card, pick Laura's valid
+    // certificate, OK, type the PIN (the field is focused), then complete the first-time job details form.
+    await tabTo(page, /Access with certificate/, log)
     await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog')).toBeVisible()
     await tabTo(page, /^Laura Navarro, Public employee/, log) // first radio = Laura's valid certificate
     await page.keyboard.press('Space')
-    await tabTo(page, /^Sign in$/, log)
+    await tabTo(page, /^OK$/, log)
+    await page.keyboard.press('Enter')
+    await expect(page.getByLabel('PIN', { exact: true })).toBeFocused()
+    await page.keyboard.type(STAFF.pins['cert-laura'])
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('staff-profile-form')).toBeVisible({ timeout: 10_000 })
     // the form focuses the first field still to fill (the NRP: the rest is prefilled from the certificate)
     await expect(page.getByLabel(/Personnel number/)).toBeFocused()
-    await page.keyboard.type('DEMO-NRP-20481')
+    await page.keyboard.type(STAFF.nrp['cert-laura'])
     await tabTo(page, /Save and open the console/, log)
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
@@ -244,23 +253,24 @@ test.describe('5. Accessibility', () => {
     const screens: [string, string, number][] = [
       ['landing', '/#/', 1440], ['landing-phone', '/#/', 390], ['citizen-signin', '/#/citizen', 390], ['citizen-signup', '/#/citizen?mode=signup', 390],
       ['citizen-assistant', '/#/citizen/start/daniel', 390], ['citizen-status-approved', '/#/citizen/case/giulia', 390],
-      ['citizen-status-refused', '/#/citizen/case/deepfake', 390], ['officer-signin', '/#/officer', 1440],
+      ['citizen-status-refused', '/#/citizen/case/deepfake', 390], ['officer-signin', '/#/officer', 1440], ['officer-signin-phone', '/#/officer', 390],
       ['officer-queue', '/#/officer', 1440], ['officer-case', '/#/officer/case/deepfake', 1440], ['officer-audit', '/#/officer/audit', 1440],
       ['officer-dashboard', '/#/officer/dashboard', 1440], ['officer-documents', '/#/officer/documents', 1440],
       ['officer-applications', '/#/officer/applications', 1440], ['officer-profile', '/#/officer/profile', 1440],
-      ['dashboard', '/#/dashboard', 1440], ['demo', '/#/demo', 1440],
+      ['dashboard', '/#/dashboard', 1440], ['about', '/#/about', 1440], ['officer-queue-tablet', '/#/officer', 1100],
+      ['officer-queue-phone', '/#/officer', 390],
     ]
     const signIn: Record<string, [string, string]> = {
-      'citizen-assistant': ['DEMO-TIE-Y0042719-K', 'daniel-demo'],
-      'citizen-status-approved': ['DEMO-P-IT-482913', 'giulia-demo'],
-      'citizen-status-refused': ['DEMO-P-BG-391027', 'ivo-demo'],
+      'citizen-assistant': [DEMO_LOGINS.daniel.doc, DEMO_LOGINS.daniel.password],
+      'citizen-status-approved': [DEMO_LOGINS.giulia.doc, DEMO_LOGINS.giulia.password],
+      'citizen-status-refused': [DEMO_LOGINS.deepfake.doc, DEMO_LOGINS.deepfake.password],
     }
     for (const [name, r, w] of screens) {
       // case screens are only shown to their signed-in owner
       if (signIn[name]) await page.evaluate(([d, p]) => window.__clave!.actions.citizenSignIn(d, p), signIn[name])
       else await page.evaluate(() => window.__clave!.actions.citizenSignOut())
       await page.setViewportSize({ width: w, height: w > 1000 ? 900 : 844 })
-      if (name === 'officer-queue') await page.evaluate(() => window.__clave!.actions.officerSignIn('OF-DEMO-07'))
+      if (name.startsWith('officer-queue')) await page.evaluate(() => window.__clave!.actions.officerSignIn('OF-DEMO-07'))
       await page.goto(`${BASE}/?debug=1${r.slice(1)}`)
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await page.waitForTimeout(1200)

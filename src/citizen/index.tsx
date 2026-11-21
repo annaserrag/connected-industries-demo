@@ -12,6 +12,7 @@ import { Welcome } from './Welcome'
 import { useEmbed, useGo, useReduced, withEmbed } from './hooks'
 
 export { LandingPage } from './Landing'
+export { AboutPage, HelpPage, AccessibilityPage, LegalPage, PrivacyPage } from './info/pages'
 
 /**
  * /citizen: a signed-in citizen jumps to where their application is; otherwise sign in / create account.
@@ -32,12 +33,12 @@ function OwnCase({ children }: { children: ReactNode }) {
   const exists = useClave(s => Boolean(id && s.cases[id]))
   // While this screen animates out (e.g. right after Sign out), keep showing it instead of a second sign-in form.
   const present = useIsPresent()
-  if (!present && exists) return <>{children}</>
+  if (!present && exists) return <div className="mx-auto w-full max-w-[640px]">{children}</div>
   if (!id || !activeId || activeId !== id || !exists) return <SignIn notice={activeId && activeId !== id ? 'other' : 'signedOut'} />
-  return <>{children}</>
+  return <div className="mx-auto w-full max-w-[640px]">{children}</div>
 }
 
-/** Follow the active case when another tab (e.g. the demo panel) switches it. */
+/** Follow the active case when another tab of the same browser switches it. */
 function useFollowActiveCase() {
   const activeId = useClave(s => s.activeCitizenCaseId)
   const cases = useClave(s => s.cases)

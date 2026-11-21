@@ -3,6 +3,9 @@
  * Run: PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright test tests/officer.spec.ts
  */
 import { test, expect, type Page } from '@playwright/test'
+import { CASE_LIBRARY } from '../src/contract/seed'
+
+const IVO = CASE_LIBRARY.find(c => c.id === 'deepfake')!.persona.name
 
 function trackErrors(page: Page) {
   const errors: string[] = []
@@ -27,12 +30,14 @@ test('live: citizen runs Giulia, officer sees her arrive and approves advanced',
     window.__clave!.actions.officerSignOut()
   })
 
-  // Officer: simulated certificate sign-in (first time: job details form).
+  // Officer: certificate + PIN sign-in (first time: job details form).
   await officer.goto('/?debug=1#/officer')
-  await officer.getByRole('button', { name: 'Sign in with your electronic certificate' }).click()
+  await officer.getByRole('button', { name: 'Access with certificate' }).click()
   await officer.getByTestId('cert-cert-laura').click()
-  await officer.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await officer.getByLabel(/Personnel number/).fill('DEMO-NRP-20481')
+  await officer.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click()
+  await officer.getByLabel('PIN', { exact: true }).fill('2580')
+  await officer.getByRole('button', { name: 'Continue' }).click()
+  await officer.getByLabel(/Personnel number/).fill('50731842JA0611')
   await officer.getByRole('button', { name: 'Save and open the console' }).click()
   await expect(officer.getByRole('heading', { name: 'Case queue' })).toBeVisible()
   await expect(officer.getByRole('link', { name: 'Giulia Ferraro', exact: true })).toHaveCount(0)
@@ -76,9 +81,9 @@ test('refuse needs a reason; info request and keyboard shortcuts work', async ({
 
   // Highest risk first: J/K + Enter opens the deepfake case.
   await page.goto('/?debug=1#/officer')
-  await expect(page.getByRole('link', { name: 'Ivo Petrov (claimed)', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: IVO, exact: true })).toBeVisible()
   await page.keyboard.press('j'); await page.keyboard.press('k'); await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Ivo Petrov (claimed)' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: IVO })).toBeVisible()
   await expect(page.getByText('Liveness failed: not a live person').first()).toBeVisible()
 
   // R opens the refuse dialog; confirm stays disabled until a reason is picked.

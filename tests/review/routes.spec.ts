@@ -1,13 +1,22 @@
 /**
  * CHECKS 2, 6 (runtime), 7 — every route: footer (EN+ES), html lang, console, external requests,
- * images/branding, Simulated labels, reference figures + number inventory.
+ * images/branding, no "Simulated"/"Demo" markers (disclosed on /about instead), privacy scan (every DNI/NIE-shaped
+ * value shown or stored fails the real check letter), reference figures + number inventory.
  */
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
-import { BASE, SHOTS, attachConsole, citizenSignIn, shot, staffCertificateSignIn, watch, type Problems } from './helpers'
+import { BASE, SHOTS, attachConsole, citizenSignIn, isFictionalDniNie, shot, staffCertificateSignIn, watch, type Problems } from './helpers'
 
-const FOOT_EN = 'Student prototype — not an official Government of Spain service.'
-const FOOT_ES = 'Prototipo de estudiantes — no es un servicio oficial del Gobierno de España.'
+const FOOT_EN = '© 2026 Get your Cl@ve · Academic prototype — IE University'
+const FOOT_ES = '© 2026 Get your Cl@ve · Prototipo académico — IE University'
+/** Words that mark a screen as a demo. What is simulated is listed once, on /about. */
+const MARKERS = /\bSimulated\b|\bSimulad[oa]s?\b|Demo data|Datos de demo|\(demo\)|\bDEMO-|Demo mode|Modo demo/
+
+/** DNI (8 digits + letter) or NIE (X/Y/Z + 7 digits + letter) shaped tokens, also inside an NRP. */
+const DNI_NIE = /(?<![A-Z0-9])(?:\d{8}|[XYZ]\d{7})[A-Z](?=A\d{4}(?![0-9])|(?![A-Z0-9]))/g
+function realLookingIds(text: string): string[] {
+  return [...new Set((text.toUpperCase().match(DNI_NIE) ?? []).filter(v => !isFictionalDniNie(v)))]
+}
 
 const REF: Record<string, { value: string; year: string; source: string }> = {
   users: { value: '21,558,192 (+10.4%)', year: '2024', source: 'OBSAE' },
@@ -25,7 +34,8 @@ const REF: Record<string, { value: string; year: string; source: string }> = {
 const ROUTES = [
   '/#/', '/#/citizen', '/#/citizen/start/giulia', '/#/citizen/case/bg-07', '/#/citizen/case/giulia',
   '/#/officer', '/#/officer/case/bg-03', '/#/officer/case/giulia', '/#/officer/audit', '/#/officer/dashboard',
-  '/#/officer/documents', '/#/officer/applications', '/#/officer/profile', '/#/dashboard', '/#/demo',
+  '/#/officer/documents', '/#/officer/applications', '/#/officer/profile', '/#/dashboard', '/#/about', '/#/help',
+  '/#/accessibility', '/#/legal', '/#/privacy',
 ]
 
 async function prep(page: Page) {
@@ -64,7 +74,7 @@ async function numbers(page: Page) {
 
 test.describe('Routes sweep', () => {
   test('7a/6/5 footer, html lang, console, network, images on every route (EN + ES)', async ({ browser }) => {
-    test.setTimeout(420_000) // 15 routes × 2 languages (the staff console added four)
+    test.setTimeout(480_000) // 19 routes × 2 languages
     const problems: Problems = { console: [], external: [] }
     const context = await browser.newContext()
     watch(context, problems)
@@ -85,6 +95,9 @@ test.describe('Routes sweep', () => {
         await page.evaluate(l => window.__clave!.actions.setLang(l), lang)
         await page.waitForTimeout(600)
         const footer = (await page.locator('footer').last().innerText()).trim()
+        const bodyText = await page.locator('body').innerText()
+        if (r !== '/#/about') expect(bodyText.match(MARKERS)?.[0] ?? null, `${r} ${lang}: demo marker`).toBeNull()
+        expect(realLookingIds(bodyText), `${r} ${lang}: DNI/NIE with a real check letter on screen`).toEqual([])
         const htmlLang = await page.evaluate(() => document.documentElement.lang)
         const imgs = await page.evaluate(() => [...document.querySelectorAll('img, image, object, embed, picture source')].map(e => (e as HTMLImageElement).src || e.getAttribute('href') || e.outerHTML.slice(0, 80)))
         const bgImgs = await page.evaluate(() => [...document.querySelectorAll('*')].map(e => getComputedStyle(e).backgroundImage).filter(b => b.includes('url(')))
@@ -102,9 +115,26 @@ test.describe('Routes sweep', () => {
     fs.mkdirSync(SHOTS, { recursive: true })
     fs.writeFileSync(SHOTS + '/routes.json', JSON.stringify({ rows, problems }, null, 2))
     fs.writeFileSync(SHOTS + '/number-inventory.json', JSON.stringify(inventory, null, 2))
+    // privacy scan of the stored state too: every DNI/NIE-shaped value must carry a wrong check letter
+    const stored = await page.evaluate(() => Object.keys(localStorage).map(k => localStorage.getItem(k) ?? '').join('\n'))
+    expect(stored.length).toBeGreaterThan(1000)
+    expect(realLookingIds(stored), 'DNI/NIE with a real check letter in localStorage').toEqual([])
     expect(problems.external, 'external requests').toEqual([])
     expect(problems.console, 'console errors/warnings').toEqual([])
     await context.close()
+  })
+
+  test('6b privacy: the scan catches a real check letter, and the seed only holds fictional ones', async () => {
+    expect(realLookingIds('DNI 12345678Z, NRP 12345678ZA0611')).toEqual(['12345678Z'])
+    expect(realLookingIds('NIE X1234567L')).toEqual(['X1234567L'])
+    expect(realLookingIds('50731842J 50731842JA0611 Y8042719P X9019583W Z9088104B')).toEqual([])
+    const seed = fs.readFileSync(new URL('../../src/contract/seed.ts', import.meta.url), 'utf8')
+    expect(realLookingIds(seed), 'seed').toEqual([])
+    const readme = fs.readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+    expect(realLookingIds(readme), 'README').toEqual([])
+    const staff = readme.slice(readme.indexOf('## Staff accounts'), readme.indexOf('\n## ', readme.indexOf('## Staff accounts') + 5))
+    expect(staff).toContain('50731842JA0611')
+    expect(staff).not.toMatch(/DEMO-/)
   })
 
   test('2 reference figures on landing + dashboard: exact value, year, source', async ({ page }) => {
@@ -124,21 +154,15 @@ test.describe('Routes sweep', () => {
       await expect(li.getByTestId('figure-year')).toHaveText(f.year)
       await expect(li.getByTestId('figure-source')).toContainText(f.source)
     }
-    // every KPI tile and chart card is labelled simulated
-    const tiles = page.getByTestId('kpi-tile')
-    const cards = page.getByTestId('chart-card')
-    const nT = await tiles.count(), nC = await cards.count()
-    expect(nT).toBeGreaterThan(0); expect(nC).toBeGreaterThan(0)
-    for (let i = 0; i < nT; i++) await expect(tiles.nth(i), `kpi ${i}`).toContainText(/Simulated/)
-    for (let i = 0; i < nC; i++) await expect(cards.nth(i), `chart ${i}`).toContainText(/Simulated/)
-    await expect(page.getByTestId('simulated-banner')).toContainText('Simulated data')
-    await expect(page.getByTestId('live-session')).toContainText(/demo|Demo|Simulated/)
+    // no demo markers on the statistics page (what is invented is listed on /about)
+    await expect(page.getByTestId('dashboard-page')).not.toContainText(MARKERS)
   })
 
-  test('7b "Simulated" labels on eIDAS step, chip, face, engine results (citizen + officer)', async ({ browser }) => {
+  test('7b no "Simulated" badges in the citizen flow or the staff console; /about discloses them instead', async ({ browser }) => {
     const context = await browser.newContext()
     const citizen = await context.newPage(); await citizen.setViewportSize({ width: 390, height: 844 })
-    const found: Record<string, boolean> = {}
+    const seen: Record<string, number> = {}
+    const count = async (p: typeof citizen, k: string) => { seen[k] = await p.getByText(MARKERS).filter({ visible: true }).count() }
     // eIDAS (route A): Giulia answers "Yes" to having her eID
     await citizenSignIn(citizen, 'giulia')
     await citizen.getByRole('button', { name: 'Next', exact: true }).click()
@@ -148,18 +172,16 @@ test.describe('Routes sweep', () => {
     await citizen.getByRole('button', { name: 'See my route' }).click()
     await expect(citizen.getByTestId('recommended-route')).toContainText('EU digital ID (eIDAS)')
     await citizen.getByRole('button', { name: 'Continue with this route' }).click()
-    found.consent = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
+    await count(citizen, 'consent')
     await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
     await expect(citizen.getByRole('heading', { name: 'EU digital ID (eIDAS)' })).toBeVisible()
-    found.eidas = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
+    await count(citizen, 'eidas')
     await shot(citizen, '7b-eidas-step')
     await citizen.getByRole('button', { name: 'Approve sign-in' }).click({ timeout: 10_000 })
-    await expect(citizen.getByRole('heading', { name: /checks|comprob/i }).first()).toBeVisible({ timeout: 10_000 })
-    found.engineLive = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
     await citizen.getByRole('button', { name: 'Go to my status' }).click({ timeout: 20_000 })
-    found.statusChecks = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
+    await count(citizen, 'status')
     // chip + face (route B)
-    await citizenSignIn(citizen, 'daniel') // signs Giulia out first, then Daniel in
+    await citizenSignIn(citizen, 'daniel')
     while (!(await citizen.getByRole('button', { name: 'See my route' }).isVisible())) {
       await citizen.getByRole('button', { name: 'Next', exact: true }).click(); await citizen.waitForTimeout(300)
     }
@@ -167,23 +189,27 @@ test.describe('Routes sweep', () => {
     await citizen.getByRole('button', { name: 'Continue with this route' }).click()
     await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
     await expect(citizen.getByRole('button', { name: 'Start reading the chip' })).toBeVisible()
-    found.chip = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
+    await count(citizen, 'chip')
     await shot(citizen, '7b-chip-step')
     await citizen.getByRole('button', { name: 'Start reading the chip' }).click()
     await citizen.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })
     await expect(citizen.getByRole('button', { name: 'Start the face check' })).toBeVisible()
-    found.face = await citizen.getByText('Simulated', { exact: true }).first().isVisible()
-    await shot(citizen, '7b-face-step')
+    await count(citizen, 'face')
     // officer engine results
     const officer = await context.newPage(); await officer.setViewportSize({ width: 1440, height: 900 })
     await officer.goto(`${BASE}/#/officer`)
+    await count(officer, 'staffSignIn')
     await staffCertificateSignIn(officer)
-    found.officerQueue = await expect(officer.getByText('Simulated', { exact: true }).filter({ visible: true }).first()).toBeVisible().then(() => true, () => false)
+    await count(officer, 'officerQueue')
     await officer.getByRole('table').getByRole('link', { name: 'Priya Nair' }).click()
-    found.officerCase = await expect(officer.getByText('Simulated', { exact: true }).filter({ visible: true }).first()).toBeVisible().then(() => true, () => false)
+    await expect(officer.getByRole('heading', { name: 'Priya Nair' })).toBeVisible()
+    await count(officer, 'officerCase')
     await shot(officer, '7b-officer-case-detail')
-    console.log(JSON.stringify(found))
-    for (const [k, v] of Object.entries(found)) expect(v, k).toBe(true)
+    console.log(JSON.stringify(seen))
+    for (const [k, v] of Object.entries(seen)) expect(v, k).toBe(0)
+    // the disclosure lives on the About page
+    await officer.goto(`${BASE}/#/about`)
+    await expect(officer.getByTestId('about-page')).toContainText('What is simulated')
     await context.close()
   })
 })

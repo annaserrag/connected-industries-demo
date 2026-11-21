@@ -282,6 +282,6 @@ test.describe('live sync', () => {
     await page.waitForFunction(() => Boolean(window.__clave))
     expect(await page.evaluate(() => window.__clave!.getState().cases.giulia.status)).toBe('approved')
     await expect(page.locator('html')).toHaveAttribute('data-embed', '1')
-    await expect(page.getByText('Student prototype — not an official Government of Spain service.')).toBeVisible()
+    await expect(page.getByTestId('gov-copyright')).toHaveText('© 2026 Get your Cl@ve · Academic prototype — IE University')
   })
 })

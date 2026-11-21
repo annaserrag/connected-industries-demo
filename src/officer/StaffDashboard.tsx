@@ -12,16 +12,16 @@ import { useClave } from '@/core/store'
 import { relativeTime } from '@/core/selectors'
 import { countsByDocument, countsByRoute, countsByTier, DOCUMENT_ORDER, liveKpis, recentActivity } from '@/core/console'
 import { AppealsChart, CorrectedChart, OfficeShareChart, RoutesChart, TimeToAdvancedChart } from '@/dashboard/charts'
-import { Avatar, PolicyBadge, SimulatedBadge, cn } from '@/ui'
+import { Avatar, cn } from '@/ui'
 import { AUDIT_ACTION_LABEL, C, S } from './copy'
-import { fill, useFlash, useLang, useTick, useTr } from './lib'
+import { fill, useFlash, useLang, useTick, useTr, actorName } from './lib'
 import { LiveDot } from './components/ui'
 import { TIER_BAR, TierTag } from './Queue'
 
-export function DemoLiveBadge() {
+export function LiveBadge() {
   const tr = useTr()
   return (
-    <span data-testid="demo-live-badge" title={tr(S.demoLiveNote)} className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
+    <span data-testid="live-badge" title={tr(S.demoLiveNote)} className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
       <span className="relative flex size-2" aria-hidden>
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60 motion-reduce:hidden" />
         <span className="relative inline-flex size-2 rounded-full bg-success" />
@@ -45,10 +45,10 @@ function Kpi({ id, icon, label, value, display, sub, tone = 'default', big }: {
       data-testid={`kpi-${id}`}
       data-value={value ?? ''}
       data-flash={flash ? '1' : undefined}
-      className={cn('relative rounded-2xl border border-line bg-surface p-4 transition-shadow', flash && 'ofc-kpi-flash', big && 'sm:col-span-2 lg:col-span-1')}
+      className={cn('relative rounded-[4px] border border-line bg-surface p-4 transition-shadow', flash && 'ofc-kpi-flash', big && 'sm:col-span-2 lg:col-span-1')}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={cn('grid size-8 place-items-center rounded-lg', toneCls)} aria-hidden>{icon}</span>
+        <span className={cn('grid size-8 place-items-center rounded-[2px]', toneCls)} aria-hidden>{icon}</span>
         <AnimatePresence>
           {flash && (
             <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-full bg-success-soft px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-success uppercase">
@@ -72,7 +72,7 @@ function UpdatedLabel() {
 
 function Card({ title, hint, action, children, className, id }: { title: string; hint?: string; action?: ReactNode; children: ReactNode; className?: string; id: string }) {
   return (
-    <section aria-labelledby={`${id}-t`} className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-5', className)} data-testid={id}>
+    <section aria-labelledby={`${id}-t`} className={cn('flex min-w-0 flex-col rounded-[4px] border border-line bg-surface p-5', className)} data-testid={id}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id={`${id}-t`} className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
@@ -165,11 +165,11 @@ function Activity() {
               initial={{ opacity: 0, x: -12, backgroundColor: 'rgba(31,79,214,0.10)' }}
               animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(31,79,214,0)' }}
               transition={{ duration: 0.35, backgroundColor: { duration: 2 } }}
-              className="flex items-center gap-3 rounded-xl px-2 py-2"
+              className="flex items-center gap-3 rounded-[2px] px-2 py-2"
             >
-              <span className={cn('grid size-7 shrink-0 place-items-center rounded-lg', ACTOR_TONE[e.actor.kind])}><Icon className="size-3.5" aria-hidden /></span>
+              <span className={cn('grid size-7 shrink-0 place-items-center rounded-[2px]', ACTOR_TONE[e.actor.kind])}><Icon className="size-3.5" aria-hidden /></span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm"><span className="font-semibold text-ink">{tr(AUDIT_ACTION_LABEL[e.action])}</span><span className="text-muted"> · {e.actor.name}</span></p>
+                <p className="truncate text-sm"><span className="font-semibold text-ink">{tr(AUDIT_ACTION_LABEL[e.action])}</span><span className="text-muted"> · {actorName(e.actor)}</span></p>
                 {c ? (
                   <Link to={PATHS.officerCase(c.id)} className="inline-flex items-center gap-1.5 rounded text-[12.5px] text-muted outline-none hover:text-ink hover:underline focus-visible:ring-2 focus-visible:ring-brand">
                     <Avatar initials={c.persona.initials} hue={c.persona.hue} size={16} />{c.persona.name}
@@ -185,14 +185,13 @@ function Activity() {
   )
 }
 
-/** The simulated 12-week charts don't depend on the store: memoised so live updates never re-render Recharts. */
+/** The projected 12-week charts don't depend on the store: memoised so live updates never re-render Recharts. */
 const Trends = memo(function Trends() {
   const tr = useTr()
   return (
     <section aria-labelledby="trends-title" className="mt-10" data-testid="simulated-trends">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id="trends-title" className="text-xl font-semibold tracking-tight text-ink">{tr(S.trendsTitle)}</h2>
-        <SimulatedBadge />
+        <h2 id="trends-title" className="font-display text-xl font-bold text-ink">{tr(S.trendsTitle)}</h2>
       </div>
       <p className="mt-1 max-w-3xl text-sm text-muted">{tr(S.trendsBody)}</p>
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -223,11 +222,10 @@ export function StaffDashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(S.dashTitle)}</h1>
-            <DemoLiveBadge />
+            <h1 className="font-display text-[28px] font-bold text-ink">{tr(S.dashTitle)}</h1>
             <LiveDot label={tr({ en: 'Live', es: 'En directo' })} />
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(S.dashSubtitle)} {tr(S.demoLiveNote)}</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(S.dashSubtitle)}</p>
         </div>
       </div>
 
@@ -252,7 +250,7 @@ export function StaffDashboardPage() {
             rows={DOCUMENT_ORDER.map(d => ({
               key: d,
               label: <span className="min-w-0 truncate">{tr(DOCUMENTS[d].label).split(' (')[0]}</span>,
-              extra: d === 'NIE_PAPER' || d === 'RED_CARD' ? <span className="shrink-0"><PolicyBadge /></span> : undefined,
+              
               value: docs[d],
               bar: d === 'NIE_PAPER' || d === 'RED_CARD' ? 'bg-warning' : 'bg-brand',
             }))}

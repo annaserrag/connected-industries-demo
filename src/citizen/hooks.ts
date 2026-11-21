@@ -16,7 +16,7 @@ export function useCase(id: string | undefined): Case | undefined {
   return useClave(s => (id ? s.cases[id] : undefined))
 }
 
-/** True when the hash query has ?embed=1 (demo panel iframes). */
+/** True when the hash query has ?embed=1 (embedded views). */
 export function useEmbed(): boolean {
   const { search } = useLocation()
   return new URLSearchParams(search).get('embed') === '1'

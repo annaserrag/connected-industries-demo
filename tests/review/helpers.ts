@@ -1,19 +1,24 @@
 import { expect, type Browser, type BrowserContext, type FrameLocator, type Page } from '@playwright/test'
+import { CASE_LIBRARY, DEMO_ACCOUNT_PASSWORDS, STAFF_DEMO_SECRETS, isFictionalDniNie } from '../../src/contract/seed'
+
+export { isFictionalDniNie }
 
 /** Override with REVIEW_BASE / REVIEW_SHOTS to run a second copy on another port (defaults unchanged). */
 export const BASE = process.env.REVIEW_BASE ?? 'http://localhost:4180'
 export const SHOTS = process.env.REVIEW_SHOTS ?? '/tmp/review-shots'
 
-/** Saved demo accounts of the library personas (documented only in the README, never shown in the app). */
-export const DEMO_LOGINS: Record<string, { doc: string; password: string; name: string }> = {
-  giulia: { doc: 'DEMO-P-IT-482913', password: 'giulia-demo', name: 'Giulia Ferraro' },
-  daniel: { doc: 'DEMO-TIE-Y0042719-K', password: 'daniel-demo', name: 'Daniel Mwangi' },
-  rafael: { doc: 'DEMO-TIE-X0019583-R', password: 'rafael-demo', name: 'Rafael Medina' },
-  noah: { doc: 'DEMO-P-DE-C01X58', password: 'noah-demo', name: 'Noah Becker' },
-  yusuf: { doc: 'DEMO-RC-0117-H', password: 'yusuf-demo', name: 'Yusuf Haddad' },
-  deepfake: { doc: 'DEMO-P-BG-391027', password: 'ivo-demo', name: 'Ivo Petrov (claimed)' },
-  fakedoc: { doc: 'DEMO-P-HR-005521', password: 'hana-demo', name: 'Hana Kovač (claimed)' },
-  linwei: { doc: 'DEMO-TIE-Z0088104-W', password: 'linwei-demo', name: 'Lin Wei' },
+/** Saved accounts of the library personas (documented only in the README, never shown in the app). Read from the seed. */
+const PERSONAS = ['giulia', 'daniel', 'rafael', 'noah', 'yusuf', 'deepfake', 'fakedoc', 'linwei'] as const
+export const DEMO_LOGINS: Record<string, { doc: string; password: string; name: string }> = Object.fromEntries(PERSONAS.map(id => {
+  const c = CASE_LIBRARY.find(x => x.id === id)!
+  return [id, { doc: c.document.number, password: DEMO_ACCOUNT_PASSWORDS[id], name: c.persona.name }]
+}))
+
+/** Staff secrets (README only): certificate PINs, staff user passwords and the NRP each officer types on first sign-in. */
+export const STAFF = {
+  pins: STAFF_DEMO_SECRETS.pins,
+  passwords: STAFF_DEMO_SECRETS.passwords,
+  nrp: { 'cert-laura': '50731842JA0611', 'cert-javier': '29640157HA0384', 'cert-marta': '71385096AA0952', lnavarro: '50731842JA0611', jprieto: '29640157HA0384', mgil: '71385096AA0952' } as Record<string, string>,
 }
 
 /** Citizen: open /citizen, sign out if someone is signed in, then sign in through the form as persona `id`. */
@@ -29,7 +34,7 @@ export async function citizenSignIn(citizen: Page, id: string) {
   await expect(form).toHaveCount(1)
   await citizen.getByTestId('signin-doc').fill(DEMO_LOGINS[id].doc)
   await citizen.getByTestId('signin-password').fill(DEMO_LOGINS[id].password)
-  await form.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await citizen.getByTestId('signin-password').press('Enter')
   await expect(citizen).toHaveURL(new RegExp(`#/citizen/(start|verify|case)/${id}`))
 }
 
@@ -74,13 +79,28 @@ export async function twoViews(browser: Browser) {
 }
 
 /**
- * Staff sign-in through the UI: simulated certificate picker, then the job-details form if this is the
- * officer's first sign-in. Works on a page or inside the demo iframe.
+ * Staff sign-in through the UI, like the Cl@ve gateway: "Electronic certificate" card → certificate picker →
+ * PIN, then the job-details form if this is the officer's first sign-in. Works on a page or inside an iframe.
  */
-export async function staffCertificateSignIn(p: Page | FrameLocator, certId = 'cert-laura', nrp = 'DEMO-NRP-20481') {
-  await p.getByRole('button', { name: 'Sign in with your electronic certificate' }).click()
+export async function staffCertificateSignIn(p: Page | FrameLocator, certId = 'cert-laura', pin = STAFF.pins[certId], nrp = STAFF.nrp[certId]) {
+  await p.getByRole('button', { name: 'Access with certificate' }).click()
   await p.getByTestId(`cert-${certId}`).click()
-  await p.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true }).click()
+  await p.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click()
+  await p.getByLabel('PIN', { exact: true }).fill(pin)
+  await p.getByRole('button', { name: 'Continue' }).click()
+  await finishStaffSignIn(p, nrp)
+}
+
+/** Staff sign-in with the "User and password" card. */
+export async function staffPasswordSignIn(p: Page | FrameLocator, userId = 'lnavarro', password = STAFF.passwords[userId], nrp = STAFF.nrp[userId]) {
+  await p.getByRole('button', { name: 'Access with user and password' }).click()
+  await p.getByLabel('User ID').fill(userId)
+  await p.getByLabel('Password', { exact: true }).fill(password)
+  await p.getByLabel('Password', { exact: true }).press('Enter')
+  await finishStaffSignIn(p, nrp)
+}
+
+async function finishStaffSignIn(p: Page | FrameLocator, nrp: string) {
   const form = p.getByTestId('staff-profile-form')
   const queue = p.getByRole('heading', { name: 'Case queue' })
   await expect(form.or(queue)).toBeVisible({ timeout: 10_000 })

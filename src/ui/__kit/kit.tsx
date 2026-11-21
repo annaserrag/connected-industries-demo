@@ -1,6 +1,7 @@
 /* Dev-only visual QA page for the UI kit. Open /src/ui/__kit/index.html on the dev server. Not part of the app build. */
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { HashRouter } from 'react-router-dom'
 import '@/index.css'
 import { BadgeCheck, CreditCard, Globe, IdCard, Inbox, Nfc, ScanFace, Smartphone, Video } from 'lucide-react'
 import {
@@ -201,4 +202,4 @@ function Kit() {
   )
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode><Kit /></StrictMode>)
+createRoot(document.getElementById('root')!).render(<StrictMode><HashRouter><Kit /></HashRouter></StrictMode>)

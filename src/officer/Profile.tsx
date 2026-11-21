@@ -3,14 +3,14 @@ import { useMemo, useState } from 'react'
 import { BadgeCheck, Building2, KeyRound, LogIn, PencilLine, ShieldX, UserPlus } from 'lucide-react'
 import { OFFICERS, REGISTRATION_AUTHORITIES, STAFF_CERTIFICATES, STAFF_OFFICES } from '@/contract/seed'
 import { useClave } from '@/core/store'
-import { isCertificateExpired } from '@/core/staff'
+import { accountOfOfficer, isCertificateExpired } from '@/core/staff'
 import { relativeTime } from '@/core/selectors'
 import { Avatar, cn } from '@/ui'
 import { toast } from 'sonner'
-import { AUDIT_ACTION_LABEL, C, S } from './copy'
+import { AUDIT_ACTION_LABEL, S } from './copy'
 import { formatDateTime, useLang, useTr } from './lib'
 import { Btn, Panel } from './components/ui'
-import { CertificateFacts, postLabel, ProfileForm } from './ProfileForm'
+import { postLabel, ProfileForm, SourceFacts, type IdentitySource } from './ProfileForm'
 import { TOASTER_ID } from './live'
 
 export function ProfilePage() {
@@ -23,6 +23,10 @@ export function ProfilePage() {
   const officer = OFFICERS.find(o => o.id === officerId)
   const cert = STAFF_CERTIFICATES.find(c => c.id === profile?.certificateId)
     ?? STAFF_CERTIFICATES.find(c => c.officerId === officerId && c.authorisedForClave && !isCertificateExpired(c))
+  const account = officerId ? accountOfOfficer(officerId) : undefined
+  const source: IdentitySource | undefined = profile?.signInMethod === 'password' && account
+    ? { method: 'password', account }
+    : cert ? { method: 'certificate', cert } : account ? { method: 'password', account } : undefined
   const history = useMemo(
     () => audit.filter(e => e.actor.id === officerId && e.action.startsWith('staff_')).slice(-5).reverse(),
     [audit, officerId],
@@ -37,6 +41,7 @@ export function ProfilePage() {
     [tr(S.post), postLabel(profile.post, lang)],
     [tr(S.nrp), <span className="font-mono">{profile.personnelNumber}</span>],
     [tr(S.role), tr(profile.role === 'supervisor' ? S.supervisor : S.registrar)],
+    [tr(S.signInMethod), tr(S.methodLabel[profile.signInMethod ?? 'certificate'])],
     [tr(S.confirmedOn), formatDateTime(profile.completedAt, lang)],
   ] : []
 
@@ -45,10 +50,10 @@ export function ProfilePage() {
       <div className="flex flex-wrap items-center gap-4">
         <Avatar initials={officer.name.split(' ').map(p => p[0]).join('').slice(0, 2)} hue={226} size={56} />
         <div className="min-w-0">
-          <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(S.profileTitlePage)}</h1>
-          <p className="text-sm text-muted">{officer.name} · <span className="font-mono">{officer.id}</span>{profile && <> · {postLabel(profile.post, lang)}</>}</p>
+          <h1 className="font-display text-[28px] font-bold text-ink">{tr(S.profileTitlePage)}</h1>
+          <p className="text-sm text-muted">{officer.name} · <span>{officer.office}</span>{profile && <> · {postLabel(profile.post, lang)}</>}</p>
         </div>
-        {!editing && cert && (
+        {!editing && source && (
           <Btn variant={profile ? 'secondary' : 'primary'} className="ml-auto" onClick={() => setEditing(true)}>
             {profile ? <PencilLine className="size-4" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}
             {profile ? tr(S.updateDetails) : tr(S.addDetails)}
@@ -57,11 +62,11 @@ export function ProfilePage() {
       </div>
       <p className="mt-2 max-w-2xl text-sm text-muted">{tr(S.profileSubtitle)}</p>
 
-      {editing && cert ? (
-        <div className="mt-6 rounded-2xl border border-line bg-surface p-6">
+      {editing && source ? (
+        <div className="mt-6 rounded-[4px] border border-line bg-surface p-6">
           <ProfileForm
             officerId={officerId}
-            cert={cert}
+            source={source}
             existing={profile}
             mode="update"
             onDone={() => { setEditing(false); toast.success(tr(S.saved), { toasterId: TOASTER_ID }) }}
@@ -81,16 +86,16 @@ export function ProfilePage() {
                 ))}
               </dl>
             ) : (
-              <div className="rounded-xl border border-dashed border-line p-5">
+              <div className="rounded-[4px] border border-dashed border-line p-5">
                 <p className="font-semibold text-ink">{tr(S.noProfile)}</p>
                 <p className="mt-1 text-sm text-muted">{tr(S.noProfileBody)}</p>
               </div>
             )}
-            <p className="mt-5 rounded-xl bg-brand-soft/60 px-3.5 py-2.5 text-[13px] leading-relaxed text-ink"><b>{tr(S.whyAsk)}:</b> {tr(S.whyAskBody)}</p>
+            <p className="mt-5 rounded-[4px] border-l-4 border-brand bg-brand-soft/60 px-3.5 py-2.5 text-[13px] leading-relaxed text-ink"><b>{tr(S.whyAsk)}:</b> {tr(S.whyAskBody)}</p>
           </Panel>
           <div className="grid content-start gap-4">
-            <Panel id="cert" title={tr(S.certUsed)} icon={<KeyRound className="size-4" />}>
-              {cert ? <CertificateFacts cert={cert} compact /> : <p className="text-sm text-muted">—</p>}
+            <Panel id="cert" title={tr(source?.method === 'password' ? S.accountUsed : S.certUsed)} icon={<KeyRound className="size-4" />}>
+              {source ? <SourceFacts source={source} compact /> : <p className="text-sm text-muted">—</p>}
               <p className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-success"><BadgeCheck className="size-3.5" aria-hidden />{tr(S.authorised)}</p>
             </Panel>
             <Panel id="history" title={tr(S.signInHistory)} icon={<LogIn className="size-4" />}>
@@ -106,7 +111,7 @@ export function ProfilePage() {
                 </ul>
               )}
             </Panel>
-            <p className="px-1 text-[12px] text-muted">{tr(C.simulatedLogin)} · {tr(S.noRealData)}</p>
+            <p className="px-1 text-[12px] text-muted">{tr(S.noRealData)}</p>
           </div>
         </div>
       )}

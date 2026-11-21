@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, animate, motion, useReducedMotion } from 'framer-motion'
 import { Check, X } from 'lucide-react'
-import { SimulatedBadge } from './primitives'
 import { ScoreBar } from './steps'
 import { cn, useTr, SPRING, SPRING_POP } from './utils'
 
@@ -62,7 +61,7 @@ export const StaggerItem = ({ children, className, as = 'div' }: { children: Rea
 
 /* ---------------------------------------------------------- ConfettiBurst */
 
-const CONFETTI = ['#1d47b8', '#9db4ff', '#16a35a', '#f2b640', '#ffffff', '#c9d6f7']
+const CONFETTI = ['#c54a0a', '#ffb48a', '#16a35a', '#f2b640', '#ffffff', '#ffd9c2']
 
 /**
  * Small, tasteful confetti burst from the centre of its (relative) parent. Re-fires whenever `fire`
@@ -103,11 +102,11 @@ export const ConfettiBurst = ({ fire, pieces = 26, className }: { fire: boolean 
 export type ChipReadState = 'idle' | 'reading' | 'done' | 'failed'
 
 /**
- * Simulated NFC chip read: a document card with the phone resting on it, wave rings from the chip
+ * NFC chip read animation: a document card with the phone resting on it, wave rings from the chip
  * while reading, and a progress bar. Props: `state`, optional `progress` (0–1, else auto), `docLabel`.
  */
-export const ChipReadAnimation = ({ state, progress, docLabel, className, showSimulated = true }: {
-  state: ChipReadState; progress?: number; docLabel?: string; className?: string; showSimulated?: boolean
+export const ChipReadAnimation = ({ state, progress, docLabel, className }: {
+  state: ChipReadState; progress?: number; docLabel?: string; className?: string; /** @deprecated ignored: no Simulated labels on public screens */ showSimulated?: boolean
 }) => {
   const tr = useTr()
   const reduce = useReducedMotion()
@@ -145,9 +144,9 @@ export const ChipReadAnimation = ({ state, progress, docLabel, className, showSi
           transition={{ duration: 0.45 }}
         >
           <svg className="absolute inset-0 size-full opacity-[0.18]" viewBox="0 0 204 128">
-            {Array.from({ length: 9 }, (_, i) => <circle key={i} cx="160" cy="70" r={10 + i * 9} fill="none" stroke="#c9d6f7" strokeWidth="0.8" />)}
+            {Array.from({ length: 9 }, (_, i) => <circle key={i} cx="160" cy="70" r={10 + i * 9} fill="none" stroke="#ffd9c2" strokeWidth="0.8" />)}
           </svg>
-          <div className="absolute top-3 left-3.5 text-[8.5px] font-bold tracking-[0.18em] text-[#c9d6f7]/80 uppercase">{docLabel ?? tr('Passport', 'Pasaporte')} · DEMO</div>
+          <div className="absolute top-3 left-3.5 text-[8.5px] font-bold tracking-[0.18em] text-[#ffd9c2]/80 uppercase">{docLabel ?? tr('Passport', 'Pasaporte')}</div>
           {/* chip */}
           <div className="absolute top-[46px] left-[22px] h-[30px] w-[38px] rounded-[6px]" style={{ background: 'linear-gradient(135deg,#e7c873,#b8923a)' }}>
             <svg viewBox="0 0 38 30" className="size-full opacity-60"><path d="M0 10h13M0 20h13M25 10h13M25 20h13M13 0v30M25 0v30M13 15h12" stroke="#7a5d1c" strokeWidth="1" fill="none" /></svg>
@@ -196,7 +195,7 @@ export const ChipReadAnimation = ({ state, progress, docLabel, className, showSi
           transition={state === 'idle' && !reduce ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } : SPRING}
           style={{ left: 'calc(50% - 4px)', rotate: 7 }}
         >
-          <div className="grid size-full place-items-center rounded-[17px] bg-[linear-gradient(160deg,#25407f,#1d47b8)]">
+          <div className="grid size-full place-items-center rounded-[17px] bg-[linear-gradient(160deg,#a33d08,#c54a0a)]">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" opacity=".95">
               <path d="M6 8.3a5 5 0 0 1 0 7.4" /><path d="M9.5 6a8 8 0 0 1 0 12" /><path d="M13 3.6a11.5 11.5 0 0 1 0 16.8" />
             </svg>
@@ -215,7 +214,6 @@ export const ChipReadAnimation = ({ state, progress, docLabel, className, showSi
         <div className="h-2 overflow-hidden rounded-full bg-surface-2 ring-1 ring-inset ring-ink/5" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={tr('Chip read progress', 'Progreso de lectura del chip')}>
           <motion.div className="h-full rounded-full" style={{ background: accent }} animate={{ width: `${pct}%` }} transition={{ duration: 0.25 }} />
         </div>
-        {showSimulated && <div className="mt-3 flex justify-center"><SimulatedBadge label={tr('Simulated chip read', 'Lectura de chip simulada')} /></div>}
       </div>
     </div>
   )
@@ -255,16 +253,16 @@ export const AbstractFace = ({ hue = 24, className }: { hue?: number; className?
 }
 
 /**
- * Simulated face check: oval mask over a generated abstract face with a scanning ring.
+ * Face check animation: oval mask over a generated abstract face with a scanning ring.
  * Shows liveness / face-match ScoreBars (with thresholds) when scores are given.
  */
-export const FaceScanAnimation = ({ state, liveness, faceMatch, livenessMin = 0.85, faceMatchMin = 0.9, hue = 24, hint, className, showSimulated = true }: {
+export const FaceScanAnimation = ({ state, liveness, faceMatch, livenessMin = 0.85, faceMatchMin = 0.9, hue = 24, hint, className }: {
   state: FaceScanState; liveness?: number; faceMatch?: number; livenessMin?: number; faceMatchMin?: number
-  hue?: number; hint?: string; className?: string; showSimulated?: boolean
+  hue?: number; hint?: string; className?: string; /** @deprecated ignored: no Simulated labels on public screens */ showSimulated?: boolean
 }) => {
   const tr = useTr()
   const reduce = useReducedMotion()
-  const ring = state === 'done' ? 'var(--color-success)' : state === 'failed' ? 'var(--color-danger)' : state === 'scanning' ? '#9db4ff' : 'rgba(255,255,255,.7)'
+  const ring = state === 'done' ? 'var(--color-success)' : state === 'failed' ? 'var(--color-danger)' : state === 'scanning' ? '#ffb48a' : 'rgba(255,255,255,.7)'
   const label = hint ?? {
     idle: tr('Place your face inside the oval', 'Coloca tu cara dentro del óvalo'),
     scanning: tr('Hold still… checking it is really you', 'No te muevas… comprobamos que eres tú'),
@@ -302,7 +300,7 @@ export const FaceScanAnimation = ({ state, liveness, faceMatch, livenessMin = 0.
           {/* rotating progress arc */}
           {state === 'scanning' && !reduce && (
             <motion.ellipse
-              cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="#9db4ff" strokeWidth="4" strokeLinecap="round"
+              cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="#ffb48a" strokeWidth="4" strokeLinecap="round"
               strokeDasharray={`${perim * 0.22} ${perim * 0.78}`}
               animate={{ strokeDashoffset: [0, -perim] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
@@ -313,18 +311,18 @@ export const FaceScanAnimation = ({ state, liveness, faceMatch, livenessMin = 0.
             <g clipPath={`url(#c${uid})`}>
               <motion.g animate={{ y: [cy - ry, cy + ry - 6, cy - ry] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}>
                 <rect x={cx - rx} y={0} width={rx * 2} height="26" fill={`url(#g${uid})`} />
-                <rect x={cx - rx} y={24} width={rx * 2} height="2" fill="#9db4ff" />
+                <rect x={cx - rx} y={24} width={rx * 2} height="2" fill="#ffb48a" />
               </motion.g>
               {[[92, 120], [148, 120], [120, 150], [100, 176], [140, 176], [120, 96], [80, 150], [160, 150]].map(([x, y], i) => (
-                <motion.circle key={i} cx={x} cy={y} r="2.2" fill="#c9d6f7"
+                <motion.circle key={i} cx={x} cy={y} r="2.2" fill="#ffd9c2"
                   animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.15 }} />
               ))}
             </g>
           )}
           <defs>
             <linearGradient id={`g${uid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#9db4ff" stopOpacity="0" />
-              <stop offset="1" stopColor="#9db4ff" stopOpacity=".35" />
+              <stop offset="0" stopColor="#ffb48a" stopOpacity="0" />
+              <stop offset="1" stopColor="#ffb48a" stopOpacity=".35" />
             </linearGradient>
           </defs>
         </svg>
@@ -344,7 +342,6 @@ export const FaceScanAnimation = ({ state, liveness, faceMatch, livenessMin = 0.
           )}
         </AnimatePresence>
 
-        {showSimulated && <div className="absolute top-3 left-3"><SimulatedBadge /></div>}
       </div>
 
       <p className={cn('mt-4 text-center text-sm font-semibold', state === 'failed' ? 'text-danger' : state === 'done' ? 'text-success' : 'text-ink')} aria-live="polite">

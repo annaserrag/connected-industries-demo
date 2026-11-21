@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   BookOpen, Bot, ChevronDown, ChevronLeft, Earth, FileText, Globe, HandHeart, IdCard, Landmark, ShieldCheck, Smartphone, Users,
 } from 'lucide-react'
-import { Avatar, PolicyBadge, SimulatedBadge, cn } from '@/ui'
+import { Avatar, cn } from '@/ui'
 import { actions } from '@/core/store'
 import type { AssistantAnswers, DocumentType } from '@/contract/types'
 import {
-  ASSISTANT_QUESTIONS, CHECKS, CITIZEN_MESSAGES, DOCUMENTS, POLICY_PROPOSALS, ROUTES, ROUTE_ORDER, recommendRoute,
+  ASSISTANT_QUESTIONS, CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES, ROUTE_ORDER, recommendRoute,
 } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar, RouteCode } from './components/basics'
@@ -69,7 +69,7 @@ export function Assistant() {
         <button
           type="button"
           onClick={back}
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink hover:bg-surface-2"
           aria-label={tr(C.back)}
         >
           <ChevronLeft size={20} aria-hidden />
@@ -84,10 +84,10 @@ export function Assistant() {
       </div>
 
       {i === 0 && (
-        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-surface p-3 ring-1 ring-line">
+        <div className="mb-5 flex items-center gap-3 rounded-[2px] bg-surface p-3 border border-line">
           <Avatar initials={c.persona.initials} hue={c.persona.hue} size={40} />
           <p className="text-[13px] leading-snug text-muted">
-            <span className="font-semibold text-ink">{tr(C.hello)}, {c.persona.name.split(' ')[0]}.</span> {tr(C.assistantIntro)}
+            <span className="font-bold text-ink">{tr(C.hello)}, {c.persona.name.split(' ')[0]}.</span> {tr(C.assistantIntro)}
           </p>
         </div>
       )}
@@ -105,7 +105,7 @@ export function Assistant() {
         >
           {q === 'nationality' && (
             <fieldset>
-              <legend className="mb-4 font-display text-2xl font-semibold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.nationality)}</legend>
+              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.nationality)}</legend>
               <div className="space-y-2.5">
                 {(['spanish', 'eu', 'non_eu'] as const).map(v => (
                   <OptionCard
@@ -121,7 +121,7 @@ export function Assistant() {
 
           {q === 'document' && (
             <fieldset>
-              <legend className="mb-4 font-display text-2xl font-semibold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.document)}</legend>
+              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.document)}</legend>
               <div className="space-y-2.5">
                 {DOC_ORDER.map(d => (
                   <OptionCard
@@ -138,7 +138,7 @@ export function Assistant() {
 
           {q === 'hasEuEid' && (
             <fieldset>
-              <legend className="mb-4 font-display text-2xl font-semibold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.hasEuEid)}</legend>
+              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.hasEuEid)}</legend>
               <div className="space-y-2.5">
                 <OptionCard name="hasEuEid" value="yes" checked={answers.hasEuEid} onChange={() => set({ hasEuEid: true })} title={tr(C.yes)} sub={tr(C.eidYesSub)} icon={<ShieldCheck size={20} />} />
                 <OptionCard name="hasEuEid" value="no" checked={!answers.hasEuEid} onChange={() => set({ hasEuEid: false })} title={tr(C.no)} sub={tr(C.eidNoSub)} icon={<IdCard size={20} />} />
@@ -148,20 +148,20 @@ export function Assistant() {
 
           {q === 'assisted' && (
             <fieldset>
-              <legend className="mb-4 font-display text-2xl font-semibold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.assisted)}</legend>
+              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.assisted)}</legend>
               <div className="space-y-2.5">
                 <OptionCard name="assisted" value="no" checked={!answers.assisted} onChange={() => set({ assisted: false })} title={tr(C.no)} sub={tr(C.assistedNoSub)} icon={<Smartphone size={20} />} />
                 <OptionCard
                   name="assisted" value="yes" checked={answers.assisted} onChange={() => set({ assisted: true })} title={tr(C.yes)} sub={tr(C.assistedYesSub)} icon={<HandHeart size={20} />}
                   aside={answers.assisted && c.assisted ? (
-                    <span className="mt-2 block rounded-xl bg-surface px-3 py-2 text-[12px] leading-snug text-muted ring-1 ring-line">
-                      <span className="font-semibold text-ink">{tr(C.helperOnDevice)}:</span> {c.assisted.helperName} ({tr(c.assisted.relation)})<br />
-                      <span className="font-semibold text-ink">{tr(C.deviceOwner)}:</span> {c.assisted.deviceOwner}
+                    <span className="mt-2 block rounded-[2px] bg-surface px-3 py-2 text-[12px] leading-snug text-muted border border-line">
+                      <span className="font-bold text-ink">{tr(C.helperOnDevice)}:</span> {c.assisted.helperName} ({tr(c.assisted.relation)})<br />
+                      <span className="font-bold text-ink">{tr(C.deviceOwner)}:</span> {c.assisted.deviceOwner}
                     </span>
                   ) : undefined}
                 />
               </div>
-              <p className="mt-4 flex gap-2 rounded-2xl bg-brand-soft/60 p-3 text-[13px] leading-snug text-ink">
+              <p className="mt-4 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
                 <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
                 {tr(CITIZEN_MESSAGES.assistedNote)}
               </p>
@@ -170,42 +170,34 @@ export function Assistant() {
 
           {q === 'result' && (
             <div>
-              <h1 className="font-display text-2xl font-semibold leading-tight text-ink">{tr(C.recommendedFor)}</h1>
+              <h1 className="font-display text-2xl font-bold leading-tight text-ink">{tr(C.recommendedFor)}</h1>
               <motion.div
                 initial={reduced ? false : { scale: 0.97, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                className="mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-[color-mix(in_oklab,var(--color-brand),black_28%)] p-5 text-brand-ink shadow-[0_18px_40px_-18px_var(--color-brand)]"
+                className="mt-4 rounded-card border-2 border-brand bg-brand-soft p-5 text-ink"
                 data-testid="recommended-route"
               >
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider">
+                  <span className="rounded-[2px] bg-brand px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-brand-ink">
                     {tr(C.routeLabel)} {route.code}
                   </span>
-                  {rec.policyProposal && <span className="rounded-full bg-white px-0.5"><PolicyBadge /></span>}
                 </div>
-                <h2 className="mt-3 font-display text-[22px] font-semibold leading-tight">{tr(route.name)}</h2>
-                <p className="mt-1 text-sm text-white/80">{tr(route.forWhom)}</p>
+                <h2 className="mt-3 font-display text-[22px] font-bold leading-tight">{tr(route.name)}</h2>
+                <p className="mt-1 text-[15px] text-muted">{tr(route.forWhom)}</p>
               </motion.div>
 
-              <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.whyThisRoute)}</h3>
+              <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-muted">{tr(C.whyThisRoute)}</h3>
               <p className="mt-1 text-[15px] leading-relaxed text-ink">{tr(rec.reason)}</p>
 
-              {rec.policyProposal && (
-                <div className="mt-3 rounded-2xl border border-warning/30 bg-warning-soft p-3 text-[13px] leading-snug text-ink">
-                  <div className="mb-1"><PolicyBadge /></div>
-                  {tr(C.policyRouteNote)} {tr(rec.route === 'FALLBACK' ? POLICY_PROPOSALS[1] : POLICY_PROPOSALS[0])}
-                </div>
-              )}
-
               {c.guardian && rec.route === 'B' && (
-                <p className="mt-3 flex gap-2 rounded-2xl bg-surface p-3 text-[13px] leading-snug text-ink ring-1 ring-line">
+                <p className="mt-3 flex gap-2 rounded-[2px] bg-surface p-3 text-[13px] leading-snug text-ink border border-line">
                   <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
                   {fill(tr(C.guardianNote), { guardian: c.guardian.name, relation: tr(c.guardian.relation) })}
                 </p>
               )}
               {answers.assisted && (
-                <p className="mt-3 flex gap-2 rounded-2xl bg-brand-soft/60 p-3 text-[13px] leading-snug text-ink">
+                <p className="mt-3 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
                   <HandHeart size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
                   <span>
                     {tr(CITIZEN_MESSAGES.assistedNote)}
@@ -219,15 +211,14 @@ export function Assistant() {
               )}
 
               <div className="mt-5 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.whatHappensNext)}</h3>
-                <SimulatedBadge />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted">{tr(C.whatHappensNext)}</h3>
               </div>
               <ol className="mt-2 space-y-1.5">
                 {[...(c.guardian && rec.route === 'B' ? (['guardian_link'] as const) : []), ...route.checks].map((ck, n) => (
-                  <li key={ck} className="flex items-start gap-3 rounded-xl bg-surface px-3 py-2 ring-1 ring-line">
+                  <li key={ck} className="flex items-start gap-3 rounded-[2px] bg-surface px-3 py-2 border border-line">
                     <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-[11px] font-bold text-brand">{n + 1}</span>
                     <span className="text-[13px] leading-snug">
-                      <span className="font-semibold text-ink">{tr(CHECKS[ck].label)}</span>
+                      <span className="font-bold text-ink">{tr(CHECKS[ck].label)}</span>
                       <span className="block text-muted">{tr(CHECKS[ck].explains)}</span>
                     </span>
                   </li>
@@ -239,7 +230,7 @@ export function Assistant() {
                 onClick={() => setShowOthers(s => !s)}
                 aria-expanded={showOthers}
                 aria-controls="other-routes"
-                className="mt-4 flex w-full items-center justify-between rounded-xl px-1 py-2 text-sm font-semibold text-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+                className="mt-4 flex w-full items-center justify-between rounded-[2px] px-1 py-2 text-sm font-bold text-brand"
               >
                 {showOthers ? tr(C.hideOtherRoutes) : tr(C.otherRoutes)}
                 <ChevronDown size={18} className={cn('transition-transform', showOthers && 'rotate-180')} aria-hidden />
@@ -252,10 +243,10 @@ export function Assistant() {
                     className="space-y-2 overflow-hidden"
                   >
                     {ROUTE_ORDER.filter(r => r !== rec.route).map(r => (
-                      <li key={r} className="flex gap-3 rounded-2xl bg-surface p-3 ring-1 ring-line">
+                      <li key={r} className="flex gap-3 rounded-[2px] bg-surface p-3 border border-line">
                         <RouteCode code={ROUTES[r].code} className="shrink-0 self-start" />
                         <span className="text-[13px] leading-snug">
-                          <span className="font-semibold text-ink">{tr(ROUTES[r].name)}</span>
+                          <span className="font-bold text-ink">{tr(ROUTES[r].name)}</span>
                           <span className="block text-muted">{tr(ROUTES[r].forWhom)}</span>
                         </span>
                       </li>

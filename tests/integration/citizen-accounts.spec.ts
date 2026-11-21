@@ -5,7 +5,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import { C } from '../../src/citizen/copy'
-import { CASE_LIBRARY, DEMO_ACCOUNT_PASSWORDS, SIGNUP_COUNTRIES, STATE_VERSION, STORAGE_KEY } from '../../src/contract/seed'
+import { CASE_LIBRARY, DEMO_ACCOUNT_PASSWORDS, SIGNUP_COUNTRIES, STATE_VERSION, STORAGE_KEY, isFictionalDniNie } from '../../src/contract/seed'
 
 const PHONE = { width: 390, height: 844 }
 const NAMES = CASE_LIBRARY.map(c => c.persona.name)
@@ -64,16 +64,16 @@ test.describe('citizen accounts', () => {
     const alert = page.getByRole('alert').filter({ hasText: C.invalidCredentials.en })
     await expect(alert).toBeVisible()
     const msgWrongPwd = await alert.innerText()
-    await signInForm(page, 'DEMO-P-XX-000000', DEMO_ACCOUNT_PASSWORDS.giulia)
+    await signInForm(page, 'XX0000000', DEMO_ACCOUNT_PASSWORDS.giulia)
     await expect(page.getByRole('alert').filter({ hasText: C.invalidCredentials.en })).toHaveText(msgWrongPwd)
     await expect(page.getByText(/password is wrong|wrong password|unknown document|not registered/i)).toHaveCount(0)
     expect(await page.evaluate(() => window.__clave!.getState().activeCitizenCaseId)).toBeNull()
     // the action itself
-    const r = await page.evaluate(() => [
-      window.__clave!.actions.citizenSignIn('DEMO-P-IT-482913', 'nope'),
-      window.__clave!.actions.citizenSignIn('DEMO-NOPE', 'giulia-demo'),
+    const r = await page.evaluate(giulia => [
+      window.__clave!.actions.citizenSignIn(giulia, 'nope'),
+      window.__clave!.actions.citizenSignIn('ZZ0000000', 'giulia-demo'),
       window.__clave!.actions.citizenSignIn('', ''),
-    ])
+    ], CASE_LIBRARY[0].document.number)
     for (const x of r) expect(x).toEqual({ ok: false, reason: 'invalid_credentials' })
     // passwords are never stored in plain text
     const raw = await page.evaluate(k => localStorage.getItem(k), STORAGE_KEY)
@@ -84,7 +84,7 @@ test.describe('citizen accounts', () => {
   test('sign-up validation: underage, weak password, wrong document for the country (UI + action)', async ({ page }) => {
     const errors = trackErrors(page)
     await fresh(page)
-    await page.getByRole('tab', { name: 'Create account' }).click()
+    await page.getByRole('button', { name: 'Create your account' }).click()
     const form = page.getByTestId('signup-form')
     // empty submit: every field explains itself, focus goes to the first invalid one
     await form.getByRole('button', { name: 'Create account' }).click()
@@ -154,7 +154,7 @@ test.describe('citizen accounts', () => {
     await officer.evaluate(() => window.__clave!.actions.officerSignIn('OF-DEMO-07'))
 
     await citizen.bringToFront()
-    await citizen.getByRole('tab', { name: 'Create account' }).click()
+    await citizen.getByRole('button', { name: 'Create your account' }).click()
     await citizen.getByLabel('Full name').fill('  Amira   Benali ')
     await citizen.getByLabel('Date of birth').fill('1996-04-12')
     await citizen.getByLabel('Nationality').selectOption({ label: 'Morocco' })
@@ -163,13 +163,15 @@ test.describe('citizen accounts', () => {
     await citizen.getByLabel('Repeat the password').fill('sunflower-42')
     await citizen.getByTestId('signup-form').getByRole('button', { name: 'Create account' }).click()
 
-    // success step: the assigned DEMO number, a copy button, then the route assistant
+    // success step: the assigned applicant number (realistic passport shape), a copy button, then the route assistant
     await expect(citizen).toHaveURL(/#\/citizen\/welcome\/su-/)
     await expect(citizen.getByRole('heading', { name: 'Account created' })).toBeVisible()
     const number = (await citizen.getByTestId('assigned-number').innerText()).trim()
-    expect(number).toMatch(/^DEMO-P-MA-\d{6}$/)
-    await citizen.getByRole('button', { name: 'Copy sign-in number' }).click()
-    await expect(citizen.getByRole('button', { name: 'Copy sign-in number' })).toContainText(/Copied|Copy/)
+    expect(number).toMatch(/^[A-Z]{2}\d{7}$/)
+    await expect(citizen.getByText('Your applicant number', { exact: true })).toBeVisible()
+    await expect(citizen.locator('body')).not.toContainText(/demo/i)
+    await citizen.getByRole('button', { name: 'Copy applicant number' }).click()
+    await expect(citizen.getByRole('button', { name: 'Copy applicant number' })).toContainText(/Copied|Copy/)
     const id = await citizen.evaluate(() => window.__clave!.getState().activeCitizenCaseId)
     expect(id).toMatch(/^su-/)
     const st = await citizen.evaluate(id => {
@@ -227,13 +229,13 @@ test.describe('citizen accounts', () => {
     await ctx.close()
   })
 
-  test('personas never appear on the citizen sign-in screen or the demo stage', async ({ page }) => {
+  test('personas never appear on the citizen sign-in screen (phone and desktop)', async ({ page }) => {
     const errors = trackErrors(page)
     await fresh(page)
     await expect(page.getByTestId('signin-form')).toBeVisible()
     const body = await page.locator('body').innerText()
     for (const n of NAMES) expect(body, n).not.toContain(n)
-    await page.getByRole('tab', { name: 'Create account' }).click()
+    await page.getByRole('button', { name: 'Create your account' }).click()
     const body2 = await page.locator('body').innerText()
     for (const n of NAMES) expect(body2, n).not.toContain(n)
     for (const c of CASE_LIBRARY) {
@@ -242,20 +244,15 @@ test.describe('citizen accounts', () => {
     }
     await expect(page.locator('[data-testid^="persona-"]')).toHaveCount(0)
 
+    // the old demo stage is gone; the desktop sign-in page shows no personas either
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto(`${D}#/demo`)
-    await expect(page.locator('iframe')).toHaveCount(2)
-    const phone = page.frameLocator('iframe').first()
-    await expect(phone.getByTestId('signin-form')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('stage-signed-out')).toBeVisible()
-    await expect(page.getByRole('button', { name: /case from the library/i })).toHaveCount(0)
-    const stage = await page.locator('body').innerText()
-    const phoneText = await phone.locator('body').innerText()
-    for (const n of NAMES) {
-      expect(stage, n).not.toContain(n)
-      expect(phoneText, n).not.toContain(n)
-    }
-    await page.screenshot({ path: '/tmp/ca-shots/demo-stage-signed-out.png' })
+    await expect(page.locator('iframe')).toHaveCount(0)
+    await page.goto(`${D}#/citizen`)
+    await expect(page.getByTestId('signin-form')).toBeVisible()
+    const desk = await page.locator('body').innerText()
+    for (const n of NAMES) expect(desk, n).not.toContain(n)
+    expect(desk).not.toMatch(/Simulated|demo/i)
     expect(errors).toEqual([])
   })
 
@@ -271,7 +268,7 @@ test.describe('citizen accounts', () => {
     }
     // signed in as Daniel: Giulia's application is not reachable
     await page.goto(`${D}#/citizen`)
-    await signInForm(page, 'DEMO-TIE-Y0042719-K', DEMO_ACCOUNT_PASSWORDS.daniel)
+    await signInForm(page, CASE_LIBRARY.find(c => c.id === 'daniel')!.document.number, DEMO_ACCOUNT_PASSWORDS.daniel)
     await expect(page).toHaveURL(/#\/citizen\/start\/daniel/)
     await page.goto(`${D}#/citizen/case/giulia`)
     await expect(page.getByTestId('signin-notice')).toHaveText(C.otherCaseNote.en)
@@ -282,7 +279,7 @@ test.describe('citizen accounts', () => {
     await expect(page.getByTestId('signin-form')).toBeVisible()
     await expect(page.getByText('Aisha Rahman')).toHaveCount(0)
     // signing in as the owner opens it
-    await signInForm(page, 'DEMO-P-IT-482913', DEMO_ACCOUNT_PASSWORDS.giulia)
+    await signInForm(page, CASE_LIBRARY.find(c => c.id === 'giulia')!.document.number, DEMO_ACCOUNT_PASSWORDS.giulia)
     await expect(page).toHaveURL(/#\/citizen\/start\/giulia/)
     expect(errors).toEqual([])
   })
@@ -292,7 +289,7 @@ test.describe('citizen accounts', () => {
     const a = await ctx.newPage()
     const errors = trackErrors(a)
     await fresh(a)
-    await signInForm(a, 'DEMO-RC-0117-H', DEMO_ACCOUNT_PASSWORDS.yusuf)
+    await signInForm(a, CASE_LIBRARY.find(c => c.id === 'yusuf')!.document.number, DEMO_ACCOUNT_PASSWORDS.yusuf)
     await expect(a).toHaveURL(/#\/citizen\/start\/yusuf/)
     const b = await ctx.newPage()
     await b.goto(`${D}#/citizen/start/yusuf`)
@@ -319,7 +316,23 @@ test.describe('citizen accounts', () => {
       return { ...res, hasEuEid: c.presetAnswers.hasEuEid, group: c.presetAnswers.nationalityGroup }
     })
     expect(r.ok).toBe(true)
-    expect(r.documentNumber).toMatch(/^DEMO-EID-DE-\d{5}$/)
+    expect(r.documentNumber).toMatch(/^[A-Z][A-Z0-9]{8}$/)
+    // DNI / NIE-shaped generated numbers always fail the real check-letter test
+    const shapes = await page.evaluate(() => {
+      const k = window.__clave!
+      const out: Record<string, string> = {}
+      for (const [i, t] of [[0, 'DNI'], [9, 'TIE'], [9, 'NIE_PAPER'], [9, 'RED_CARD'], [9, 'PASSPORT']] as const) {
+        const res = k.actions.citizenSignUp({ fullName: 'Ana Prueba Ficticia', dateOfBirth: '1990-01-01', countryIndex: i, documentType: t, password: 'long-enough-pass' })
+        if (!res.ok) throw new Error(res.reason)
+        out[t] = res.documentNumber
+      }
+      return out
+    })
+    for (const t of ['DNI', 'TIE', 'NIE_PAPER', 'RED_CARD']) expect(isFictionalDniNie(shapes[t]), `${t} ${shapes[t]}`).toBe(true)
+    expect(shapes.DNI).toMatch(/^\d{8}[A-Z]$/)
+    expect(shapes.TIE).toMatch(/^[XYZ]\d{7}[A-Z]$/)
+    expect(shapes.PASSPORT).toMatch(/^[A-Z]{2}\d{7}$/)
+    expect(JSON.stringify(shapes)).not.toContain('DEMO')
     expect(r).toMatchObject({ hasEuEid: true, group: 'eu' })
     // run it through route A, then reset only this case
     const afterRun = await page.evaluate(async id => {
@@ -335,7 +348,7 @@ test.describe('citizen accounts', () => {
     expect(afterRun.done).toEqual({ status: 'approved', level: 'basic' })
     expect(afterRun.reset).toEqual({ status: 'draft', checks: 0, name: 'Lena Vogel' })
 
-    expect(await page.evaluate(() => Object.keys(window.__clave!.getState().accounts).length)).toBe(9)
+    expect(await page.evaluate(() => Object.keys(window.__clave!.getState().accounts).length)).toBe(14)
     await page.evaluate(() => window.__clave!.actions.resetDemo())
     const after = await page.evaluate(([doc, id]) => {
       const s = window.__clave!.getState()

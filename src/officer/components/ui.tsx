@@ -4,8 +4,7 @@ import * as RDialog from '@radix-ui/react-dialog'
 import * as RTooltip from '@radix-ui/react-tooltip'
 import { CircleCheck, CircleDashed, CircleMinus, CircleX, ShieldAlert, ShieldCheck, ShieldQuestion, TriangleAlert, X } from 'lucide-react'
 import type { CheckOutcome, RiskLevel } from '@/contract/types'
-import { SIMULATED_LABEL } from '@/contract/seed'
-import { cn, SimulatedBadge } from '@/ui'
+import { cn } from '@/ui'
 import { OUTCOME_LABEL, RISK_LABEL } from '../copy'
 import { useTr } from '../lib'
 
@@ -32,16 +31,6 @@ export function LiveDot({ label, className }: { label: string; className?: strin
         <span className="relative inline-flex size-2 rounded-full bg-success" />
       </span>
       {label}
-    </span>
-  )
-}
-
-/* ------------------------------------------------------------- Simulated */
-export function Sim({ className }: { className?: string }) {
-  const tr = useTr()
-  return (
-    <span className={className}>
-      <SimulatedBadge label={tr(SIMULATED_LABEL)} />
     </span>
   )
 }
@@ -75,10 +64,10 @@ export function Panel({
   const ring = { default: 'border-line', danger: 'border-danger/30', warning: 'border-warning/30', sim: 'border-sim/25' }[tone]
   const headId = id ? `${id}-title` : undefined
   return (
-    <section aria-labelledby={headId} className={cn('rounded-2xl border bg-surface shadow-[0_1px_2px_rgba(16,16,20,0.04)]', ring, className)}>
+    <section aria-labelledby={headId} className={cn('rounded-[4px] border bg-surface', ring, className)}>
       <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
         <div className="min-w-0">
-          <h2 id={headId} className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-ink">
+          <h2 id={headId} className="flex items-center gap-2 text-[15px] font-bold text-ink">
             {icon && <span className="text-muted" aria-hidden>{icon}</span>}
             {title}
           </h2>
@@ -166,14 +155,14 @@ export function Dialog({
         <RDialog.Overlay className="fixed inset-0 z-50 bg-ink/45 backdrop-blur-[2px] data-[state=open]:animate-[ofc-fade_.18s_ease-out]" />
         <RDialog.Content
           className={cn(
-            'fixed top-1/2 left-1/2 z-50 flex max-h-[90vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl shadow-2xl outline-none data-[state=open]:animate-[ofc-pop_.2s_cubic-bezier(.2,.9,.3,1.2)]',
+            'fixed top-1/2 left-1/2 z-50 flex max-h-[90vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[4px] shadow-pop outline-none data-[state=open]:animate-[ofc-pop_.2s_cubic-bezier(.2,.9,.3,1.2)]',
             wide ? 'max-w-3xl' : 'max-w-lg',
             dark ? 'bg-[#0f1117] text-white' : 'bg-surface text-ink',
           )}
         >
           <div className={cn('flex items-start justify-between gap-4 border-b px-6 pt-5 pb-4', dark ? 'border-white/10' : 'border-line')}>
             <div>
-              <RDialog.Title className="text-lg font-semibold tracking-tight">{title}</RDialog.Title>
+              <RDialog.Title className="font-display text-lg font-bold">{title}</RDialog.Title>
               {description ? (
                 <RDialog.Description className={cn('mt-1 text-sm', dark ? 'text-white/65' : 'text-muted')}>{description}</RDialog.Description>
               ) : (
@@ -202,11 +191,11 @@ export function Btn({
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'dangerOutline'; size?: 'sm' | 'md' | 'lg'; kbd?: string
 }) {
   const v = {
-    primary: 'bg-brand text-brand-ink hover:brightness-110 shadow-sm',
-    success: 'bg-success text-white hover:brightness-110 shadow-sm',
-    secondary: 'bg-surface text-ink border border-line hover:bg-surface-2',
+    primary: 'bg-brand text-brand-ink hover:bg-brand-strong',
+    success: 'bg-success text-white hover:brightness-110',
+    secondary: 'bg-surface text-ink border border-line-strong hover:bg-surface-2',
     ghost: 'text-muted hover:bg-surface-2 hover:text-ink',
-    danger: 'bg-danger text-white hover:brightness-110 shadow-sm',
+    danger: 'bg-danger text-white hover:brightness-110',
     dangerOutline: 'bg-surface text-danger border border-danger/35 hover:bg-danger-soft',
   }[variant]
   const s = { sm: 'h-8 px-2.5 text-[13px] gap-1.5', md: 'h-10 px-3.5 text-sm gap-2', lg: 'h-11 px-4 text-[15px] gap-2' }[size]
@@ -215,7 +204,7 @@ export function Btn({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center rounded-xl font-semibold whitespace-nowrap transition outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:hover:brightness-100',
+        'inline-flex items-center justify-center rounded-[2px] font-bold whitespace-nowrap transition outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:hover:brightness-100',
         v, s, className,
       )}
       {...p}

@@ -1,79 +1,83 @@
 /* =============================================================================
- * Design tokens — owned by Design agent (E). Tailwind v4 @theme.
+ * Design tokens — Spanish e-government look (clave.gob.es / pasarela Cl@ve style). Tailwind v4 @theme.
  *
- * Use as Tailwind classes: bg-canvas, bg-surface, bg-surface-2, text-ink, text-muted,
- * border-line, border-line-strong, bg-brand, text-brand-ink, bg-brand-soft, text-success,
- * bg-success-soft, text-warning, bg-warning-soft, text-danger, bg-danger-soft, text-info,
- * bg-info-soft, text-sim, bg-sim-soft, font-display, shadow-card, shadow-pop, rounded-card …
- * The dark "stage" palette (bg-stage, text-stage-ink …) is only for the presenter /demo page.
+ * Use as Tailwind classes: bg-canvas, bg-surface, bg-surface-2 / bg-band, text-ink, text-muted,
+ * border-line, border-line-strong, bg-brand, hover:bg-brand-strong (= brand-hover), text-brand-ink,
+ * bg-brand-soft (light orange highlight), bg-brand-tint (gateway pill buttons), text-success,
+ * bg-success-soft, text-warning, bg-warning-soft, text-danger, bg-danger-soft, text-info, bg-info-soft,
+ * font-display (Merriweather), font-sans (Nunito Sans), shadow-card, shadow-pop, rounded-card (2px),
+ * rounded-field (2px), rounded-method (16px), rounded-pill …
+ * The `sim` and dark `stage` palettes are kept for backwards compatibility only (no public screen uses them).
  *
- * CONTRAST CHECK (WCAG 2.1 relative luminance, computed with a node script) — all pass AA:
- *   ink        on canvas 16.30 · surface 17.76 · surface-2 15.33 · brand-soft 15.31
- *   muted      on canvas  6.05 · surface  6.59 · surface-2  5.69 · brand-soft  5.68
- *   brand      on surface 7.94 · canvas 7.29 · brand-soft 6.84 ; brand-ink on brand 7.94
- *   success    on success-soft 5.66 · surface 6.58
- *   warning    on warning-soft 5.76 · surface 6.56
- *   danger     on danger-soft  5.68 · surface 6.74 ; white on danger 6.74
- *   sim        on sim-soft     6.30 · surface 7.44
- *   line-strong (state borders / input outlines) on surface 3.59 · canvas 3.29  (≥ 3:1 UI)
- *   stage-ink  on stage 16.64 · stage-2 14.95 ; stage-muted on stage 7.81 · stage-2 7.02
- * `line` (#e6e2d8) is a decorative hairline only — never the sole indicator of state.
+ * CONTRAST CHECK (WCAG 2.1 relative luminance, node script) — every text pair passes AA (≥ 4.5:1):
+ *   ink #0A0E14   on canvas 19.34 · surface-2 18.06 · brand-soft 18.14 · brand-tint 14.82 · tint-hover 12.70
+ *   muted #363D47 on canvas 10.96 · surface-2 10.24 · brand-soft 10.28
+ *   brand #C54A0A on canvas  4.82 · surface-2  4.50 · brand-soft  4.52   (links, outlined buttons)
+ *   white on brand 4.82 · white on brand-strong 6.50 ; brand-strong on brand-soft 6.10 · on brand-tint 4.98
+ *   success on success-soft 5.75 · canvas 6.58 ; warning on warning-soft 5.82 · canvas 6.56
+ *   danger  on danger-soft  5.72 · canvas 6.74 ; white on danger 6.74 ; info on info-soft 7.31 · canvas 8.31
+ *   sim on sim-soft 6.30
+ *   line-strong #7A818C (input outlines, state borders) on canvas 3.93 · surface-2 3.67 (≥ 3:1 non-text)
+ * `line` (#E1E3E6) is a decorative hairline only — never the sole indicator of state.
  * ============================================================================= */
 @theme static {
-  /* typography */
-  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  /* typography — bundled locally with @fontsource (no CDN) */
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Merriweather", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
-  /* neutrals — warm paper */
-  --color-canvas: #f7f5f0;
+  /* neutrals — white page, light grey bands */
+  --color-canvas: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-2: #f1eee7;
-  --color-ink: #16181d;
-  --color-muted: #585d69;
-  --color-line: #e6e2d8;
-  --color-line-strong: #8b877c;
+  --color-surface-2: #f7f7f8;
+  --color-band: #f7f7f8;
+  --color-ink: #0a0e14;
+  --color-ink-2: #212529;
+  --color-muted: #363d47;
+  --color-line: #e1e3e6;
+  --color-line-strong: #7a818c;
 
-  /* the one accent — cobalt */
-  --color-brand: #1d47b8;
-  --color-brand-strong: #163894;
+  /* the one accent — institutional orange */
+  --color-brand: #c54a0a;
+  --color-brand-strong: #a33d08;
+  --color-brand-hover: #a33d08;
   --color-brand-ink: #ffffff;
-  --color-brand-soft: #e9eefc;
-  --color-brand-tint: #c9d6f7;
+  --color-brand-soft: #fff6f0;
+  --color-brand-tint: #f8dccb;
+  --color-brand-tint-hover: #f3c9b0;
 
   /* semantic */
   --color-success: #0e6b3d;
-  --color-success-soft: #e1f2e7;
+  --color-success-soft: #e5f3ea;
   --color-warning: #8a4f00;
-  --color-warning-soft: #fcefd4;
+  --color-warning-soft: #fcf0d9;
   --color-danger: #b0241c;
-  --color-danger-soft: #fce7e4;
-  --color-info: #1d47b8;
-  --color-info-soft: #e9eefc;
+  --color-danger-soft: #fce8e6;
+  --color-info: #1f4e8c;
+  --color-info-soft: #eaf1fa;
 
-  /* reserved for "Simulated" only */
+  /* legacy (kept so older classes keep compiling; not used on public screens) */
   --color-sim: #6533c4;
   --color-sim-soft: #f0e9fd;
-
-  /* presenter stage (demo page only) */
   --color-stage: #101317;
   --color-stage-2: #1a1e24;
   --color-stage-line: #2b313a;
   --color-stage-ink: #f4f2ec;
   --color-stage-muted: #a3a8b3;
 
-  /* radii */
-  --radius-card: 18px;
-  --radius-field: 12px;
+  /* radii — square institutional corners; gateway method cards and pills are the exception */
+  --radius-card: 2px;
+  --radius-field: 2px;
+  --radius-method: 16px;
   --radius-pill: 999px;
   --radius-phone: 46px;
 
-  /* layered shadows */
-  --shadow-hairline: 0 0 0 1px rgb(22 24 29 / 0.06);
-  --shadow-card: 0 1px 2px rgb(22 24 29 / 0.04), 0 2px 6px -2px rgb(22 24 29 / 0.06), 0 0 0 1px rgb(22 24 29 / 0.05);
-  --shadow-raised: 0 2px 4px rgb(22 24 29 / 0.04), 0 8px 24px -8px rgb(22 24 29 / 0.14), 0 0 0 1px rgb(22 24 29 / 0.05);
-  --shadow-pop: 0 4px 8px rgb(22 24 29 / 0.05), 0 24px 56px -16px rgb(22 24 29 / 0.28), 0 0 0 1px rgb(22 24 29 / 0.06);
-  --shadow-brand: 0 1px 2px rgb(29 71 184 / 0.3), 0 6px 16px -6px rgb(29 71 184 / 0.55);
+  /* shadows — flat; borders do the work */
+  --shadow-hairline: 0 0 0 1px var(--color-line);
+  --shadow-card: 0 0 0 1px var(--color-line);
+  --shadow-raised: 0 0 0 1px var(--color-line), 0 4px 14px -6px rgb(10 14 20 / 0.14);
+  --shadow-pop: 0 0 0 1px var(--color-line), 0 18px 48px -16px rgb(10 14 20 / 0.3);
+  --shadow-brand: none;
   --shadow-device: 0 2px 4px rgb(0 0 0 / 0.2), 0 30px 80px -20px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06);
 
   /* motion */
@@ -85,7 +89,7 @@
 }
 
 :root {
-  /* motion durations (ms) — mirrored in src/ui/motion.ts */
+  /* motion durations (ms) — mirrored in src/ui/utils.ts */
   --dur-fast: 140ms;
   --dur-base: 240ms;
   --dur-slow: 420ms;

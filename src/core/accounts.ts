@@ -5,8 +5,9 @@
  * The store wires these in with one spread (see the end of `actions` in store.ts); this module never
  * imports the store, it receives its read/commit/audit helpers instead (no circular import).
  *
- * DEMO ONLY: passwords are kept as demoHash(password), which is not a secure hash. Every generated
- * document number is fictional and starts with "DEMO-". Nothing leaves the browser.
+ * Prototype only: passwords are kept as demoHash(password), which is not a secure hash. Every generated
+ * document number is fictional but realistic in shape: DNI/NIE-shaped numbers come from fictionalDniNie()
+ * (deliberately wrong check letter), passports are 2 letters + 7 digits, EU eIDs 9 alphanumerics. Nothing leaves the browser.
  */
 import type {
   Actor, AppState, AuditAction, AuditEvent, Case, CitizenAccount, DocumentType, IdentityDocument,
@@ -14,7 +15,7 @@ import type {
 } from '@/contract/types'
 import type { ClaveActions } from '@/contract/api'
 import {
-  DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_DOCUMENTS, SIGNUP_MIN_AGE, demoHash, normaliseDocNumber,
+  DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_DOCUMENTS, SIGNUP_MIN_AGE, demoHash, fictionalDniNie, normaliseDocNumber,
 } from '@/contract/seed'
 
 /* ------------------------------------------------------------ validation */
@@ -77,27 +78,25 @@ export function validateSignUp(input: SignUpInput, today: Date = new Date()): Ex
 
 /* ------------------------------------------------- fictional identifiers */
 
-/** ISO 3166 alpha-2 codes for the sign-up countries (by English name). "XX" = other. */
-const COUNTRY_CODE: Record<string, string> = {
-  Spain: 'ES', Italy: 'IT', France: 'FR', Germany: 'DE', Portugal: 'PT', Poland: 'PL', Romania: 'RO', Netherlands: 'NL',
-  Morocco: 'MA', Colombia: 'CO', Venezuela: 'VE', Argentina: 'AR', Mexico: 'MX', 'United States': 'US',
-  'United Kingdom': 'GB', China: 'CN', India: 'IN', Ukraine: 'UA', Nigeria: 'NG',
-}
-const countryCode = (c: SignUpCountry) => COUNTRY_CODE[c.name.en] ?? 'XX'
-
-const LETTERS = 'TRWAGMYFPDXBNJZSQVHLCKE'
+const UPPER = 'ABCDEFGHJKLMNPRSTUVWXYZ'
+const ALNUM = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789'
 const digits = (n: number, rnd: () => number) => Array.from({ length: n }, () => Math.floor(rnd() * 10)).join('')
-const letter = (rnd: () => number) => LETTERS[Math.floor(rnd() * LETTERS.length)]
+const pick = (set: string, n: number, rnd: () => number) => Array.from({ length: n }, () => set[Math.floor(rnd() * set.length)]).join('')
+const nieDigits = (rnd: () => number) => 1_000_000 + Math.floor(rnd() * 9_000_000)
 
-/** A clearly fake document number in a format that hints at the document type. Always "DEMO-…". */
-export function fakeDocumentNumber(type: DocumentType, country: SignUpCountry, rnd: () => number = Math.random): string {
+/**
+ * A fictional document number with a realistic shape for the document type:
+ * DNI 8 digits + wrong letter; TIE / NIE paper / red card X|Y|Z + 7 digits + wrong letter (both via fictionalDniNie);
+ * passport 2 letters + 7 digits; EU national eID 9 alphanumerics (starting with a letter).
+ */
+export function fakeDocumentNumber(type: DocumentType, _country?: SignUpCountry, rnd: () => number = Math.random): string {
   switch (type) {
-    case 'PASSPORT': return `DEMO-P-${countryCode(country)}-${digits(6, rnd)}`
-    case 'EU_EID': return `DEMO-EID-${countryCode(country)}-${digits(5, rnd)}`
-    case 'DNI': return `DEMO-DNI-${digits(7, rnd)}-${letter(rnd)}`
-    case 'TIE': return `DEMO-TIE-${'XYZ'[Math.floor(rnd() * 3)]}${digits(7, rnd)}-${letter(rnd)}`
-    case 'NIE_PAPER': return `DEMO-NIE-${'XYZ'[Math.floor(rnd() * 3)]}${digits(7, rnd)}-${letter(rnd)}`
-    case 'RED_CARD': return `DEMO-RC-${digits(4, rnd)}-${letter(rnd)}`
+    case 'PASSPORT': return `${pick(UPPER, 2, rnd)}${digits(7, rnd)}`
+    case 'EU_EID': return `${pick(UPPER, 1, rnd)}${pick(ALNUM, 8, rnd)}`
+    case 'DNI': return fictionalDniNie('', 10_000_000 + Math.floor(rnd() * 89_999_999))
+    case 'TIE':
+    case 'NIE_PAPER':
+    case 'RED_CARD': return fictionalDniNie((['X', 'Y', 'Z'] as const)[Math.floor(rnd() * 3)], nieDigits(rnd))
   }
 }
 
@@ -111,8 +110,11 @@ function uniqueDocumentNumber(s: AppState, type: DocumentType, country: SignUpCo
     const n = fakeDocumentNumber(type, country)
     if (!taken.has(normaliseDocNumber(n))) return n
   }
-  // Practically unreachable: fall back to a time-based suffix.
-  return `${fakeDocumentNumber(type, country)}-${Date.now().toString(36).toUpperCase()}`
+  // Practically unreachable: keep drawing until a free number appears.
+  for (;;) {
+    const n = fakeDocumentNumber(type, country)
+    if (!taken.has(normaliseDocNumber(n))) return n
+  }
 }
 
 function newCaseId(s: AppState): string {
@@ -176,8 +178,8 @@ export function buildSignUpCase(id: string, input: SignUpInput, documentNumber: 
     },
     policyProposal: input.documentType === 'RED_CARD' || input.documentType === 'NIE_PAPER' ? true : undefined,
     scenario: {
-      en: 'Created with the sign-up form on this device. Every simulated check passes by default.',
-      es: 'Creada con el formulario de registro en este dispositivo. Todas las comprobaciones simuladas se superan por defecto.',
+      en: 'Created with the sign-up form on this device. Every check passes by default.',
+      es: 'Creada con el formulario de registro en este dispositivo. Todas las comprobaciones se superan por defecto.',
     },
     demoBeat: { en: 'New sign-up', es: 'Nuevo registro' },
     simulation: { attempts: [] },
@@ -247,7 +249,7 @@ export function createAccountActions({ get, commit, audit }: AccountDeps): Accou
       const actor: Actor = { kind: 'citizen', id, name: c.persona.name }
       // Never put the password (or its hash) in the audit trail.
       const ev = audit(id, actor, 'account_created',
-        `${c.persona.name} created a citizen account (${c.persona.nationality}, ${input.documentType}). Demo document number ${documentNumber} assigned.`)
+        `${c.persona.name} created a citizen account (${c.persona.nationality}, ${input.documentType}). Applicant number ${documentNumber} assigned.`)
       commit({
         ...s,
         cases: { ...s.cases, [id]: c },

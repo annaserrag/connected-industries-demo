@@ -2,8 +2,8 @@ import type { Bilingual } from '@/contract/types'
 
 /** Every dashboard label, in both languages. Numbers are never written here. */
 export const COPY = {
-  eyebrow: { en: 'Get your Cl@ve · Public performance', es: 'Get your Cl@ve · Rendimiento público' },
-  title: { en: 'Service performance', es: 'Rendimiento del servicio' },
+  eyebrow: { en: 'Get your Cl@ve · Open data', es: 'Get your Cl@ve · Datos abiertos' },
+  title: { en: 'Service statistics', es: 'Estadísticas del servicio' },
   subtitle: {
     en: 'How the new registration is doing for foreigners and Spaniards: time to the advanced level, office visits, corrected rejections and appeals.',
     es: 'Cómo funciona el nuevo registro para personas extranjeras y españolas: tiempo hasta el nivel avanzado, visitas a oficina, denegaciones corregidas y recursos.',
@@ -17,7 +17,7 @@ export const COPY = {
     en: 'Real published figures appear only in the “Context” section, with year and source.',
     es: 'Las cifras reales publicadas aparecen solo en la sección «Contexto», con año y fuente.',
   },
-  period: { en: '12 simulated weeks · launch in week 5', es: '12 semanas simuladas · lanzamiento en la semana 5' },
+  period: { en: '12 weeks · launch in week 5', es: '12 semanas · lanzamiento en la semana 5' },
 
   /* ---- KPI tiles ---- */
   kpiSection: { en: 'Headline indicators', es: 'Indicadores principales' },
@@ -88,28 +88,22 @@ export const COPY = {
   ofTotal: { en: 'of total', es: 'del total' },
 
   /* ---- live session ---- */
-  liveSection: { en: 'This demo session (live)', es: 'Esta sesión de demostración (en directo)' },
-  liveBadge: { en: 'Demo session', es: 'Sesión de demostración' },
-  liveIntro: {
-    en: 'Counted from the cases in this browser right now. Run a case in the citizen or officer view, in any tab, and these numbers move.',
-    es: 'Contado a partir de los casos de este navegador en este momento. Ejecuta un caso en la vista ciudadana o funcionaria, en cualquier pestaña, y estas cifras cambian.',
-  },
-  liveTotal: { en: 'Cases in this session', es: 'Casos en esta sesión' },
+  liveSection: { en: 'Applications right now', es: 'Solicitudes en este momento' },
+  liveBadge: { en: 'Live', es: 'En directo' },
+  liveIntro: { en: 'Counted from the applications on the platform right now. The numbers update live as applications move.', es: 'Contado a partir de las solicitudes de la plataforma en este momento. Las cifras se actualizan en directo según avanzan.' },
+  liveTotal: { en: 'Applications', es: 'Solicitudes' },
   liveAuto: { en: 'Approved automatically', es: 'Aprobados automáticamente' },
   liveOfficer: { en: 'Decided by an officer', es: 'Decididos por una persona funcionaria' },
   liveAwaiting: { en: 'Awaiting an officer', es: 'Esperando a una persona funcionaria' },
   liveCorrected: { en: 'Corrected after refusal', es: 'Corregidos tras una denegación' },
   liveByStatus: { en: 'By status', es: 'Por estado' },
   liveDraft: { en: 'Not started', es: 'Sin empezar' },
-  liveNotPart: { en: 'not part of the simulated weekly data.', es: 'no forma parte de los datos semanales simulados.' },
+  liveNotPart: { en: 'not part of the weekly indicators.', es: 'no forma parte de los indicadores semanales.' },
   liveUpdated: { en: 'Updates live across tabs', es: 'Se actualiza en directo entre pestañas' },
 
   /* ---- published figures ---- */
   contextSection: { en: 'Context: published figures', es: 'Contexto: cifras publicadas' },
-  contextIntro: {
-    en: 'Real, published numbers about Cl@ve and digital government in Spain, quoted exactly with their year and source. They are context only and are not part of the simulation.',
-    es: 'Cifras reales y publicadas sobre Cl@ve y la administración digital en España, citadas literalmente con su año y fuente. Son solo contexto y no forman parte de la simulación.',
-  },
+  contextIntro: { en: 'Published numbers about Cl@ve and digital government in Spain, quoted exactly with their year and source.', es: 'Cifras publicadas sobre Cl@ve y la administración digital en España, citadas literalmente con su año y fuente.' },
   publishedBadge: { en: 'Published figure', es: 'Cifra publicada' },
   year: { en: 'Year', es: 'Año' },
   source: { en: 'Source', es: 'Fuente' },
@@ -119,8 +113,5 @@ export const COPY = {
   notes: { en: 'Notes', es: 'Notas' },
   footRule: { en: 'The key rule', es: 'La regla clave' },
   footProposals: { en: 'What we propose to change in the rules', es: 'Lo que proponemos cambiar en las normas' },
-  footProposalsNote: {
-    en: 'These are proposals for a rule change, not something the app solves by itself.',
-    es: 'Son propuestas de cambio normativo, no algo que la aplicación resuelva por sí sola.',
-  },
+  footProposalsNote: { en: 'How the methodology and data were built is explained in About this platform.', es: 'Cómo se han construido la metodología y los datos se explica en Sobre esta plataforma.' },
 } satisfies Record<string, Bilingual>

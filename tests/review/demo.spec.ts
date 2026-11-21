@@ -1,77 +1,83 @@
 /**
- * CHECK 8 — demo readiness: entry points from the landing page, /#/demo side by side, case library, reset.
+ * CHECK 8 — readiness as a real platform: entry points from the landing page, no demo stage, no persona list,
+ * staff sign-in by certificate + PIN or by user + password, the About page discloses what is simulated.
  */
 import { test, expect } from '@playwright/test'
-import { BASE, DEMO_LOGINS, attachConsole, shot, staffCertificateSignIn, type Problems } from './helpers'
+import { BASE, DEMO_LOGINS, attachConsole, shot, staffCertificateSignIn, staffPasswordSignIn, type Problems } from './helpers'
 
-test('8a landing leads with Apply; Staff access tab leads to sign-in; /demo by URL only', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto(`${BASE}/#/`)
-  await expect(page.getByTestId('landing-citizen')).toBeVisible()
-  await expect(page.getByTestId('landing-citizen')).toContainText('Apply')
-  // the dashboard now lives in the staff console; demo mode is reachable by URL only
-  await expect(page.getByRole('link', { name: /Demo mode|dashboard/i })).toHaveCount(0)
-  await page.getByRole('tab', { name: 'Staff access' }).click()
-  await expect(page.getByTestId('landing-officer')).toBeVisible()
-  await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByTestId('landing-officer')).toBeVisible()
-  await page.getByTestId('landing-officer').click()
-  await expect(page.getByRole('button', { name: 'Sign in with your electronic certificate' })).toBeVisible()
-  await page.goto(`${BASE}/#/demo`)
-  await expect(page.locator('iframe')).toHaveCount(2)
-  await page.goto(`${BASE}/#/citizen`)
-  // sign in / create account, and no persona list (demo logins live only in the README)
-  await expect(page.getByTestId('signin-form')).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Create account' })).toBeVisible()
-  await expect(page.locator('[data-testid^="persona-"]')).toHaveCount(0)
-  for (const l of Object.values(DEMO_LOGINS)) await expect(page.getByText(l.name)).toHaveCount(0)
-})
-
-test('8b /#/demo: citizen + officer side by side, live sync inside iframes, reset works', async ({ page }) => {
+test('8a landing leads with Apply; the menu leads to staff sign-in; no /demo stage, no persona list', async ({ page }) => {
   const problems: Problems = { console: [], external: [] }
   attachConsole(page, problems)
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE}/#/`)
+  await expect(page.getByTestId('landing-apply')).toBeVisible()
+  await expect(page.getByTestId('landing-apply')).toContainText('Apply')
+  await expect(page.getByRole('link', { name: /Demo mode/i })).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByTestId('gov-menu-button').first().click()
+  await page.getByRole('link', { name: /^Staff access/ }).first().click()
+  await expect(page).toHaveURL(/#\/officer/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Staff identification' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Access with certificate' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Access with user and password' })).toBeVisible()
+  // the demo stage is gone: /#/demo falls back to the landing page, no iframes
   await page.goto(`${BASE}/#/demo`)
-  const frames = page.locator('iframe')
-  await expect(frames).toHaveCount(2)
-  const srcs = await frames.evaluateAll(f => f.map(x => (x as HTMLIFrameElement).getAttribute('src')))
-  expect(srcs).toEqual(['#/citizen?embed=1', '#/officer?embed=1'])
-  const boxes = await frames.evaluateAll(f => f.map(x => x.getBoundingClientRect()).map(r => ({ x: r.x, y: r.y, w: r.width, h: r.height })))
-  expect(boxes[0].x + boxes[0].w).toBeLessThanOrEqual(boxes[1].x) // side by side
-  expect(boxes[0].w).toBeGreaterThan(200); expect(boxes[1].w).toBeGreaterThan(500)
-  const phone = page.frameLocator('iframe').first()
-  const laptop = page.frameLocator('iframe').nth(1)
-  // officer signs in inside the laptop frame
-  await staffCertificateSignIn(laptop)
-  // no case library on the stage: the phone shows the citizen sign-in; Giulia signs in on the phone
-  await expect(page.getByRole('button', { name: 'Choose a case from the library' })).toHaveCount(0)
+  await expect(page.locator('iframe')).toHaveCount(0)
+  await expect(page.getByTestId('landing-apply')).toBeVisible()
+  await page.goto(`${BASE}/#/citizen`)
+  // sign in / create account, and no persona list (the saved logins live only in the README)
+  await expect(page.getByTestId('signin-form')).toBeVisible()
+  await expect(page.locator('[data-testid^="persona-"]')).toHaveCount(0)
   for (const l of Object.values(DEMO_LOGINS)) await expect(page.getByText(l.name)).toHaveCount(0)
-  await phone.getByTestId('signin-doc').fill(DEMO_LOGINS.giulia.doc)
-  await phone.getByTestId('signin-password').fill(DEMO_LOGINS.giulia.password)
-  await phone.getByTestId('signin-form').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(phone.getByText('Hi, Giulia.')).toBeVisible({ timeout: 10_000 })
-  // run Giulia on the phone frame
-  while (!(await phone.getByRole('button', { name: 'See my route' }).isVisible())) {
-    await phone.getByRole('button', { name: 'Next', exact: true }).click(); await page.waitForTimeout(300)
-  }
-  await phone.getByRole('button', { name: 'See my route' }).click()
-  await phone.getByRole('button', { name: 'Continue with this route' }).click()
-  await phone.getByRole('button', { name: 'I agree, start the checks' }).click()
-  await phone.getByRole('button', { name: 'Start reading the chip' }).click()
-  await phone.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })
-  await phone.getByRole('button', { name: 'Start the face check' }).click()
-  await phone.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })
-  await expect(laptop.getByRole('link', { name: 'Giulia Ferraro', exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await shot(page, '8b-demo-side-by-side')
-  // reset everything
-  await page.getByRole('button', { name: 'Reset all demo data' }).click()
-  await page.getByRole('button', { name: 'Reset everything' }).click()
-  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('getyourclave.state.v1')!).cases.giulia)
-  expect(st.status).toBe('draft')
-  expect(st.decisions).toEqual([])
-  // reset signs the phone out: it is back on the sign-in screen
-  await expect(phone.getByTestId('signin-form')).toBeVisible({ timeout: 10_000 })
-  await expect(laptop.getByRole('link', { name: 'Giulia Ferraro', exact: true })).toHaveCount(0, { timeout: 10_000 })
-  await shot(page, '8b-demo-after-reset')
   expect(problems.console).toEqual([])
+})
+
+test('8b staff sign-in: certificate + PIN and user + password both reach the console; no secrets on screen', async ({ browser }) => {
+  const problems: Problems = { console: [], external: [] }
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage()
+  attachConsole(page, problems)
+  await page.goto(`${BASE}/?debug=1#/officer`)
+  await page.waitForFunction(() => !!window.__clave)
+  await page.evaluate(() => { window.__clave!.actions.officerSignOut(); window.__clave!.actions.resetDemo() })
+  // a wrong PIN is refused with a generic message and reveals nothing about the certificate
+  await page.getByRole('button', { name: 'Access with certificate' }).click()
+  await page.getByTestId('cert-cert-old').click()
+  await page.getByRole('dialog').getByRole('button', { name: 'OK', exact: true }).click()
+  await page.getByLabel('PIN', { exact: true }).fill('0000')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByText('The PIN is not correct.')).toBeVisible()
+  await expect(page.getByTestId('staff-denied')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Other sign-in methods' }).click()
+  await staffCertificateSignIn(page)
+  await shot(page, '8b-staff-console-certificate')
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  // user + password: wrong password is generic, right one signs in (Laura already has her job details)
+  await page.getByRole('button', { name: 'Access with user and password' }).click()
+  await page.getByLabel('User ID').fill('lnavarro')
+  await page.getByLabel('Password', { exact: true }).fill('not-the-password')
+  await page.getByLabel('Password', { exact: true }).press('Enter')
+  await expect(page.getByText('The user or password is not correct.')).toBeVisible()
+  await page.getByRole('button', { name: 'Other sign-in methods' }).click()
+  await staffPasswordSignIn(page)
+  const body = await page.locator('body').innerText()
+  for (const secret of ['2580', 'Navarro-2026', 'not-the-password', '0000']) expect(body).not.toContain(secret)
+  const audit = await page.evaluate(() => JSON.stringify(window.__clave!.getState().audit))
+  for (const secret of ['Navarro-2026', 'not-the-password', '"0000"']) expect(audit).not.toContain(secret)
+  expect(problems.console).toEqual([])
+  await context.close()
+})
+
+test('8c About page lists what is simulated (EN + ES)', async ({ page }) => {
+  await page.goto(`${BASE}/#/about`)
+  const about = page.getByTestId('about-page')
+  await expect(about).toBeVisible()
+  await expect(about.getByRole('heading', { name: 'What is simulated' })).toBeVisible()
+  for (const part of [/verification engine/i, /eIDAS/, /chip/i, /face check/i, /padrón/i, /Staff certificates, PINs and staff accounts/, /wrong check letter/, /Service statistics/]) {
+    await expect(about, String(part)).toContainText(part)
+  }
+  await page.getByRole('button', { name: 'Español' }).first().click()
+  await expect(about.getByRole('heading', { name: 'Qué está simulado' })).toBeVisible()
+  await expect(about).toContainText(/letra de control/i)
+  await page.getByRole('button', { name: 'English' }).first().click()
 })

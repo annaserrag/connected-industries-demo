@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, Check, Info, KeyRound, LoaderCircle, ShieldCheck, Video } from 'lucide-react'
-import { PolicyBadge, SimulatedBadge, StatusPill, cn } from '@/ui'
+import { CalendarClock, Check, KeyRound, LoaderCircle, ShieldCheck, Video } from 'lucide-react'
+import { StatusPill, cn } from '@/ui'
 import { actions, plannedChecks } from '@/core/store'
 import type { Case, CheckId } from '@/contract/types'
-import { CHECKS, CITIZEN_MESSAGES, DOCUMENTS, PENDING_FACT_CHECKS, POLICY_PROPOSALS, ROUTES } from '@/contract/seed'
+import { CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar } from './components/basics'
 import { ChipReadAnimation, FaceScanAnimation, useProgress } from './components/animations'
@@ -39,7 +39,7 @@ function StepHeading({ title, body, badges }: { title: string; body?: ReactNode;
   return (
     <div className="mb-4">
       {badges && <div className="mb-2 flex flex-wrap gap-1.5">{badges}</div>}
-      <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight text-ink">{title}</h1>
+      <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-ink">{title}</h1>
       {body && <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{body}</p>}
     </div>
   )
@@ -50,18 +50,17 @@ function Consent({ c, onDone }: { c: Case; onDone: () => void }) {
   const { tr } = useTr()
   return (
     <div>
-      <div className="mb-4 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"><ShieldCheck size={24} aria-hidden /></div>
+      <div className="mb-4 grid size-12 place-items-center rounded-[2px] bg-brand-soft text-brand"><ShieldCheck size={24} aria-hidden /></div>
       <StepHeading title={tr(CITIZEN_MESSAGES.consentTitle)} body={tr(CITIZEN_MESSAGES.consentBody)} />
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.consentWhat)}</h2>
-        <SimulatedBadge />
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted">{tr(C.consentWhat)}</h2>
       </div>
       <ul className="space-y-1.5">
         {expectedChecks(c).map(id => (
-          <li key={id} className="flex gap-3 rounded-xl bg-surface px-3 py-2.5 ring-1 ring-line">
+          <li key={id} className="flex gap-3 rounded-[2px] bg-surface px-3 py-2.5 border border-line">
             <Check size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
             <span className="text-[13px] leading-snug">
-              <span className="font-semibold text-ink">{tr(CHECKS[id].label)}</span>
+              <span className="font-bold text-ink">{tr(CHECKS[id].label)}</span>
               <span className="block text-muted">{tr(CHECKS[id].explains)}</span>
             </span>
           </li>
@@ -95,23 +94,23 @@ function EidasHandoff({ person, country, onDone, children }: { person: string; c
               <span className="absolute inset-0 animate-ping rounded-full bg-brand/15 motion-reduce:animate-none" />
               <span className="grid size-16 place-items-center rounded-full bg-brand text-brand-ink"><KeyRound size={26} aria-hidden /></span>
             </div>
-            <p className="mt-6 font-display text-xl font-semibold text-ink">{tr(C.redirecting)}</p>
+            <p className="mt-6 font-display text-xl font-bold text-ink">{tr(C.redirecting)}</p>
             <p className="mt-2 max-w-xs text-sm text-muted">{tr(C.redirectingBody)}</p>
             <LoaderCircle className="mt-5 animate-spin text-brand motion-reduce:animate-none" aria-hidden />
           </motion.div>
         )}
         {stage === 'login' && (
           <motion.div key="l" initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="overflow-hidden rounded-3xl border border-line bg-surface shadow-lg">
+            <div className="overflow-hidden rounded-[2px] border border-line bg-surface shadow-lg">
               <div className="flex items-center gap-2 bg-[hsl(215_25%_22%)] px-4 py-3 text-white">
-                <span className="grid size-7 place-items-center rounded-lg bg-white/15"><ShieldCheck size={16} aria-hidden /></span>
-                <span className="text-sm font-semibold">{fill(tr(C.countryLogin), { country })}</span>
+                <span className="grid size-7 place-items-center rounded-[2px] bg-white/15"><ShieldCheck size={16} aria-hidden /></span>
+                <span className="text-sm font-bold">{fill(tr(C.countryLogin), { country })}</span>
               </div>
               <div className="p-4">
                 <p className="text-[13px] leading-snug text-muted">{tr(C.countryLoginBody)}</p>
-                <div className="mt-3 rounded-2xl bg-surface-2 p-3">
-                  <p className="text-[15px] font-semibold text-ink">{person}</p>
-                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">{tr(C.sharedData)}</p>
+                <div className="mt-3 rounded-[2px] bg-surface-2 p-3">
+                  <p className="text-[15px] font-bold text-ink">{person}</p>
+                  <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-muted">{tr(C.sharedData)}</p>
                   <p className="text-[13px] text-ink">{tr(C.sharedFields)}</p>
                 </div>
                 <div className="mt-4">
@@ -119,13 +118,12 @@ function EidasHandoff({ person, country, onDone, children }: { person: string; c
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-center text-[11px] text-muted">{tr(C.neutralNote)}</p>
           </motion.div>
         )}
         {(stage === 'returning' || stage === 'done') && (
           <motion.div key="b" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center py-8 text-center">
             <motion.span initial={reduced ? false : { scale: 0 }} animate={{ scale: 1 }} className="grid size-16 place-items-center rounded-full bg-success text-white"><Check size={30} strokeWidth={3} aria-hidden /></motion.span>
-            <p className="mt-4 font-display text-lg font-semibold text-ink">{tr(C.returning)}</p>
+            <p className="mt-4 font-display text-lg font-bold text-ink">{tr(C.returning)}</p>
             {stage === 'done' && children}
           </motion.div>
         )}
@@ -147,13 +145,13 @@ function GuardianStep({ c, onDone }: { c: Case; onDone: () => void }) {
   return (
     <div>
       <StepHeading
-        badges={<><SimulatedBadge /><span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand">{tr(C.routeLabel)} {ROUTES[g.route].code}</span></>}
+        badges={<><span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand">{tr(C.routeLabel)} {ROUTES[g.route].code}</span></>}
         title={fill(tr(C.guardianTitle), { guardian: g.name })}
         body={fill(tr(C.guardianBody), { guardian: g.name, relation: tr(g.relation), name: first })}
       />
       <EidasHandoff person={g.name} country={g.document.issuingCountry} onDone={() => undefined}>
         <div className="mt-6 w-full text-left">
-          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-line bg-surface p-4 has-[:checked]:border-brand has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/30">
+          <label className="flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/30">
             <input type="checkbox" name="guardianConfirm" className="mt-0.5 size-5 accent-[var(--color-brand)]" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
             <span className="text-[14px] font-medium text-ink">{fill(tr(C.guardianConfirm), { name: first, relation: tr(g.relation) })}</span>
           </label>
@@ -171,20 +169,13 @@ function ChipStep({ c, onDone }: { c: Case; onDone: () => void }) {
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
   const p = useProgress(running, 3400, () => setDone(true))
-  const isTie = c.document.type === 'TIE'
   return (
     <div>
-      <StepHeading badges={<SimulatedBadge />} title={tr(C.chipTitle)} body={tr(C.chipBody)} />
+      <StepHeading title={tr(C.chipTitle)} body={tr(C.chipBody)} />
       <ChipReadAnimation progress={done ? 1 : p} done={done} docLabel={tr(DOCUMENTS[c.document.type].label)} />
-      <p className="mt-3 text-center text-sm font-semibold text-ink" aria-live="polite">
+      <p className="mt-3 text-center text-sm font-bold text-ink" aria-live="polite">
         {done ? tr(C.chipDone) : running ? tr(C.chipReading) : ' '}
       </p>
-      {isTie && (
-        <p className="mt-3 flex gap-2 rounded-2xl bg-warning-soft p-3 text-[12px] leading-snug text-ink" data-testid="tie-assumption">
-          <Info size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-          {tr(PENDING_FACT_CHECKS[0])}
-        </p>
-      )}
       <div className="mt-5">
         {!done ? (
           <BigButton disabled={running} onClick={() => setRunning(true)}>{running ? tr(C.chipReading) : tr(C.chipStart)}</BigButton>
@@ -206,15 +197,13 @@ function FaceStep({ c, onDone }: { c: Case; onDone: () => void }) {
   return (
     <div>
       <StepHeading
-        badges={<SimulatedBadge />}
         title={tr(C.faceTitle)}
         body={assisted ? fill(tr(C.faceBodyAssisted), { name: c.persona.name.split(' ')[0], helper: c.assisted!.helperName.split(' ')[0] }) : tr(C.faceBody)}
       />
       <FaceScanAnimation progress={done ? 1 : p} done={done} />
-      <p className="mt-3 text-center text-sm font-semibold text-ink" aria-live="polite">
+      <p className="mt-3 text-center text-sm font-bold text-ink" aria-live="polite">
         {done ? tr(C.faceDone) : running ? (p < 0.75 ? tr(C.faceTurn) : tr(C.faceHold)) : ' '}
       </p>
-      <p className="mt-1 text-center text-[11px] text-muted">{tr(C.noCameraNote)}</p>
       <div className="mt-4">
         {!done ? (
           <BigButton disabled={running} onClick={() => setRunning(true)}>{running ? tr(C.faceTurn) : tr(C.faceStart)}</BigButton>
@@ -238,12 +227,12 @@ function DniStep({ onDone }: { onDone: () => void }) {
   }, [stage, reduced])
   return (
     <div>
-      <StepHeading badges={<SimulatedBadge />} title={tr(C.dniTitle)} body={tr(C.dniBody)} />
-      <div className="relative grid h-52 place-items-center overflow-hidden rounded-3xl bg-ink text-white">
+      <StepHeading title={tr(C.dniTitle)} body={tr(C.dniBody)} />
+      <div className="relative grid h-52 place-items-center overflow-hidden rounded-[2px] bg-ink text-white">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,hsl(220_20%_30%),hsl(220_25%_9%)_70%)]" aria-hidden />
         <div className="relative text-center" aria-live="polite">
           <Video size={34} className="mx-auto opacity-80" aria-hidden />
-          <p className="mt-2 text-sm font-semibold">
+          <p className="mt-2 text-sm font-bold">
             {stage === -2 ? tr(C.dniTitle) : stage === -1 ? tr(C.connecting) : stage >= 3 ? tr(C.dniDone) : tr(C.dniSteps[stage])}
           </p>
         </div>
@@ -280,19 +269,13 @@ function BookStep({ c, onDone }: { c: Case; onDone: () => void }) {
   return (
     <div>
       <StepHeading
-        badges={<><SimulatedBadge />{(c.policyProposal || c.answers?.document === 'RED_CARD' || c.answers?.document === 'NIE_PAPER') && <PolicyBadge />}</>}
         title={tr(C.bookTitle)}
         body={tr(C.bookBody)}
       />
-      {(c.policyProposal || c.answers?.document === 'RED_CARD' || c.answers?.document === 'NIE_PAPER') && (
-        <p className="mb-4 rounded-2xl border border-warning/30 bg-warning-soft p-3 text-[13px] leading-snug text-ink">
-          {tr(C.policyRouteNote)} {tr(POLICY_PROPOSALS[1])}
-        </p>
-      )}
       {!booked ? (
         <>
           <fieldset>
-            <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.slotsLegend)}</legend>
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">{tr(C.slotsLegend)}</legend>
             <div className="space-y-2">
               {slots.map((s, i) => (
                 <OptionCard key={i} name="videoCallSlot" value={String(i)} checked={pick === i} onChange={() => setPick(i)} title={fill(tr(C.todayAt), { time: fmtTime(s, lang) })} icon={<CalendarClock size={20} />} />
@@ -305,10 +288,10 @@ function BookStep({ c, onDone }: { c: Case; onDone: () => void }) {
         </>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} role="status">
-          <div className="flex gap-3 rounded-2xl bg-success-soft p-4">
+          <div className="flex gap-3 rounded-[2px] bg-success-soft p-4">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-success text-white"><Check size={18} strokeWidth={3} aria-hidden /></span>
             <div>
-              <p className="font-semibold text-ink">{fill(tr(C.booked), { time })}</p>
+              <p className="font-bold text-ink">{fill(tr(C.booked), { time })}</p>
               <p className="mt-0.5 text-[13px] text-muted">{tr(C.bookedBody)}</p>
             </div>
           </div>
@@ -343,7 +326,7 @@ function LiveChecks({ c }: { c: Case }) {
   const approved = c.status === 'approved'
   return (
     <div>
-      <StepHeading badges={<SimulatedBadge />} title={tr(C.liveChecks)} body={tr(C.checksRunning)} />
+      <StepHeading title={tr(C.liveChecks)} body={tr(C.checksRunning)} />
       <div className="mb-3 flex items-center gap-2" aria-live="polite">
         <StatusPill status={status} />
       </div>
@@ -354,7 +337,7 @@ function LiveChecks({ c }: { c: Case }) {
       <AnimatePresence>
         {done && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-5" role="status">
-            <p className={cn('rounded-2xl p-4 text-[15px] font-semibold', approved ? 'bg-success-soft text-success' : 'bg-brand-soft text-ink')}>
+            <p className={cn('rounded-[2px] p-4 text-[15px] font-bold', approved ? 'border-l-4 border-success bg-success-soft text-success' : 'border-l-4 border-brand bg-brand-soft text-ink')}>
               {approved ? tr(C.checksDoneApproved) : tr(C.checksDoneOfficer)}
             </p>
             <div className="mt-3"><BigButton onClick={() => go(`/citizen/case/${c.id}`)}>{tr(C.goToStatus)}</BigButton></div>
@@ -402,7 +385,7 @@ export function Verify() {
           {phase === 'guardian' && <GuardianStep c={c} onDone={next} />}
           {phase === 'eidas' && (
             <div>
-              <StepHeading badges={<SimulatedBadge />} title={tr(ROUTES.A.name)} />
+              <StepHeading title={tr(ROUTES.A.name)} />
               <EidasHandoff person={c.persona.name} country={eidCountry(c)} onDone={next} />
             </div>
           )}

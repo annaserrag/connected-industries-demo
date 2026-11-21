@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { REFERENCE_FIGURES } from '../src/contract/seed'
 
-/** Dashboard (screen 9): simulated labelling, published figures verbatim, live demo-session counts. */
+/** Public "Service statistics" page: no Simulated labels (disclosed on About), published figures verbatim, live counts. */
 
 test.beforeEach(async ({ page }) => {
   // Fresh demo state once per test page (guarded so HMR reloads don't wipe it again).
@@ -15,24 +15,22 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('dashboard-page')).toBeVisible({ timeout: 15000 })
 })
 
-test('shows the page-level Simulated banner', async ({ page }) => {
-  const banner = page.getByTestId('simulated-banner')
-  await expect(banner).toBeVisible()
-  await expect(banner).toContainText('Simulated data')
+test('no Simulated banner or badges: the About page discloses the data instead', async ({ page }) => {
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Service statistics')
+  await expect(page.getByTestId('simulated-banner')).toHaveCount(0)
+  await expect(page.getByText(/Simulated|demo/)).toHaveCount(0)
+  await page.goto('/#/about')
+  await expect(page.getByTestId('about-page')).toContainText('Service statistics page')
 })
 
-test('every chart and KPI tile carries a Simulated badge', async ({ page }) => {
+test('every chart has a text alternative; four KPI tiles', async ({ page }) => {
   const charts = page.getByTestId('chart-card')
   await expect(charts).toHaveCount(5)
   for (const card of await charts.all()) {
-    await expect(card.getByTestId('sim-badge')).toHaveText('Simulated')
-    // Text alternative: an accessible chart image and a data table (hidden until toggled).
     await expect(card.getByRole('img')).toHaveAttribute('aria-label', /.+/)
     await expect(card.locator('table')).toHaveCount(1)
   }
-  const tiles = page.getByTestId('kpi-tile')
-  await expect(tiles).toHaveCount(4)
-  for (const tile of await tiles.all()) await expect(tile.getByTestId('sim-badge')).toBeVisible()
+  await expect(page.getByTestId('kpi-tile')).toHaveCount(4)
 })
 
 test('data table toggles open', async ({ page }) => {
@@ -61,18 +59,17 @@ test('each published figure appears verbatim with its year and source', async ({
 })
 
 test('Spanish labels switch with the toggle', async ({ page }) => {
-  await page.getByTestId('dashboard-page').locator('header button', { hasText: /^\s*es\s*$/i }).first().click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Rendimiento del servicio')
-  await expect(page.getByTestId('simulated-banner')).toContainText('Datos simulados')
+  await page.getByRole('button', { name: 'Español' }).first().click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Estadísticas del servicio')
 })
 
 test('embed mode hides the page header', async ({ page }) => {
   await page.goto('/#/dashboard?embed=1')
-  await expect(page.getByTestId('simulated-banner')).toBeVisible()
-  await expect(page.locator('header')).toHaveCount(0)
+  await expect(page.getByTestId('kpi-tile').first()).toBeVisible()
+  await expect(page.getByTestId('gov-header')).toHaveCount(0)
 })
 
-test('demo-session counts update live from another tab', async ({ page, context }) => {
+test('live counts update from another tab', async ({ page, context }) => {
   const live = page.getByTestId('live-session')
   const awaitingTile = live.locator('li', { hasText: 'Awaiting an officer' })
   const before = Number(await awaitingTile.locator('p').first().innerText())

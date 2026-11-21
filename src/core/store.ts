@@ -474,7 +474,7 @@ export const actions: ClaveActions = {
     runs.clear()
     const s = useClave.getState()
     const fresh = freshState(new Date())
-    const ev = audit(null, SYSTEM_ACTOR, 'demo_reset', 'Demo reset to the seed state.')
+    const ev = audit(null, SYSTEM_ACTOR, 'demo_reset', 'Data reset to the initial state.')
     // Keep the per-tab language, the signed-in officer and staff job details so the presenter is not logged out.
     commit({ ...fresh, lang: s.lang, officerId: s.officerId, officerProfiles: s.officerProfiles ?? {}, audit: [...fresh.audit, ev] }, null, 'demo_reset')
   },

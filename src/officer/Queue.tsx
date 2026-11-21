@@ -8,11 +8,11 @@ import { CHECKS, DOCUMENTS, PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS, ROUTES, ROU
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { baseTierOf, isAgeBumped, officerQueue, priorityOf, relativeTime, waitingSince } from '@/core/selectors'
-import { Avatar, RouteBadge, SimulatedBadge, StatusPill, cn } from '@/ui'
+import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, DECISION_LABEL, OUTCOME_LABEL, RISK_LABEL, S } from './copy'
 import { effectiveOutcome, fill, lastDecisionAt, RISK_RANK, reviewKind, useHotkeys, useLang, useTick, useTr } from './lib'
 import { useLive } from './live'
-import { CheckIcon, Kbd, LiveDot, RiskTag, Sim, Tip } from './components/ui'
+import { CheckIcon, Kbd, LiveDot, RiskTag , Tip } from './components/ui'
 
 type View = 'all' | 'decision' | 'advanced'
 
@@ -233,10 +233,9 @@ export function QueuePage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(C.queueTitle)}</h1>
+            <h1 className="font-display text-[28px] font-bold text-ink">{tr(C.queueTitle)}</h1>
             <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{queue.length}</span>
             <LiveDot label={tr(C.live)} />
-            <SimulatedBadge label={tr({ en: 'AI flags and scores simulated', es: 'Alertas y puntuaciones de IA simuladas' })} />
           </div>
           <p className="mt-1 max-w-2xl text-sm text-muted">{tr(C.queueSubtitle)}</p>
           <p data-testid="priority-legend" className="mt-1.5 flex max-w-3xl items-start gap-1.5 text-[13px] font-medium text-ink">
@@ -263,11 +262,11 @@ export function QueuePage() {
             aria-pressed={risk === r}
             onClick={() => { setRisk(risk === r ? 'all' : r); setSel(0) }}
             className={cn(
-              'group flex items-center gap-3 rounded-2xl border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
+              'group flex items-center gap-3 rounded-[4px] border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
               risk === r ? 'border-ink shadow-sm' : 'border-line',
             )}
           >
-            <span className={cn('grid size-10 place-items-center rounded-xl', bg, fg)}><Icon className="size-5" aria-hidden /></span>
+            <span className={cn('grid size-10 place-items-center rounded-[2px]', bg, fg)}><Icon className="size-5" aria-hidden /></span>
             <span>
               <span className="block text-2xl leading-none font-semibold tabular-nums text-ink">{n}</span>
               <span className="mt-1 block text-xs font-medium text-muted">{tr(RISK_LABEL[r])}</span>
@@ -279,11 +278,11 @@ export function QueuePage() {
           aria-pressed={view === 'advanced'}
           onClick={() => { setView(view === 'advanced' ? 'all' : 'advanced'); setSel(0) }}
           className={cn(
-            'flex items-center gap-3 rounded-2xl border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
+            'flex items-center gap-3 rounded-[4px] border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
             view === 'advanced' ? 'border-ink shadow-sm' : 'border-line',
           )}
         >
-          <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><Layers className="size-5" aria-hidden /></span>
+          <span className="grid size-10 place-items-center rounded-[2px] bg-brand-soft text-brand"><Layers className="size-5" aria-hidden /></span>
           <span>
             <span className="block text-2xl leading-none font-semibold tabular-nums text-ink">{counts.advanced}</span>
             <span className="mt-1 block text-xs font-medium text-muted">{tr(C.advancedReviews)}</span>
@@ -301,14 +300,13 @@ export function QueuePage() {
             aria-label={tr(C.inVerification)}
             className="overflow-hidden"
           >
-            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-sim/25 bg-sim-soft/60 px-4 py-3">
-              <span className="flex items-center gap-2 text-sm font-semibold text-sim"><Cpu className="size-4 animate-pulse" aria-hidden />{tr(C.inVerification)}</span>
-              <Sim />
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[4px] border border-line bg-surface-2 px-4 py-3">
+              <span className="flex items-center gap-2 text-sm font-semibold text-ink"><Cpu className="size-4 animate-pulse" aria-hidden />{tr(C.inVerification)}</span>
               <span className="text-xs text-muted">{tr(C.inVerificationHint)}</span>
               <ul className="flex flex-wrap gap-2">
                 {inVerification.map(c => (
                   <li key={c.id}>
-                    <Link to={PATHS.officerCase(c.id)} className="flex items-center gap-2 rounded-xl bg-surface px-2.5 py-1.5 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                    <Link to={PATHS.officerCase(c.id)} className="flex items-center gap-2 rounded-[2px] bg-surface px-2.5 py-1.5 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-brand">
                       <Avatar initials={c.persona.initials} hue={c.persona.hue} size={22} />
                       <span className="font-medium">{c.persona.name}</span>
                       <span className="flex gap-0.5">
@@ -328,7 +326,7 @@ export function QueuePage() {
 
       {/* Filters */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <div role="group" aria-label={tr(C.view)} className="inline-flex rounded-xl border border-line bg-surface p-1">
+        <div role="group" aria-label={tr(C.view)} className="inline-flex max-w-full flex-wrap rounded-[2px] border border-line bg-surface p-1">
           {([
             ['all', tr(C.all), queue.length],
             ['decision', tr(C.needsDecision), counts.decision],
@@ -340,7 +338,7 @@ export function QueuePage() {
               aria-pressed={view === v}
               onClick={() => { setView(v); setSel(0) }}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-brand',
+                'flex items-center gap-1.5 rounded-[2px] px-3 py-1.5 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-brand',
                 view === v ? 'bg-ink text-white shadow-sm' : 'text-muted hover:text-ink',
               )}
             >
@@ -351,20 +349,20 @@ export function QueuePage() {
         </div>
         <label className="flex items-center gap-2 text-sm text-muted">
           <span>{tr(C.risk)}</span>
-          <select value={risk} onChange={e => { setRisk(e.target.value as RiskLevel | 'all'); setSel(0) }} className="h-9 rounded-xl border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <select value={risk} onChange={e => { setRisk(e.target.value as RiskLevel | 'all'); setSel(0) }} className="h-9 rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <option value="all">{tr(C.allRisks)}</option>
             {(['high', 'medium', 'low'] as const).map(r => <option key={r} value={r}>{tr(RISK_LABEL[r])}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm text-muted">
           <span>{tr(C.route)}</span>
-          <select value={route} onChange={e => { setRoute(e.target.value as RouteId | 'all'); setSel(0) }} className="h-9 max-w-[240px] rounded-xl border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <select value={route} onChange={e => { setRoute(e.target.value as RouteId | 'all'); setSel(0) }} className="h-9 max-w-[240px] rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <option value="all">{tr(C.allRoutes)}</option>
             {ROUTE_ORDER.map(r => <option key={r} value={r}>{ROUTES[r].code} · {tr(ROUTES[r].name)}</option>)}
           </select>
         </label>
         {filtersOn && (
-          <button type="button" onClick={clear} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand">
+          <button type="button" onClick={clear} className="inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1.5 text-sm font-medium text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand">
             <FilterX className="size-4" aria-hidden />{tr(C.clearFilters)}
           </button>
         )}
@@ -372,16 +370,16 @@ export function QueuePage() {
       </div>
 
       {/* Table */}
-      <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(16,16,20,0.04)]">
+      <div className="mt-3 overflow-hidden rounded-[4px] border border-line bg-surface shadow-[0_1px_2px_rgba(16,16,20,0.04)]">
         {filtered.length === 0 ? (
           <div className="grid place-items-center px-6 py-16 text-center">
-            <span className="grid size-14 place-items-center rounded-2xl bg-success-soft text-success"><Inbox className="size-7" aria-hidden /></span>
+            <span className="grid size-14 place-items-center rounded-[4px] bg-success-soft text-success"><Inbox className="size-7" aria-hidden /></span>
             <p className="mt-4 text-lg font-semibold">{queue.length === 0 ? tr(C.emptyQueueTitle) : tr(C.emptyFilterTitle)}</p>
             <p className="mt-1 max-w-md text-sm text-muted">{queue.length === 0 ? tr(C.emptyQueueBody) : ''}</p>
             {queue.length > 0 && <button type="button" onClick={clear} className="mt-3 text-sm font-semibold text-brand hover:underline">{tr(C.clearFilters)}</button>}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-sm">
               <colgroup>
                 <col className="w-[25%]" />
@@ -400,7 +398,7 @@ export function QueuePage() {
                   <th scope="col" className="px-3 py-2.5">{tr(C.risk)}</th>
                   <th scope="col" className="px-3 py-2.5">{tr(C.status)}</th>
                   <th scope="col" className="px-3 py-2.5">
-                    <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3" aria-hidden />{tr(C.whyFlagged)}<SimulatedBadge /></span>
+                    <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3" aria-hidden />{tr(C.whyFlagged)}</span>
                   </th>
                   <th scope="col" className="px-3 py-2.5">{tr(C.checks)}</th>
                   <th scope="col" className="py-2.5 pr-5 pl-3 text-right">{tr(C.waiting)}</th>
@@ -445,9 +443,9 @@ export function QueuePage() {
           <p className="text-xs text-muted">{tr(C.recentlyDecidedHint)}</p>
         </div>
         {recent.length === 0 ? (
-          <p className="mt-3 rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{tr(C.nothingDecided)}</p>
+          <p className="mt-3 rounded-[4px] border border-dashed border-line p-6 text-center text-sm text-muted">{tr(C.nothingDecided)}</p>
         ) : (
-          <ul className="mt-3 grid gap-2 md:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
             <AnimatePresence initial={false}>
               {recent.map(c => {
                 const d = c.decisions[c.decisions.length - 1]
@@ -457,7 +455,7 @@ export function QueuePage() {
                 const when = waiting ? c.infoRequest?.at ?? c.updatedAt : lastDecisionAt(c) ?? c.updatedAt
                 return (
                   <motion.li key={c.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                    <Link to={PATHS.officerCase(c.id)} className={cn('flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand', flashed.has(c.id) && 'ofc-flash')}>
+                    <Link to={PATHS.officerCase(c.id)} className={cn('flex items-center gap-3 rounded-[4px] border border-line bg-surface px-4 py-3 outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand', flashed.has(c.id) && 'ofc-flash')}>
                       <Avatar initials={c.persona.initials} hue={c.persona.hue} size={32} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{c.persona.name}</p>

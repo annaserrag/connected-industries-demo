@@ -1,4 +1,4 @@
-/* UI kit — owned by Design agent (E). Stable API listed in src/contract/api.ts (UI KIT). */
+/* UI kit — Spanish e-government look. Stable API listed in src/contract/api.ts (UI KIT) + GovHeader/GovFooter. */
 export { cn, useLang, useTr, DUR, SPRING, SPRING_POP } from './utils'
 export {
   Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
@@ -7,7 +7,13 @@ export {
 } from './primitives'
 export type { ButtonProps, ButtonVariant, ButtonSize, Tone } from './primitives'
 export { HomeLink } from './HomeLink'
-export { Logo, LogoGlyph, PhoneFrame, PhoneStatusBar, LaptopFrame, Footer, LangToggle, PageHeader } from './layout'
+export { Logo, LogoGlyph, PhoneFrame, PhoneStatusBar, LaptopFrame, LangToggle, PageHeader } from './layout'
+export {
+  GovHeader, GovFooter, Footer, GovTitleBand, GovPage, GovWordmark, GOV_MENU, GOV_FOOTER_LINKS, GOV_TAGLINE, GOV_COPYRIGHT,
+} from './gov'
+export type { GovHeaderProps, GovFooterProps, GovNavItem } from './gov'
+export { MethodCard, InfoCard, Illustration } from './cards'
+export type { IllustrationName } from './cards'
 export { EmptyState, LoadingState, ErrorState, Toaster, toast } from './feedback'
 export { Stepper, CheckRow, OutcomeIcon, ScoreBar, CheckTick, CountUp } from './steps'
 export type { StepItem, StepState } from './steps'

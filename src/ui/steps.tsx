@@ -162,9 +162,9 @@ export const CheckRow = ({ label, outcome, detail, score, threshold, icon, trail
     <motion.div
       layout={reduce ? false : 'position'}
       className={cn(
-        'relative flex gap-3 rounded-[14px] transition-colors duration-300',
+        'relative flex gap-3 rounded-[2px] transition-colors duration-300',
         compact ? 'py-2' : 'p-3.5',
-        !compact && (outcome === 'fail' ? 'bg-danger-soft/60' : outcome === 'warn' ? 'bg-warning-soft/60' : 'bg-surface'),
+        !compact && (outcome === 'fail' ? 'bg-danger-soft' : outcome === 'warn' ? 'bg-warning-soft' : 'bg-surface'),
         className,
       )}
     >
@@ -172,7 +172,7 @@ export const CheckRow = ({ label, outcome, detail, score, threshold, icon, trail
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {icon && <span className="text-muted [&_svg]:size-4" aria-hidden>{icon}</span>}
-          <span className={cn('font-semibold text-ink', compact ? 'text-sm' : 'text-[15px]')}>{label}</span>
+          <span className={cn('font-bold text-ink', compact ? 'text-sm' : 'text-[15px]')}>{label}</span>
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={outcome}
@@ -180,7 +180,7 @@ export const CheckRow = ({ label, outcome, detail, score, threshold, icon, trail
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18 }}
-              className={cn('text-xs font-semibold', m.cls)}
+              className={cn('text-xs font-bold', m.cls)}
             >
               {tr(m.en, m.es)}
             </motion.span>
@@ -241,8 +241,8 @@ export const Stepper = ({ steps, current = 0, orientation = 'horizontal', classN
         className={cn(
           'relative grid size-8 place-items-center rounded-full text-[13px] font-bold',
           s === 'done' && 'bg-success text-white',
-          s === 'current' && 'bg-brand text-brand-ink shadow-brand',
-          s === 'upcoming' && 'bg-surface text-muted ring-[1.5px] ring-inset ring-line-strong/60',
+          s === 'current' && 'bg-brand text-brand-ink',
+          s === 'upcoming' && 'bg-surface text-muted ring-[1.5px] ring-inset ring-line-strong',
           s === 'error' && 'bg-danger text-white',
           s === 'warning' && 'bg-warning text-white',
         )}
@@ -273,7 +273,7 @@ export const Stepper = ({ steps, current = 0, orientation = 'horizontal', classN
               )}
               {dot(st, i)}
               <div className="min-w-0 pt-1">
-                <p className={cn('text-[15px] leading-snug font-semibold', st === 'upcoming' ? 'text-muted' : 'text-ink')}>
+                <p className={cn('text-[15px] leading-snug font-bold', st === 'upcoming' ? 'text-muted' : 'text-ink')}>
                   {s.label}<span className="sr-only"> — {word(st)}</span>
                 </p>
                 {s.description && <div className="mt-1 text-sm leading-relaxed text-muted">{s.description}</div>}
@@ -303,7 +303,7 @@ export const Stepper = ({ steps, current = 0, orientation = 'horizontal', classN
               </span>
             )}
             {dot(st, i)}
-            <span className={cn('mt-2 max-w-[11ch] text-xs leading-tight font-semibold', st === 'upcoming' ? 'text-muted' : 'text-ink')}>
+            <span className={cn('mt-2 max-w-[11ch] text-xs leading-tight font-bold', st === 'upcoming' ? 'text-muted' : 'text-ink')}>
               {s.label}<span className="sr-only"> — {word(st)}</span>
             </span>
           </li>

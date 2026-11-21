@@ -46,10 +46,10 @@ export function ChipReadAnimation({ progress, done, docLabel }: { progress: numb
   const active = progress > 0 && !done
   return (
     <div className="relative mx-auto grid h-64 w-full place-items-center" aria-hidden>
-      <div className="absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_50%_45%,var(--color-brand-soft),transparent_65%)]" />
+      <div className="absolute inset-0 rounded-[2px] bg-[radial-gradient(circle_at_50%_45%,var(--color-brand-soft),transparent_65%)]" />
       {/* phone back */}
       <div className="relative h-56 w-28 rounded-[1.6rem] border-[3px] border-ink/80 bg-gradient-to-b from-surface to-surface-2 shadow-xl">
-        <div className="absolute left-3 top-3 grid grid-cols-2 gap-1 rounded-xl bg-ink/85 p-1.5">
+        <div className="absolute left-3 top-3 grid grid-cols-2 gap-1 rounded-[2px] bg-ink/85 p-1.5">
           <span className="size-3 rounded-full bg-surface-2/70" />
           <span className="size-3 rounded-full bg-surface-2/70" />
           <span className="size-3 rounded-full bg-surface-2/70" />
@@ -68,7 +68,7 @@ export function ChipReadAnimation({ progress, done, docLabel }: { progress: numb
       </div>
       {/* document */}
       <motion.div
-        className="absolute flex h-24 w-40 flex-col justify-between rounded-xl border border-ink/10 bg-gradient-to-br from-[hsl(222_45%_32%)] to-[hsl(222_50%_20%)] p-2.5 text-[9px] font-semibold uppercase tracking-wider text-white/85 shadow-2xl"
+        className="absolute flex h-24 w-40 flex-col justify-between rounded-[2px] border border-ink/10 bg-gradient-to-br from-[hsl(222_45%_32%)] to-[hsl(222_50%_20%)] p-2.5 text-[9px] font-bold uppercase tracking-wider text-white/85 shadow-2xl"
         initial={{ x: 120, y: 60, rotate: 18, opacity: 0 }}
         animate={progress > 0 || done ? { x: 0, y: 18, rotate: -4, opacity: 0.96 } : { x: 120, y: 60, rotate: 18, opacity: 0.9 }}
         transition={{ type: 'spring', stiffness: 120, damping: 16 }}
@@ -78,7 +78,6 @@ export function ChipReadAnimation({ progress, done, docLabel }: { progress: numb
           <span className="grid h-6 w-8 grid-cols-3 gap-px rounded-[3px] bg-[hsl(45_70%_62%)] p-[3px]">
             {Array.from({ length: 6 }).map((_, i) => <span key={i} className="rounded-[1px] bg-[hsl(45_60%_45%)]" />)}
           </span>
-          <span className="text-[8px] tracking-normal text-white/60">DEMO</span>
         </span>
       </motion.div>
       {/* progress badge */}
@@ -106,7 +105,7 @@ export function FaceScanAnimation({ progress, done }: { progress: number; done: 
   const H = 270
   const perim = useMemo(() => Math.PI * (3 * (W / 2 + H / 2) - Math.sqrt((3 * W / 2 + H / 2) * (W / 2 + 3 * H / 2))), [])
   return (
-    <div className="relative mx-auto grid h-[300px] w-full place-items-center overflow-hidden rounded-3xl bg-ink" aria-hidden>
+    <div className="relative mx-auto grid h-[300px] w-full place-items-center overflow-hidden rounded-[2px] bg-ink" aria-hidden>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,hsl(220_20%_30%),hsl(220_25%_9%)_70%)]" />
       {/* silhouette */}
       <motion.svg viewBox="0 0 200 240" width={170} className="relative" animate={{ rotateY: turn, x: turn * 0.6 }} transition={{ type: 'tween', duration: 0.1 }}>

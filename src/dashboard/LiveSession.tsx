@@ -11,7 +11,7 @@ const OFFICER_DECISION_ACTIONS = new Set(['officer_approved_basic', 'officer_app
 
 function LivePill({ label }: { label: string }) {
   return (
-    <span data-testid="demo-badge" className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink">
+    <span data-testid="live-badge" className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-bold text-ink">
       <span className="relative flex size-2" aria-hidden="true">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60 motion-reduce:hidden" />
         <span className="relative inline-flex size-2 rounded-full bg-success" />
@@ -76,25 +76,25 @@ export function LiveSession() {
       <div className="grid gap-4 lg:grid-cols-5">
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-3 lg:grid-cols-3" aria-live="polite">
           {tiles.map(({ icon: Icon, label, value }, i) => (
-            <li key={label} className={`rounded-2xl border border-dashed border-line bg-surface p-4 ${i === 0 ? 'col-span-2 sm:col-span-1' : ''}`}>
+            <li key={label} className={`rounded-[2px] border border-dashed border-line bg-surface p-4 ${i === 0 ? 'col-span-2 sm:col-span-1' : ''}`}>
               <Icon className="size-4 text-muted" aria-hidden="true" />
-              <p className="mt-3 text-3xl font-semibold tracking-tight text-ink tabular-nums">{f.num(value)}</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-ink tabular-nums">{f.num(value)}</p>
               <p className="mt-0.5 text-sm leading-snug text-muted">{label}</p>
             </li>
           ))}
-          <li className="col-span-2 flex items-center rounded-2xl bg-surface-2 p-4 text-sm leading-snug text-muted sm:col-span-1">
-            {tr(COPY.liveUpdated)}. {tr(COPY.liveBadge)}: {tr(COPY.liveNotPart)}
+          <li className="col-span-2 flex items-center rounded-[2px] bg-surface-2 p-4 text-sm leading-snug text-muted sm:col-span-1">
+            {tr(COPY.liveUpdated)}.
           </li>
         </ul>
-        <div className="rounded-2xl border border-dashed border-line bg-surface p-5 lg:col-span-2">
-          <h3 className="text-sm font-semibold text-ink">{tr(COPY.liveByStatus)}</h3>
+        <div className="rounded-[2px] border border-dashed border-line bg-surface p-5 lg:col-span-2">
+          <h3 className="text-sm font-bold text-ink">{tr(COPY.liveByStatus)}</h3>
           <table className="mt-3 w-full text-sm">
             <caption className="sr-only">{tr(COPY.liveByStatus)}</caption>
             <tbody>
               {statusRows.map(r => (
                 <tr key={r.id} className="align-middle">
                   <th scope="row" className="w-[52%] py-1.5 pr-3 text-left font-normal text-ink">
-                    {r.step && <span className="mr-1.5 text-xs font-semibold text-muted tabular-nums">{r.step}.</span>}
+                    {r.step && <span className="mr-1.5 text-xs font-bold text-muted tabular-nums">{r.step}.</span>}
                     {r.label}
                   </th>
                   <td className="py-1.5">
@@ -105,7 +105,7 @@ export function LiveSession() {
                           style={{ width: `${(stats.byStatus[r.id] / maxStatus) * 100}%` }}
                         />
                       </div>
-                      <span className="w-6 text-right font-semibold text-ink tabular-nums">{f.num(stats.byStatus[r.id])}</span>
+                      <span className="w-6 text-right font-bold text-ink tabular-nums">{f.num(stats.byStatus[r.id])}</span>
                     </div>
                   </td>
                 </tr>

@@ -10,12 +10,12 @@ import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { priorityOf, relativeTime } from '@/core/selectors'
 import { casesByDocument, DOCUMENT_ORDER } from '@/core/console'
-import { Avatar, PolicyBadge, RouteBadge, StatusPill, cn } from '@/ui'
+import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, S } from './copy'
 import { useLang, useTick, useTr } from './lib'
 import { RiskTag } from './components/ui'
 import { TierTag } from './Queue'
-import { DemoLiveBadge } from './StaffDashboard'
+import { LiveBadge } from './StaffDashboard'
 
 export const DOC_ICON: Record<DocumentType, typeof IdCard> = {
   DNI: IdCard, EU_EID: Globe2, PASSPORT: BookUser, TIE: CreditCard, NIE_PAPER: ScrollText, RED_CARD: FileText,
@@ -37,8 +37,8 @@ export function DocumentsPage() {
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-6 xl:px-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(S.docTitle)}</h1>
-        <DemoLiveBadge />
+        <h1 className="font-display text-[28px] font-bold text-ink">{tr(S.docTitle)}</h1>
+        <LiveBadge />
       </div>
       <p className="mt-1 max-w-2xl text-sm text-muted">{tr(S.docSubtitle)}</p>
 
@@ -55,18 +55,17 @@ export function DocumentsPage() {
                 data-testid={`doc-tab-${d}`}
                 data-count={n}
                 className={cn(
-                  'group relative flex flex-col items-start gap-2 rounded-2xl border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
+                  'group relative flex flex-col items-start gap-2 rounded-[4px] border bg-surface p-4 text-left outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand',
                   'data-[state=active]:border-ink data-[state=active]:shadow-[0_0_0_1px_var(--color-ink)] border-line',
                 )}
               >
                 <span className="flex w-full items-center justify-between gap-2">
-                  <span className={cn('grid size-9 place-items-center rounded-xl', isPolicyDoc(d) ? 'bg-warning-soft text-warning' : 'bg-brand-soft text-brand')}><Icon className="size-[18px]" aria-hidden /></span>
+                  <span className={cn('grid size-9 place-items-center rounded-[2px]', 'bg-brand-soft text-brand')}><Icon className="size-[18px]" aria-hidden /></span>
                   <span className="text-[28px] leading-none font-semibold tracking-tight text-ink tabular-nums" data-testid={`doc-count-${d}`}>{n}</span>
                 </span>
                 <span className="text-sm leading-snug font-semibold text-ink">{tr(DOCUMENTS[d].label).split(' (')[0]}</span>
                 <span className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
                   {queued > 0 ? <span className="font-semibold text-warning">{queued} {tr(C.inQueue)}</span> : <span>{tr(S.notInQueue)}</span>}
-                  {isPolicyDoc(d) && <PolicyBadge />}
                 </span>
               </Tabs.Trigger>
             )
@@ -78,27 +77,24 @@ export function DocumentsPage() {
           const def = DOCUMENTS[d]
           return (
             <Tabs.Content key={d} value={d} className="mt-5 outline-none focus-visible:ring-2 focus-visible:ring-brand" data-testid={`doc-panel-${d}`}>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-line bg-surface px-5 py-4">
-                <h2 className="text-lg font-semibold tracking-tight text-ink">{tr(def.label)}</h2>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[4px] border border-line bg-surface px-5 py-4">
+                <h2 className="font-display text-lg font-bold text-ink">{tr(def.label)}</h2>
                 <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">
                   {def.hasChip ? <Nfc className="size-4 text-brand" aria-hidden /> : <Video className="size-4 text-sim" aria-hidden />}
                   {def.hasChip ? tr(S.hasChip) : tr(S.noChip)}
                 </span>
-                {isPolicyDoc(d) && (
-                  <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink"><PolicyBadge />{tr(S.policyRoute)}</span>
-                )}
                 <span className="ml-auto text-sm font-semibold text-ink tabular-nums">{list.length} {tr(list.length === 1 ? S.caseOne : S.casesN)}</span>
               </div>
 
-              <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+              <div className="mt-3 overflow-hidden rounded-[4px] border border-line bg-surface">
                 {list.length === 0 ? (
                   <div className="grid place-items-center px-6 py-14 text-center">
-                    <span className="grid size-12 place-items-center rounded-2xl bg-surface-2 text-muted"><Fingerprint className="size-6" aria-hidden /></span>
+                    <span className="grid size-12 place-items-center rounded-[4px] bg-surface-2 text-muted"><Fingerprint className="size-6" aria-hidden /></span>
                     <p className="mt-3 font-semibold text-ink">{tr(S.noAppsDoc)}</p>
                     <p className="mt-1 text-sm text-muted">{tr(S.noAppsDocBody)}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className="w-full min-w-[860px] border-collapse text-left text-sm">
                       <caption className="sr-only">{tr(def.label)}</caption>
                       <thead>

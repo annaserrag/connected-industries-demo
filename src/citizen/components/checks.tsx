@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, CircleMinus, Clock, LoaderCircle, TriangleExclamationPoint, X } from 'lucide-react'
 import type { CheckId, CheckOutcome, CheckResult } from '@/contract/types'
 import { CHECKS, ENGINE } from '@/contract/seed'
-import { cn, SimulatedBadge } from '@/ui'
+import { cn } from '@/ui'
 import { C, fill } from '../copy'
 import { useReduced, useTr } from '../hooks'
 
@@ -58,7 +58,7 @@ export function CheckList({
   const firstWaiting = order.find(id => !got.has(id))
 
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+    <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface">
       <AnimatePresence initial={false}>
         {order.map(id => {
           const r = got.get(id)
@@ -94,7 +94,7 @@ export function CheckList({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                  <span className={cn('text-sm font-semibold', r || active ? 'text-ink' : 'text-muted')}>{tr(def.label)}</span>
+                  <span className={cn('text-sm font-bold', r || active ? 'text-ink' : 'text-muted')}>{tr(def.label)}</span>
                   <span
                     className={cn(
                       'text-xs font-medium',
@@ -121,8 +121,7 @@ export function CheckList({
 export function CheckListHeader({ title }: { title: string }) {
   return (
     <div className="mb-2 flex items-center justify-between">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{title}</h2>
-      <SimulatedBadge />
+      <h2 className="font-display text-[18px] font-bold text-ink">{title}</h2>
     </div>
   )
 }

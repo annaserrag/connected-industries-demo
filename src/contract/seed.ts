@@ -1,7 +1,8 @@
 /**
  * CONTRACT — owned by the orchestrator. Subagents import from here and must NOT edit it.
  *
- * All people, documents and numbers are FICTIONAL. Document numbers always start with "DEMO-".
+ * All people, documents and numbers are FICTIONAL. DNI/NIE-shaped numbers always carry a wrong check letter
+ * (see isFictionalDniNie), so none can be a real person's number.
  * Real figures appear only in REFERENCE_FIGURES, exactly as in the plan's reference sheet.
  */
 import type {
@@ -795,7 +796,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     id: 'deepfake',
     origin: 'library',
     persona: {
-      name: 'Ivo Petrov (claimed)', age: 35, nationality: 'Bulgarian', initials: 'IP', hue: 0,
+      name: 'Ivo Petrov', age: 35, nationality: 'Bulgarian', initials: 'IP', hue: 0,
       profile: { en: 'Deepfake attempt: someone else’s passport, a synthetic face video', es: 'Intento de deepfake: pasaporte ajeno y vídeo facial sintético' },
     },
     document: d('PASSPORT', '391027844', 'Bulgaria', '2029-11-08'),
@@ -808,7 +809,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     simulation: {
       attempts: [{
         liveness: { outcome: 'fail', score: 0.22, detail: { en: 'Injected video stream: no depth, screen-replay pattern, frozen micro-movement', es: 'Vídeo inyectado: sin profundidad, patrón de pantalla, micromovimiento congelado' } },
-        face_match: { outcome: 'pass', score: 0.97, detail: { en: 'Matches chip photo (expected for a deepfake built from it)', es: 'Coincide con la foto del chip (esperable en un deepfake hecho a partir de ella)' } },
+        face_match: { outcome: 'pass', score: 0.97, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
         residence: { outcome: 'warn', detail: { en: 'Address registered 3 days ago', es: 'Domicilio registrado hace 3 días' } },
       }],
     },
@@ -817,7 +818,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     id: 'fakedoc',
     origin: 'library',
     persona: {
-      name: 'Hana Kovač (claimed)', age: 41, nationality: 'Croatian', initials: 'HK', hue: 330,
+      name: 'Hana Kovač', age: 41, nationality: 'Croatian', initials: 'HK', hue: 330,
       profile: { en: 'Fake document: a passport whose chip was cloned and edited', es: 'Documento falso: pasaporte con el chip clonado y modificado' },
     },
     document: d('PASSPORT', '205521963', 'Croatia', '2028-04-30'),

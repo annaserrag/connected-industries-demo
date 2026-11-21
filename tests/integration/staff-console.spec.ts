@@ -1,5 +1,5 @@
 /**
- * Staff console (branch feature/staff-console): certificate sign-in outcomes, job details, priority tiers,
+ * Staff console: certificate + PIN and user + password sign-in outcomes, sidebar by width, job details, priority tiers,
  * age bump, by-document view, live dashboard, landing entry points.
  * Run: PORT=5182 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright test tests/integration/staff-console.spec.ts
  */
@@ -26,136 +26,301 @@ async function boot(page: Page, path = '#/officer') {
   })
 }
 
+const SECRETS = { pins: { 'cert-laura': '2580', 'cert-javier': '1357', 'cert-marta': '4826', 'cert-diego': '9031', 'cert-old': '2580' } as Record<string, string> }
+
 async function pickCertificate(page: Page, certId: string) {
-  await page.getByRole('button', { name: 'Sign in with your electronic certificate' }).click()
+  await page.getByTestId('method-certificate').getByRole('button', { name: 'Access with certificate' }).click()
   const dlg = page.getByRole('dialog')
-  await expect(dlg.getByText('Simulated', { exact: true })).toBeVisible()
+  await expect(dlg.getByText('Simulated', { exact: true })).toHaveCount(0)
   await page.getByTestId(`cert-${certId}`).click()
-  await dlg.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await dlg.getByRole('button', { name: 'OK', exact: true }).click()
+  await expect(page.getByTestId('staff-pin-step')).toBeVisible()
+}
+
+async function certSignIn(page: Page, certId: string, pin = SECRETS.pins[certId]) {
+  await pickCertificate(page, certId)
+  await page.getByLabel('PIN', { exact: true }).fill(pin)
+  await page.getByRole('button', { name: 'Continue' }).click()
+}
+
+async function passwordSignIn(page: Page, user: string, password: string) {
+  await page.getByTestId('method-password').getByRole('button', { name: 'Access with user and password' }).click()
+  await page.getByLabel('User ID').fill(user)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByTestId('staff-password-form').getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
 const lastAudit = (page: Page) => page.evaluate(() => (window as K).__clave.getState().audit.at(-1))
+const auditText = (page: Page) => page.evaluate(() => JSON.stringify((window as K).__clave.getState().audit))
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('Laura, first time: certificate → job details → console; second sign-in skips the form', async ({ page }) => {
+test('sign-in page looks like the gateway: two method cards, no simulated wording', async ({ page }) => {
   const errors = track(page)
   await boot(page)
-  await pickCertificate(page, 'cert-laura')
+  await expect(page.getByRole('heading', { level: 1, name: 'Staff identification' })).toBeVisible()
+  await expect(page.getByText('Choose how to sign in')).toBeVisible()
+  await expect(page.getByTestId('staff-methods').locator('article')).toHaveCount(2)
+  await expect(page.getByTestId('method-certificate')).toContainText('Recommended')
+  await expect(page.locator('body')).not.toContainText(/Simulated|Demo data|\(demo\)|DEMO-/)
+  await page.getByRole('button', { name: 'Español' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Identificación del personal' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Acceder con certificado' })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/Simulado|demostración/)
+  await page.getByRole('button', { name: 'English' }).click()
+  expect(errors).toEqual([])
+})
+
+test('Laura, certificate + PIN: wrong PIN is generic and counted; then job details → console; second sign-in skips the form', async ({ page }) => {
+  const errors = track(page)
+  await boot(page)
+  await certSignIn(page, 'cert-laura', '1111')
+  await expect(page.getByTestId('staff-pin-step')).toContainText('The PIN is not correct.')
+  await expect(page.getByTestId('pin-attempts')).toHaveText('2 attempts left before a short pause.')
+  await expect(page.getByLabel('PIN', { exact: true })).toHaveAttribute('aria-invalid', 'true')
+  expect(await lastAudit(page)).toMatchObject({ action: 'staff_access_denied', actor: { name: 'Laura Navarro' } })
+  expect((await lastAudit(page)).detail).toContain('wrong PIN')
+  // show/hide toggles the field type
+  await page.getByLabel('PIN', { exact: true }).fill('2580')
+  await page.getByRole('button', { name: 'Show PIN' }).click()
+  await expect(page.getByLabel('PIN', { exact: true })).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Continue' }).click()
+
   const form = page.getByTestId('staff-profile-form')
   await expect(form).toBeVisible()
-  // read from the certificate, prefilled from it
-  await expect(form.getByText('DEMO-NIF-0007-L').first()).toBeVisible()
+  await expect(form.getByText('50731842J').first()).toBeVisible()
   await expect(form.getByLabel(/Organisation/)).toHaveValue('aeat')
-  await expect(form.getByLabel(/Office/)).toHaveValue('DEMO-E04000101')
+  await expect(form.getByLabel(/Office/)).toHaveValue('E04999101')
   await expect(form.getByLabel(/^Post/)).toHaveValue('Cl@ve registration officer')
-  await expect(form.getByText(/every decision you take is recorded with these details/)).toBeVisible()
+  await expect(form.getByLabel(/Personnel number/)).toHaveAttribute('placeholder', '50731842JA0611')
+  await expect(form.getByText(/your DNI number and letter, “A”, and your 4-digit body code/)).toBeVisible()
   expect(await lastAudit(page)).toMatchObject({ action: 'staff_signed_in', actor: { kind: 'officer', name: 'Laura Navarro' } })
   expect(await page.evaluate(() => (window as K).__clave.getState().officerId)).toBeNull()
 
-  await form.getByLabel(/Personnel number/).fill('DEMO-NRP-20481')
+  await form.getByLabel(/Personnel number/).fill('50731842ja0611')
   await form.getByRole('button', { name: 'Save and open the console' }).click()
   await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
   await expect(page.getByTestId('officer-identity')).toContainText('Cl@ve registration officer')
-  await expect(page.getByTestId('officer-identity')).toContainText('DEMO-E04000101')
+  await expect(page.getByTestId('officer-identity')).toContainText('E04999101')
   expect(await lastAudit(page)).toMatchObject({ action: 'staff_profile_completed', actor: { id: 'OF-DEMO-07' } })
+  const p = await page.evaluate(() => (window as K).__clave.getState().officerProfiles['OF-DEMO-07'])
+  expect(p).toMatchObject({ personnelNumber: '50731842JA0611', signInMethod: 'certificate', certificateId: 'cert-laura' })
 
-  // profile tab shows the details and the certificate used
-  await page.getByRole('link', { name: 'My profile' }).first().click()
-  await expect(page.getByTestId('profile-details')).toContainText('DEMO-NRP-20481')
+  await page.getByTestId('nav-profile').click()
+  await expect(page.getByTestId('profile-details')).toContainText('50731842JA0611')
+  await expect(page.getByTestId('profile-details')).toContainText('Electronic certificate + PIN')
   await expect(page.getByTestId('staff-profile')).toContainText('Public employee certificate (cryptocard)')
 
-  // sign out, sign in again: no form this time
   await page.getByRole('button', { name: 'Sign out' }).click()
-  await pickCertificate(page, 'cert-laura')
+  await certSignIn(page, 'cert-laura')
   await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
   await expect(page.getByTestId('staff-profile-form')).toHaveCount(0)
   expect(await lastAudit(page)).toMatchObject({ action: 'staff_signed_in' })
 
-  // audit trail shows the staff sign-in events
+  // the PIN never reaches the audit trail
+  const text = await auditText(page)
+  expect(text).toContain('method: certificate + PIN')
+  expect(text).not.toMatch(/2580|1111/)
   await page.goto(`${D}#/officer/audit`)
   await expect(page.getByRole('cell', { name: 'Staff signed in' }).first()).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Job details confirmed' }).first()).toBeVisible()
   expect(errors).toEqual([])
 })
 
-test('Javier with his DNIe: picks organisation, office and post himself', async ({ page }) => {
+test('three wrong PINs give a short pause, never a permanent lock', async ({ page }) => {
   await boot(page)
-  await pickCertificate(page, 'cert-javier')
+  await certSignIn(page, 'cert-marta', '0000')
+  for (const pin of ['0001', '0002']) {
+    await page.getByLabel('PIN', { exact: true }).fill(pin)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByLabel('PIN', { exact: true })).toHaveValue('')
+  }
+  await expect(page.getByTestId('staff-pin-step')).toContainText(/Too many wrong PINs\. For your security, try again in \d+ s\./)
+  await expect(page.getByLabel('PIN', { exact: true })).toBeDisabled()
+  // the core never locks: the right PIN still works through the action
+  const r = await page.evaluate(() => (window as K).__clave.actions.officerSignInWithCertificate('cert-marta', '4826'))
+  expect(r).toMatchObject({ status: 'needs_profile', method: 'certificate', certificateId: 'cert-marta' })
+})
+
+test('Javier with user + password: generic error, then picks organisation, office and post himself', async ({ page }) => {
+  const errors = track(page)
+  await boot(page)
+  await passwordSignIn(page, 'jprieto', 'wrong-password')
+  await expect(page.getByTestId('staff-password-step')).toContainText('The user or password is not correct.')
+  await page.getByLabel('Password', { exact: true }).fill('Prieto-2026')
+  await expect(page.getByLabel('User ID')).toHaveAttribute('autocomplete', 'username')
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'current-password')
+  await page.getByTestId('staff-password-form').getByRole('button', { name: 'Sign in', exact: true }).click()
   const form = page.getByTestId('staff-profile-form')
   await expect(form).toBeVisible()
-  await expect(form.getByText('Electronic DNI (DNIe)').first()).toBeVisible()
+  await expect(form.getByText('From your staff account')).toBeVisible()
+  await expect(form.getByText('jprieto', { exact: true })).toBeVisible()
   await expect(form.getByLabel(/Organisation/)).toHaveValue('')
   await expect(form.getByLabel(/Office/)).toBeDisabled()
   await form.getByLabel(/Organisation/).selectOption('seg_social')
-  await expect(form.getByLabel(/Office/)).toHaveValue('DEMO-E04000214') // only office of that body
+  await expect(form.getByLabel(/Office/)).toHaveValue('E04999214')
   await form.getByLabel(/^Post/).selectOption('Citizen information officer')
-  await form.getByLabel(/Personnel number/).fill('DEMO-NRP-55120')
+  await form.getByLabel(/Personnel number/).fill('29640157HA0384')
   await form.getByText('Supervisor', { exact: true }).click()
   await form.getByRole('button', { name: 'Save and open the console' }).click()
   await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
   await expect(page.getByTestId('officer-identity')).toContainText('Valencia Ruzafa')
   const p = await page.evaluate(() => (window as K).__clave.getState().officerProfiles['OF-DEMO-12'])
-  expect(p).toMatchObject({ authorityId: 'seg_social', officeCode: 'DEMO-E04000214', role: 'supervisor', certificateId: 'cert-javier' })
+  expect(p).toMatchObject({ authorityId: 'seg_social', officeCode: 'E04999214', role: 'supervisor', signInMethod: 'password' })
+  expect(p.certificateId).toBeUndefined()
+  const text = await auditText(page)
+  expect(text).toContain('method: user + password')
+  expect(text).not.toMatch(/Prieto-2026|wrong-password/)
+  expect(errors).toEqual([])
 })
 
-test('Diego is refused: not staff of a registration authority', async ({ page }) => {
+test('Diego is refused by both methods: not staff of a registration authority', async ({ page }) => {
   await boot(page)
-  await pickCertificate(page, 'cert-diego')
+  await certSignIn(page, 'cert-diego')
   const denied = page.getByTestId('staff-denied')
-  await expect(denied).toBeVisible()
   await expect(denied).toHaveAttribute('data-reason', 'not_staff')
   await expect(denied.getByRole('heading', { level: 1 })).toHaveText(/isn’t linked to registration staff/)
   await expect(denied).toContainText('office supervisor')
   expect(await page.evaluate(() => (window as K).__clave.getState().officerId)).toBeNull()
   expect(await lastAudit(page)).toMatchObject({ action: 'staff_access_denied', actor: { name: 'Diego Romero' } })
+  await denied.getByRole('button', { name: 'Sign in another way' }).click()
+  await passwordSignIn(page, 'dromero', 'Romero-2026')
+  await expect(page.getByTestId('staff-denied')).toHaveAttribute('data-reason', 'not_staff')
+  await expect(page.getByTestId('staff-denied')).toContainText('dromero')
   // the console stays closed even by URL
   await page.goto(`${D}#/officer/dashboard`)
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Sign in with your electronic certificate' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Access with certificate' })).toBeVisible()
 })
 
-test('an expired certificate is refused, and "Choose another certificate" reopens the picker', async ({ page }) => {
+test('expired certificate: a wrong PIN reveals nothing; the right PIN shows the expiry', async ({ page }) => {
   await boot(page)
-  await pickCertificate(page, 'cert-old')
+  await certSignIn(page, 'cert-old', '9999')
+  await expect(page.getByTestId('staff-pin-step')).toContainText('The PIN is not correct.')
+  await expect(page.getByTestId('staff-denied')).toHaveCount(0)
+  expect((await lastAudit(page)).detail).not.toContain('expired')
+  await page.getByLabel('PIN', { exact: true }).fill('2580')
+  await page.getByRole('button', { name: 'Continue' }).click()
   const denied = page.getByTestId('staff-denied')
   await expect(denied).toHaveAttribute('data-reason', 'expired')
   await expect(denied.getByRole('heading', { level: 1 })).toHaveText('This certificate has expired')
   await expect(denied).toContainText('30 Jun 2025')
-  expect(await lastAudit(page)).toMatchObject({ action: 'staff_access_denied' })
   expect((await lastAudit(page)).detail).toContain('certificate expired')
   await denied.getByRole('button', { name: 'Choose another certificate' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
 })
 
+test('core: generic invalid_credentials, same outcomes by password, officerSignIn kept for tests', async ({ page }) => {
+  await boot(page)
+  const r = await page.evaluate(() => {
+    const a = (window as K).__clave.actions
+    return {
+      wrongPin: a.officerSignInWithCertificate('cert-old', '1234'),
+      badPinShape: a.officerSignInWithCertificate('cert-laura', 'abcd'),
+      unknownUser: a.officerSignInWithPassword('nobody', 'Navarro-2026'),
+      wrongPw: a.officerSignInWithPassword('lnavarro', 'nope'),
+      emptyPw: a.officerSignInWithPassword('lnavarro', ''),
+      caseInsensitiveUser: a.officerSignInWithPassword('  LNavarro ', 'Navarro-2026'),
+      diego: a.officerSignInWithPassword('dromero', 'Romero-2026'),
+    }
+  })
+  expect(r.wrongPin).toEqual({ status: 'invalid_credentials' })
+  expect(r.badPinShape).toEqual({ status: 'invalid_credentials' })
+  expect(r.unknownUser).toEqual({ status: 'invalid_credentials' })
+  expect(r.wrongPw).toEqual({ status: 'invalid_credentials' })
+  expect(r.emptyPw).toEqual({ status: 'invalid_credentials' })
+  expect(r.caseInsensitiveUser).toEqual({ status: 'needs_profile', officerId: 'OF-DEMO-07', method: 'password' })
+  expect(r.diego).toEqual({ status: 'not_authorised', reason: 'not_staff' })
+  const text = await auditText(page)
+  for (const secret of ['Navarro-2026', 'Romero-2026', '"1234"', 'abcd']) expect(text).not.toContain(secret)
+  await page.evaluate(() => (window as K).__clave.actions.officerSignIn('OF-DEMO-07'))
+  await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
+})
+
 test('personnel number (NRP) is validated in the form and in core', async ({ page }) => {
   await boot(page)
-  await pickCertificate(page, 'cert-marta')
+  await certSignIn(page, 'cert-marta')
   const form = page.getByTestId('staff-profile-form')
   const nrp = form.getByLabel(/Personnel number/)
-  await expect(form.getByText(/use a DEMO-NRP-… number/)).toBeVisible()
-  for (const bad of ['12345678', 'DEMO-NRP-12', 'NRP-1234']) {
+  // 12345678Z has the REAL check letter: refused, like any real-looking DNI
+  for (const bad of ['12345678', 'DEMO-NRP-1234', '71385096AB0952', '12345678ZA0952', '71385096AA095']) {
     await nrp.fill(bad)
     await form.getByRole('button', { name: 'Save and open the console' }).click()
     await expect(nrp).toHaveAttribute('aria-invalid', 'true')
-    await expect(form.getByText('Use the demo format DEMO-NRP- followed by 4 to 8 digits.')).toBeVisible()
+    await expect(form.getByText(/Enter a valid personnel number/)).toBeVisible()
   }
+  await nrp.fill('50731842JA0611') // Laura's DNI, not Marta's
+  await form.getByRole('button', { name: 'Save and open the console' }).click()
+  await expect(form.getByText('The personnel number must start with your own DNI number and letter.')).toBeVisible()
   expect(await page.evaluate(() => (window as K).__clave.getState().officerProfiles['OF-DEMO-21'])).toBeUndefined()
 
   const errs = await page.evaluate(() => {
     const a = (window as K).__clave.actions
     const tryIt = (fn: () => void) => { try { fn(); return null } catch (e) { return (e as Error).name } }
-    const ok = { authorityId: 'delegacion', officeCode: 'DEMO-E04000377', post: 'Office supervisor', personnelNumber: 'DEMO-NRP-7781', role: 'supervisor' }
+    const ok = { authorityId: 'delegacion', officeCode: 'E04999377', post: 'Office supervisor', personnelNumber: '71385096AA0952', role: 'supervisor' }
     return {
-      badNrp: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'cert-marta', { ...ok, personnelNumber: 'X-1' })),
-      wrongOffice: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'cert-marta', { ...ok, officeCode: 'DEMO-E04000101' })),
-      wrongCert: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'cert-laura', ok)),
-      expired: tryIt(() => a.officerCompleteProfile('OF-DEMO-07', 'cert-old', { ...ok, authorityId: 'aeat', officeCode: 'DEMO-E04000101' })),
-      good: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'cert-marta', ok)),
+      badNrp: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', 'cert-marta', { ...ok, personnelNumber: 'X-1' })),
+      realLetter: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', 'cert-marta', { ...ok, personnelNumber: '12345678ZA0952' })),
+      wrongOffice: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', 'cert-marta', { ...ok, officeCode: 'E04999101' })),
+      wrongCert: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', 'cert-laura', ok)),
+      noCert: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', null, ok)),
+      expired: tryIt(() => a.officerCompleteProfile('OF-DEMO-07', 'certificate', 'cert-old', { ...ok, authorityId: 'aeat', officeCode: 'E04999101', personnelNumber: '50731842JA0611' })),
+      notAuthorisedPw: tryIt(() => a.officerCompleteProfile('OF-DEMO-99', 'password', null, ok)),
+      good: tryIt(() => a.officerCompleteProfile('OF-DEMO-21', 'certificate', 'cert-marta', ok)),
     }
   })
-  expect(errs).toEqual({ badNrp: 'ClaveRuleError', wrongOffice: 'ClaveRuleError', wrongCert: 'ClaveRuleError', expired: 'ClaveRuleError', good: null })
+  expect(errs).toEqual({ badNrp: 'ClaveRuleError', realLetter: 'ClaveRuleError', wrongOffice: 'ClaveRuleError', wrongCert: 'ClaveRuleError', noCert: 'ClaveRuleError', expired: 'ClaveRuleError', notAuthorisedPw: 'ClaveRuleError', good: null })
   await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
+})
+
+test('the console menu never disappears: full sidebar, icon rail, phone drawer', async ({ browser }) => {
+  const ROUTES = ['#/officer', '#/officer/dashboard', '#/officer/documents', '#/officer/applications', '#/officer/audit', '#/officer/profile', '#/officer/case/bg-03']
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  const errors = track(page)
+  await boot(page)
+  await page.evaluate(() => { localStorage.removeItem('getyourclave.officer.nav'); (window as K).__clave.actions.officerSignIn('OF-DEMO-07') })
+  // ≥ 1280: full sidebar with labels on every route
+  for (const r of ROUTES) {
+    await page.goto(`${D}${r}`)
+    const side = page.getByTestId('console-sidebar')
+    await expect(side).toBeVisible()
+    await expect(side).toHaveAttribute('data-expanded', 'true')
+    await expect(side.getByText('Dashboard', { exact: true })).toBeVisible()
+  }
+  await expect(page.getByTestId('nav-queue')).toHaveAttribute('aria-current', 'page') // case detail belongs to the queue
+  // 768–1279: icon rail with tooltips, expand toggle remembered across reloads
+  await page.setViewportSize({ width: 1100, height: 800 })
+  for (const r of ROUTES) {
+    await page.goto(`${D}${r}`)
+    await expect(page.getByTestId('console-sidebar')).toHaveAttribute('data-expanded', 'false')
+    await expect(page.getByTestId('nav-dashboard')).toBeVisible()
+  }
+  await page.getByTestId('nav-dashboard').hover()
+  await expect(page.getByRole('tooltip')).toContainText('Dashboard')
+  await page.getByTestId('nav-toggle').click()
+  await expect(page.getByTestId('console-sidebar')).toHaveAttribute('data-expanded', 'true')
+  await page.reload()
+  await expect(page.getByTestId('console-sidebar')).toHaveAttribute('data-expanded', 'true')
+  await page.getByTestId('nav-toggle').click()
+  await expect(page.getByTestId('console-sidebar')).toHaveAttribute('data-expanded', 'false')
+  // < 768: visible Menu button opens a drawer with the same items
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const r of ROUTES) {
+    await page.goto(`${D}${r}`)
+    await expect(page.getByTestId('console-menu-button')).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  }
+  await page.getByTestId('console-menu-button').click()
+  const drawer = page.getByTestId('console-drawer')
+  await expect(drawer).toBeVisible()
+  for (const name of ['Case queue', 'Dashboard', 'By document', 'All applications', 'Audit trail', 'My profile']) await expect(drawer.getByRole('link', { name: new RegExp(name) })).toBeVisible()
+  await drawer.getByRole('link', { name: /Dashboard/ }).click()
+  await expect(drawer).toBeHidden()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  expect(errors).toEqual([])
+  await ctx.close()
 })
 
 test('queue follows the priority tiers, with the age bump', async ({ page }) => {
@@ -234,7 +399,9 @@ test('by-document tab counts match the store', async ({ page }) => {
   await expect(page.getByTestId('doc-panel-TIE').locator('tr[data-case-id]')).toHaveCount(expected.TIE)
   await expect(page.getByTestId('doc-panel-TIE').getByRole('link', { name: 'Daniel Mwangi' })).toBeVisible()
   await page.getByTestId('doc-tab-RED_CARD').click()
-  await expect(page.getByTestId('doc-panel-RED_CARD').getByText('Policy proposal').first()).toBeVisible()
+  // policy-proposal documents are shown as normal routes
+  await expect(page.getByTestId('doc-panel-RED_CARD')).toContainText('No chip: officer video call')
+  await expect(page.getByTestId('doc-panel-RED_CARD').getByText('Policy proposal')).toHaveCount(0)
 })
 
 test('dashboard updates live when a citizen tab submits a case', async ({ browser }) => {
@@ -244,8 +411,8 @@ test('dashboard updates live when a citizen tab submits a case', async ({ browse
   const errors = [...track(officer), ...track(citizen)]
   await boot(officer, '#/officer/dashboard')
   await officer.evaluate(() => (window as K).__clave.actions.officerSignIn('OF-DEMO-07'))
-  await expect(officer.getByTestId('demo-live-badge').first()).toHaveText('Demo data · live')
-  await expect(officer.getByTestId('simulated-trends')).toContainText('Simulated')
+  await expect(officer.getByText('Live', { exact: true }).first()).toBeVisible()
+  await expect(officer.getByTestId('staff-dashboard')).not.toContainText(/Simulated|Demo data/)
   const read = async (id: string) => Number(await officer.getByTestId(id).getAttribute('data-value'))
   const before = { awaiting: await read('kpi-awaiting'), passport: await read('doc-bar-PASSPORT'), p1: await read('tier-count-p1_high_risk') }
 
@@ -266,21 +433,16 @@ test('dashboard updates live when a citizen tab submits a case', async ({ browse
   await ctx.close()
 })
 
-test('landing: Apply first, Staff access tab leads to certificate sign-in (phone)', async ({ browser }) => {
+test('the site menu leads to staff access (phone)', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } })
   const page = await ctx.newPage()
   const errors = track(page)
   await page.goto('/#/')
-  await expect(page.getByRole('tab', { name: 'Apply' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByTestId('landing-citizen')).toContainText('Apply')
-  await expect(page.getByRole('link', { name: /dashboard|Demo mode/i })).toHaveCount(0)
-  const width = await page.evaluate(() => document.documentElement.scrollWidth)
-  expect(width).toBeLessThanOrEqual(390)
-  await page.getByRole('tab', { name: 'Staff access' }).click()
-  await expect(page.getByTestId('landing-staff-panel')).toContainText('registration authorities')
-  await page.getByRole('link', { name: 'Sign in with your certificate' }).click()
+  await page.getByTestId('gov-menu-button').first().click()
+  await page.getByRole('link', { name: /^Staff access/ }).first().click()
   await expect(page).toHaveURL(/#\/officer/)
-  await expect(page.getByRole('button', { name: 'Sign in with your electronic certificate' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Access with certificate' })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   expect(errors).toEqual([])
   await ctx.close()
 })

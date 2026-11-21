@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   CalendarClock, Check, Clock, MessageSquare, PartyPopper, RotateCcw, Scale, Send, ShieldCheck, Undo2, UserRound, Video, X,
 } from 'lucide-react'
-import { Avatar, SimulatedBadge, StatusPill, cn } from '@/ui'
+import { Avatar, StatusPill, cn } from '@/ui'
 import { actions, ClaveRuleError } from '@/core/store'
 import { LiveIndicator, useRecentRemote } from '@/core/LiveIndicator'
 import type { Case, Decision, RejectionReasonId, StatusId } from '@/contract/types'
@@ -14,8 +14,8 @@ import { BigButton, LiveToast, Modal, OptionCard } from './components/basics'
 import { CheckList, CheckListHeader } from './components/checks'
 import { Confetti } from './components/animations'
 import { expectedChecks } from './Verify'
-import { flowPath, safe } from './Shell'
-import { clearSlot, fmtDate, fmtTime, readSlot, rel, todaySlots, useCase, useGo, useReduced, useTick, useTr } from './hooks'
+import { flowPath } from './Shell'
+import { fmtDate, fmtTime, readSlot, rel, todaySlots, useCase, useGo, useReduced, useTick, useTr } from './hooks'
 
 type StepState = 'done' | 'now' | 'next' | 'notNeeded' | 'ifNeeded' | 'notReached'
 
@@ -72,10 +72,10 @@ function Tracker({ c }: { c: Case }) {
                 className={cn(
                   'relative grid size-8 place-items-center rounded-full text-xs font-bold',
                   st === 'done' && 'bg-success text-white',
-                  isNow && !good && !bad && 'bg-brand text-brand-ink ring-4 ring-brand/20',
+                  isNow && !good && !bad && 'bg-brand text-brand-ink ring-4 ring-brand-tint',
                   good && 'bg-success text-white ring-4 ring-success/20',
                   bad && 'bg-danger text-white ring-4 ring-danger/20',
-                  dim && 'border-2 border-dashed border-line bg-surface text-muted',
+                  dim && 'border-2 border-dashed border-line-strong bg-surface text-muted',
                 )}
               >
                 {st === 'done' || good ? <Check size={15} strokeWidth={3} aria-hidden /> : bad ? <X size={15} strokeWidth={3} aria-hidden /> : def.step}
@@ -83,8 +83,8 @@ function Tracker({ c }: { c: Case }) {
             </span>
             <div className="min-w-0 flex-1 pt-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className={cn('text-[15px] font-semibold', isNow ? 'text-ink' : dim ? 'text-muted' : 'text-ink/90')}>{tr(def.label)}</span>
-                <span className={cn('text-[11px] font-semibold uppercase tracking-wide', isNow ? (bad ? 'text-danger' : good ? 'text-success' : 'text-brand') : 'text-muted')}>
+                <span className={cn('text-[15px] font-bold', isNow ? 'text-ink' : dim ? 'text-muted' : 'text-ink/90')}>{tr(def.label)}</span>
+                <span className={cn('text-[11px] font-bold uppercase tracking-wide', isNow ? (bad ? 'text-danger' : good ? 'text-success' : 'text-brand-strong') : 'text-muted')}>
                   {tr(C.stepState[st])}{time ? ` · ${rel(time, lang)}` : ''}
                 </span>
               </div>
@@ -111,7 +111,7 @@ function Levels({ c }: { c: Case }) {
   const { tr } = useTr()
   const chip = (on: boolean, label: string, icon: ReactNode, tone: 'success' | 'warning' | 'muted') => (
     <span className={cn(
-      'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+      'inline-flex items-center gap-1.5 rounded-[2px] px-2.5 py-1 text-[13px] font-bold',
       tone === 'success' && 'bg-success-soft text-success', tone === 'warning' && 'bg-warning-soft text-warning', tone === 'muted' && 'bg-surface-2 text-muted',
       !on && 'line-through decoration-1',
     )}>
@@ -150,14 +150,14 @@ function TextDialog({
           if (typeof res === 'string') setErr(res)
         }}
       >
-        <label htmlFor={`${name}-text`} className="text-sm font-semibold text-ink">{label}</label>
+        <label htmlFor={`${name}-text`} className="text-sm font-bold text-ink">{label}</label>
         <textarea
           id={`${name}-text`} name={name} value={text} onChange={e => setText(e.target.value)} rows={4}
           aria-invalid={err ? true : undefined} aria-describedby={err ? `${name}-err` : undefined}
-          className="mt-1.5 w-full resize-none rounded-2xl border border-line bg-surface p-3 text-[15px] text-ink placeholder:text-muted focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/20"
+          className="mt-1.5 w-full resize-none rounded-[2px] border border-line-strong bg-surface p-3 text-[16px] text-ink placeholder:text-muted focus:border-brand focus:shadow-[inset_0_0_0_1px_var(--color-brand)]"
           placeholder={tr(C.replyPlaceholder)}
         />
-        <button type="button" onClick={() => setText(suggestion)} className="mt-1 text-xs font-semibold text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 rounded">
+        <button type="button" onClick={() => setText(suggestion)} className="gov-link mt-1 text-[14px]">
           {tr(C.replySuggest)}
         </button>
         {err && <p id={`${name}-err`} role="alert" className="mt-2 text-sm text-danger">{err}</p>}
@@ -173,9 +173,8 @@ function BookCallDialog({ open, onOpenChange, onBooked }: { open: boolean; onOpe
   const [pick, setPick] = useState(0)
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={tr(C.bookTitle)} description={tr(C.bookBody)} closeLabel={tr(C.close)}>
-      <div className="mb-3"><SimulatedBadge /></div>
       <fieldset>
-        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.slotsLegend)}</legend>
+        <legend className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">{tr(C.slotsLegend)}</legend>
         <div className="space-y-2">
           {slots.map((s, i) => (
             <OptionCard key={i} name="resultVideoCallSlot" value={String(i)} checked={pick === i} onChange={() => setPick(i)} title={fill(tr(C.todayAt), { time: fmtTime(s, lang) })} icon={<CalendarClock size={20} />} />
@@ -183,7 +182,6 @@ function BookCallDialog({ open, onOpenChange, onBooked }: { open: boolean; onOpe
         </div>
       </fieldset>
       <div className="mt-4"><BigButton onClick={() => onBooked(slots[pick].toISOString())}>{tr(C.bookConfirm)}</BigButton></div>
-      <p className="mt-2 text-center text-[11px] text-muted">{tr(C.bookedSimNote)}</p>
     </Modal>
   )
 }
@@ -198,26 +196,26 @@ function Approved({ c }: { c: Case }) {
   })() : undefined
   return (
     <section aria-labelledby="result-title" className="mb-6" data-testid="result-approved">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-success to-[color-mix(in_oklab,var(--color-success),black_30%)] p-5 text-white shadow-[0_18px_40px_-18px_var(--color-success)]">
-        <PartyPopper size={28} aria-hidden className="opacity-90" />
-        <h2 id="result-title" className="mt-2 font-display text-[26px] font-semibold leading-tight">{tr(C.congrats)}</h2>
-        <p className="mt-1 text-sm text-white/85">{tr(C.congratsBody)}</p>
+      <div className="rounded-card border border-success/40 border-l-[6px] border-l-success bg-success-soft p-5 text-ink">
+        <PartyPopper size={28} aria-hidden className="text-success" />
+        <h2 id="result-title" className="mt-2 font-display text-[26px] font-bold leading-tight">{tr(C.congrats)}</h2>
+        <p className="mt-1 text-[16px] text-ink">{tr(C.congratsBody)}</p>
       </div>
       <div className="mt-3 grid gap-2">
-        <div className="flex items-start gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
+        <div className="flex items-start gap-3 rounded-card border border-line bg-surface p-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-success text-white"><Check size={18} strokeWidth={3} aria-hidden /></span>
           <div>
-            <p className="font-semibold text-ink">{tr(C.basicGranted)}</p>
+            <p className="font-bold text-ink">{tr(C.basicGranted)}</p>
             <p className="text-[13px] text-muted">{tr(C.basicGrantedBody)} · {basicDecision?.by.kind === 'system' ? tr(C.autoGranted) : tr(C.grantedByPerson)}</p>
           </div>
         </div>
         {c.advanced !== 'not_requested' && (
-          <div className="flex items-start gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line" data-testid="advanced-card">
+          <div className="flex items-start gap-3 rounded-card border border-line bg-surface p-4" data-testid="advanced-card">
             <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', c.advanced === 'granted' ? 'bg-success text-white' : 'bg-warning-soft text-warning')}>
               {c.advanced === 'granted' ? <ShieldCheck size={18} aria-hidden /> : <Clock size={18} aria-hidden />}
             </span>
             <div>
-              <p className="font-semibold text-ink">{c.advanced === 'granted' ? tr(C.levelAdvGranted) : tr(LEVEL_LABELS.advanced)}</p>
+              <p className="font-bold text-ink">{c.advanced === 'granted' ? tr(C.levelAdvGranted) : tr(LEVEL_LABELS.advanced)}</p>
               <p className="text-[13px] text-muted">{c.advanced === 'granted' ? tr(C.advGrantedBody) : tr(C.advPendingBody)}</p>
             </div>
           </div>
@@ -225,7 +223,7 @@ function Approved({ c }: { c: Case }) {
       </div>
       {advRefusal?.reasonId && (
         <div className="mt-3">
-          <p className="mb-2 text-sm font-semibold text-ink">{tr(LEVEL_LABELS.advanced)} · {tr(STATUSES.not_approved.label)}</p>
+          <p className="mb-2 text-sm font-bold text-ink">{tr(LEVEL_LABELS.advanced)} · {tr(STATUSES.not_approved.label)}</p>
           <Refusal c={c} decision={advRefusal} compact />
         </div>
       )}
@@ -247,41 +245,41 @@ function Refusal({ c, decision, compact = false }: { c: Case; decision: Decision
   return (
     <div className="space-y-3" data-testid="result-refused">
       {!compact && (
-        <div className="rounded-3xl bg-surface p-5 ring-1 ring-line">
-          <span className="grid size-11 place-items-center rounded-2xl bg-danger-soft text-danger"><UserRound size={22} aria-hidden /></span>
-          <h2 id="result-title" className="mt-3 font-display text-[24px] font-semibold leading-tight text-ink">{tr(C.notApprovedTitle)}</h2>
+        <div className="rounded-card border border-line border-l-[6px] border-l-danger bg-surface p-5">
+          <span className="grid size-11 place-items-center rounded-[2px] bg-danger-soft text-danger"><UserRound size={22} aria-hidden /></span>
+          <h2 id="result-title" className="mt-3 font-display text-[24px] font-bold leading-tight text-ink">{tr(C.notApprovedTitle)}</h2>
           <p className="mt-1 text-[13px] text-muted">{fill(tr(C.personReviewed), { date: fmtDate(decision.at, lang) })}</p>
-          {c.level === 'basic' && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success"><Check size={12} strokeWidth={3} aria-hidden /> {tr(C.levelBasic)}</p>}
+          {c.level === 'basic' && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-bold text-success"><Check size={12} strokeWidth={3} aria-hidden /> {tr(C.levelBasic)}</p>}
         </div>
       )}
       {reason && (
-        <div className="rounded-3xl border border-danger/25 bg-danger-soft/50 p-4" data-testid="refusal-reason">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-danger">{tr(C.theReason)}</h3>
-          <p className="mt-1 text-[15px] font-medium leading-snug text-ink">{tr(reason.citizenMessage)}</p>
-          <h3 className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.howToFix)}</h3>
-          <p className="mt-1 text-[14px] leading-snug text-ink">{tr(reason.howToFix)}</p>
+        <div className="rounded-card border border-danger/40 bg-danger-soft p-4" data-testid="refusal-reason">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-danger">{tr(C.theReason)}</h3>
+          <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">{tr(reason.citizenMessage)}</p>
+          <h3 className="mt-3 text-xs font-bold uppercase tracking-wider text-ink">{tr(C.howToFix)}</h3>
+          <p className="mt-1 text-[15px] leading-snug text-ink">{tr(reason.howToFix)}</p>
         </div>
       )}
-      <p className="flex gap-2 rounded-2xl bg-surface p-3 text-[12px] leading-snug text-muted ring-1 ring-line" data-testid="key-rule">
+      <p className="flex gap-2 rounded-[2px] border-l-4 border-brand bg-brand-soft p-3 text-[14px] leading-snug text-ink" data-testid="key-rule">
         <Scale size={15} className="mt-0.5 shrink-0 text-brand" aria-hidden />
         <span><strong className="text-ink">{tr(C.keyRuleTitle)}:</strong> {tr(KEY_RULE)}</span>
       </p>
 
       {appealOpenState ? (
-        <div className="rounded-2xl bg-brand-soft/70 p-4" role="status" data-testid="appeal-state">
-          <p className="flex items-center gap-2 font-semibold text-ink">
+        <div className="rounded-card border border-brand bg-brand-soft p-4" role="status" data-testid="appeal-state">
+          <p className="flex items-center gap-2 font-bold text-ink">
             <Clock size={16} className="text-brand" aria-hidden />
             {appealOpenState.state === 'open' ? tr(C.appealUnderReview) : appealOpenState.state === 'upheld' ? tr(C.appealUpheld) : tr(C.appealDismissed)}
           </p>
           {appealOpenState.state === 'open' && <p className="mt-1 text-[13px] text-muted">{tr(CITIZEN_MESSAGES.appealConfirmation)}</p>}
-          <p className="mt-2 text-[12px] text-muted"><span className="font-semibold">{tr(C.yourAppeal)}:</span> “{appealOpenState.text}”</p>
+          <p className="mt-2 text-[12px] text-muted"><span className="font-bold">{tr(C.yourAppeal)}:</span> “{appealOpenState.text}”</p>
         </div>
       ) : null}
 
-      {notice && <p role="status" className="rounded-2xl bg-success-soft p-3 text-sm font-medium text-success">{notice}</p>}
+      {notice && <p role="status" className="rounded-[2px] bg-success-soft p-3 text-sm font-medium text-success">{notice}</p>}
       {booked && (
-        <p role="status" className="flex items-center gap-2 rounded-2xl bg-success-soft p-3 text-sm font-medium text-success">
-          <Video size={16} aria-hidden /> {fill(tr(C.booked), { time: fmtTime(new Date(booked), lang) })} <SimulatedBadge />
+        <p role="status" className="flex items-center gap-2 rounded-[2px] bg-success-soft p-3 text-sm font-medium text-success">
+          <Video size={16} aria-hidden /> {fill(tr(C.booked), { time: fmtTime(new Date(booked), lang) })}
         </p>
       )}
 
@@ -343,11 +341,11 @@ function NeedInfo({ c }: { c: Case }) {
   const [err, setErr] = useState('')
   const req = c.infoRequest!
   return (
-    <section className="mb-6 rounded-3xl border-2 border-warning/40 bg-warning-soft/60 p-4" aria-labelledby="need-info-title" data-testid="need-info">
-      <h2 id="need-info-title" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-warning">
+    <section className="mb-6 rounded-card border border-warning/50 border-l-[6px] border-l-warning bg-warning-soft p-4" aria-labelledby="need-info-title" data-testid="need-info">
+      <h2 id="need-info-title" className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-warning">
         <MessageSquare size={16} aria-hidden /> {tr(C.officerAsks)}
       </h2>
-      <blockquote className="mt-2 rounded-2xl bg-surface p-3 text-[15px] leading-snug text-ink ring-1 ring-line">
+      <blockquote className="mt-2 rounded-[2px] bg-surface p-3 text-[15px] leading-snug text-ink border border-line">
         “{req.message}”
         <footer className="mt-1 text-[11px] text-muted">{rel(req.at, lang)}</footer>
       </blockquote>
@@ -359,13 +357,13 @@ function NeedInfo({ c }: { c: Case }) {
           try { actions.respondToInfoRequest(c.id, text.trim()); setText('') } catch (ex) { setErr(ex instanceof Error ? ex.message : String(ex)) }
         }}
       >
-        <label htmlFor="info-reply" className="text-sm font-semibold text-ink">{tr(C.replyLabel)}</label>
+        <label htmlFor="info-reply" className="text-sm font-bold text-ink">{tr(C.replyLabel)}</label>
         <textarea
           id="info-reply" name="infoReply" rows={3} value={text} onChange={e => { setText(e.target.value); setErr('') }}
           placeholder={tr(C.replyPlaceholder)} aria-invalid={err ? true : undefined} aria-describedby={err ? 'info-reply-err' : undefined}
-          className="mt-1.5 w-full resize-none rounded-2xl border border-line bg-surface p-3 text-[15px] text-ink placeholder:text-muted focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/20"
+          className="mt-1.5 w-full resize-none rounded-[2px] border border-line-strong bg-surface p-3 text-[16px] text-ink placeholder:text-muted focus:border-brand focus:shadow-[inset_0_0_0_1px_var(--color-brand)]"
         />
-        <button type="button" onClick={() => setText(tr(C.replySuggestion))} className="text-xs font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 rounded">
+        <button type="button" onClick={() => setText(tr(C.replySuggestion))} className="gov-link text-[14px]">
           {tr(C.replySuggest)}
         </button>
         {err && <p id="info-reply-err" role="alert" className="mt-2 text-sm text-danger">{err}</p>}
@@ -380,7 +378,6 @@ export function StatusPage() {
   const { id } = useParams()
   const c = useCase(id)
   const { tr, lang } = useTr()
-  const go = useGo()
   useTick(20_000)
   const remote = useRecentRemote(id, 2500)
   const [toast, setToast] = useState(false)
@@ -414,13 +411,13 @@ export function StatusPage() {
       <motion.div
         animate={remote ? { boxShadow: ['0 0 0 0 rgba(18,120,74,0)', '0 0 0 6px rgba(18,120,74,0.25)', '0 0 0 0 rgba(18,120,74,0)'] } : {}}
         transition={{ duration: 1.4 }}
-        className={cn('mb-5 flex items-center gap-3 rounded-3xl bg-surface p-3 ring-1 ring-line transition-colors', remote && 'bg-success-soft/50')}
+        className={cn('mb-5 flex items-center gap-3 rounded-card border border-line border-t-4 border-t-brand bg-surface p-4 transition-colors', remote && 'bg-success-soft')}
         data-live-flash={remote ? '1' : undefined}
       >
         <Avatar initials={c.persona.initials} hue={c.persona.hue} size={44} />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[15px] font-semibold text-ink">{tr(C.statusTitle)}</h1>
-          <p className="truncate text-[12px] text-muted">
+          <h1 className="truncate font-display text-[20px] font-bold text-ink">{tr(C.statusTitle)}</h1>
+          <p className="truncate text-[14px] text-muted">
             {c.persona.name}{route ? ` · ${tr(C.routeLabel)} ${route.code}` : ''}{c.submittedAt ? ` · ${tr(C.submitted)} ${rel(c.submittedAt, lang)}` : ''}
           </p>
         </div>
@@ -437,15 +434,15 @@ export function StatusPage() {
       {/* need info */}
       {c.status === 'need_info' && c.infoRequest && <NeedInfo c={c} />}
       {c.infoRequest?.response && c.status !== 'need_info' && (
-        <div className="mb-5 rounded-2xl bg-surface p-3 text-[13px] ring-1 ring-line">
-          <p className="font-semibold text-ink">{tr(C.officerAsks)}: <span className="font-normal">“{c.infoRequest.message}”</span></p>
-          <p className="mt-1 text-muted"><span className="font-semibold">{tr(C.youReplied)}:</span> “{c.infoRequest.response.text}”</p>
+        <div className="mb-5 rounded-card border border-line bg-surface p-3 text-[14px]">
+          <p className="font-bold text-ink">{tr(C.officerAsks)}: <span className="font-normal">“{c.infoRequest.message}”</span></p>
+          <p className="mt-1 text-muted"><span className="font-bold">{tr(C.youReplied)}:</span> “{c.infoRequest.response.text}”</p>
         </div>
       )}
 
       {/* waiting states */}
       {engineRunning && (
-        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-brand-soft/70 p-4 text-sm text-ink" role="status">
+        <div className="mb-5 flex items-center gap-3 rounded-[2px] border-l-4 border-brand bg-brand-soft p-4 text-[15px] text-ink" role="status">
           <RotateCcw size={18} className="animate-spin text-brand [animation-direction:reverse] motion-reduce:animate-none" aria-hidden />
           {tr(C.checksRunning)}
         </div>
@@ -453,30 +450,30 @@ export function StatusPage() {
       {awaiting && (
         <div className="mb-5 space-y-2" role="status">
           {c.route === 'FALLBACK' && slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
-            <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
-              <span className="grid size-10 place-items-center rounded-xl bg-brand text-brand-ink"><Video size={18} aria-hidden /></span>
+            <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
+              <span className="grid size-10 place-items-center rounded-[2px] bg-brand text-brand-ink"><Video size={18} aria-hidden /></span>
               <div>
-                <p className="text-sm font-semibold text-ink">{tr(C.videoCallBookedCard)}</p>
+                <p className="text-sm font-bold text-ink">{tr(C.videoCallBookedCard)}</p>
                 <p className="text-[13px] text-muted">{fill(tr(C.todayAt), { time: fmtTime(new Date(slot), lang) })}</p>
               </div>
-              <span className="ml-auto"><SimulatedBadge /></span>
+              <span className="ml-auto"></span>
             </div>
           )}
-          <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
-            <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><UserRound size={18} aria-hidden /></span>
+          <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
+            <span className="grid size-10 place-items-center rounded-[2px] bg-brand-soft text-brand"><UserRound size={18} aria-hidden /></span>
             <p className="text-[13px] leading-snug text-ink">{tr(C.waitingPerson)}</p>
           </div>
         </div>
       )}
 
       {/* tracker */}
-      <section aria-labelledby="tracker-title" className="mb-6 rounded-3xl bg-surface p-4 ring-1 ring-line">
-        <h2 id="tracker-title" className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.statusTitle)}</h2>
+      <section aria-labelledby="tracker-title" className="mb-6 rounded-card border border-line bg-surface p-4">
+        <h2 id="tracker-title" className="mb-3 font-display text-[18px] font-bold text-ink">{tr(C.progressTitle)}</h2>
         <div aria-live="polite"><Tracker c={c} /></div>
       </section>
 
       <section aria-labelledby="level-title" className="mb-6">
-        <h2 id="level-title" className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{tr(C.levelTitle)}</h2>
+        <h2 id="level-title" className="mb-2 font-display text-[18px] font-bold text-ink">{tr(C.levelTitle)}</h2>
         <Levels c={c} />
       </section>
 
@@ -485,22 +482,6 @@ export function StatusPage() {
         <CheckList expected={expectedChecks(c)} results={c.checks} running={engineRunning} compact />
       </section>
 
-      {c.origin !== 'background' && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={() => {
-              safe(() => actions.resetCase(c.id))
-              clearSlot(c.id)
-              try { sessionStorage.removeItem(`getyourclave.citizen.slot.${c.id}-result`) } catch { /* ignore */ }
-              go(`/citizen/start/${c.id}`)
-            }}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
-          >
-            <RotateCcw size={13} aria-hidden /> {tr(C.startOver)}
-          </button>
-        </div>
-      )}
     </div>
   )
 }

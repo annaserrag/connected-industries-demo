@@ -1,18 +1,18 @@
 /**
- * Citizen sign-in / create-account screen (branch feature/citizen-accounts).
- * No demo identities are listed anywhere: the team's demo logins live only in the README.
+ * Citizen sign-in / create-account screen, laid out like the Cl@ve identification gateway:
+ * centred title, then a grid of method cards (applicant number + password, create an account).
+ * No test identities are listed anywhere: the team's accounts live only in the README.
  */
 import { useId, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
-import * as Tabs from '@radix-ui/react-tabs'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Link, useLocation } from 'react-router-dom'
 import {
-  AlertCircle, BookOpen, ChevronDown, Eye, EyeOff, FileText, FlaskConical, IdCard, KeyRound, LogIn, ShieldCheck, UserPlus,
+  AlertCircle, ArrowUpRight, BookOpen, ChevronDown, Eye, EyeOff, FileText, IdCard, LogIn, ShieldCheck, UserPlus,
 } from 'lucide-react'
-import { cn } from '@/ui'
+import { MethodCard, cn } from '@/ui'
 import { actions, useClave } from '@/core/store'
 import { ageOn, documentsForCountry, isValidName, NAME_MAX_LENGTH, parseIsoDate, SIGNUP_MAX_AGE } from '@/core/accounts'
-import { DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_MIN_AGE } from '@/contract/seed'
+import { DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_MIN_AGE, fictionalDniNie } from '@/contract/seed'
 import type { Bilingual, DocumentType, SignUpResult } from '@/contract/types'
 import { C, fill } from './copy'
 import { BigButton, OptionCard } from './components/basics'
@@ -24,13 +24,17 @@ type Mode = 'signin' | 'signup'
 /* ---------------------------------------------------------- form pieces */
 
 const inputCls =
-  'h-12 w-full rounded-[14px] bg-surface px-4 text-[16px] text-ink ring-1 ring-inset ring-line-strong/70 transition-shadow placeholder:text-muted/80 ' +
-  'hover:ring-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-danger'
+  'h-12 w-full rounded-[2px] border border-line-strong bg-surface px-4 text-[16px] text-ink transition-shadow placeholder:text-muted ' +
+  'hover:border-ink focus-visible:border-brand focus-visible:shadow-[inset_0_0_0_1px_var(--color-brand)] ' +
+  'aria-[invalid=true]:border-danger aria-[invalid=true]:shadow-[inset_0_0_0_1px_var(--color-danger)]'
+
+/** Example shown in the sign-in placeholder: NIE-shaped with a deliberately wrong check letter. */
+const EXAMPLE_NUMBER = fictionalDniNie('Y', 1234567)
 
 function FieldError({ id, children }: { id: string; children?: ReactNode }) {
   if (!children) return null
   return (
-    <p id={id} className="flex items-start gap-1.5 text-[13px] font-semibold leading-snug text-danger">
+    <p id={id} className="flex items-start gap-1.5 text-[14px] font-bold leading-snug text-danger">
       <AlertCircle size={15} className="mt-px shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
@@ -39,7 +43,7 @@ function FieldError({ id, children }: { id: string; children?: ReactNode }) {
 
 function Hint({ id, children }: { id: string; children?: ReactNode }) {
   if (!children) return null
-  return <p id={id} className="text-[13px] leading-snug text-muted">{children}</p>
+  return <p id={id} className="text-[14px] leading-snug text-muted">{children}</p>
 }
 
 type TextFieldProps = {
@@ -59,7 +63,7 @@ function TextField({ label, hint, error, trailing, inputRef, id: idProp, ...inpu
   const describedBy = [error ? errId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-[14px] font-semibold text-ink">{label}</label>
+      <label htmlFor={id} className="block text-[15px] font-bold text-ink">{label}</label>
       <div className="relative">
         <input
           ref={inputRef}
@@ -98,7 +102,7 @@ function PasswordField(props: Omit<TextFieldProps, 'type' | 'trailing'>) {
           aria-pressed={shown}
           aria-label={tr(shown ? C.hidePassword : C.showPassword)}
           title={tr(shown ? C.hidePassword : C.showPassword)}
-          className="grid size-10 place-items-center rounded-[12px] text-muted hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30"
+          className="grid size-10 place-items-center rounded-[2px] text-muted hover:bg-surface-2 hover:text-ink"
         >
           {shown ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
         </button>
@@ -111,7 +115,7 @@ function FormAlert({ children, id }: { children?: ReactNode; id?: string }) {
   return (
     <div aria-live="assertive" aria-atomic="true">
       {children && (
-        <div id={id} role="alert" className="flex items-start gap-2.5 rounded-[14px] bg-danger-soft p-3.5 text-[14px] font-medium leading-snug text-danger">
+        <div id={id} role="alert" className="flex items-start gap-2.5 rounded-[2px] border-l-4 border-danger bg-danger-soft p-3.5 text-[15px] font-semibold leading-snug text-danger">
           <AlertCircle size={18} className="mt-px shrink-0" aria-hidden />
           <span>{children}</span>
         </div>
@@ -167,7 +171,7 @@ function SignInForm({ onSwitch }: { onSwitch: () => void }) {
         autoCorrect="off"
         spellCheck={false}
         inputMode="text"
-        placeholder="DEMO-…"
+        placeholder={fill(tr(C.signInPlaceholder), { example: EXAMPLE_NUMBER })}
         value={doc}
         onChange={e => { setDoc(e.target.value); setFailed(false) }}
         data-testid="signin-doc"
@@ -183,9 +187,9 @@ function SignInForm({ onSwitch }: { onSwitch: () => void }) {
         data-testid="signin-password"
       />
       <BigButton type="submit"><LogIn size={18} aria-hidden /> {tr(C.signInCta)}</BigButton>
-      <p className="text-center text-[14px] text-muted">
+      <p className="text-center text-[15px] text-muted">
         {tr(C.noAccountYet)}{' '}
-        <button type="button" onClick={onSwitch} className="rounded font-semibold text-brand underline decoration-brand/30 underline-offset-[3px] hover:decoration-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30">
+        <button type="button" onClick={onSwitch} className="gov-link">
           {tr(C.createOne)}
         </button>
       </p>
@@ -321,7 +325,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
       />
 
       <div className="space-y-1.5">
-        <label htmlFor="signup-country" className="block text-[14px] font-semibold text-ink">{tr(C.nationality)}</label>
+        <label htmlFor="signup-country" className="block text-[15px] font-bold text-ink">{tr(C.nationality)}</label>
         <div className="relative">
           <select
             id="signup-country"
@@ -348,9 +352,9 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
         className="space-y-2"
         data-testid="signup-doc"
       >
-        <legend id={docLegendId} className="mb-1.5 block text-[14px] font-semibold text-ink">{tr(C.documentType)}</legend>
+        <legend id={docLegendId} className="mb-1.5 block text-[15px] font-bold text-ink">{tr(C.documentType)}</legend>
         {allowedDocs.length === 0 ? (
-          <p id={`${docLegendId}-hint`} className="rounded-[14px] border border-dashed border-line-strong/50 p-3.5 text-[13px] leading-snug text-muted">{tr(C.documentTypeFirst)}</p>
+          <p id={`${docLegendId}-hint`} className="rounded-[2px] border border-dashed border-line-strong p-3.5 text-[14px] leading-snug text-muted">{tr(C.documentTypeFirst)}</p>
         ) : (
           <div className="space-y-2" ref={el => { refs.current.doc = el?.querySelector('input') ?? null }}>
             <AnimatePresence initial={false}>
@@ -398,15 +402,15 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
         data-testid="signup-password2"
       />
 
-      <div className="flex gap-3 rounded-[14px] bg-surface p-3.5 text-[13px] leading-snug text-ink ring-1 ring-line" data-testid="real-doc-note">
+      <div className="flex gap-3 rounded-[2px] border-l-4 border-brand bg-brand-soft p-3.5 text-[14px] leading-snug text-ink" data-testid="real-doc-note">
         <ShieldCheck size={18} className="mt-px shrink-0 text-brand" aria-hidden />
         <p>{tr(C.realDocNote)}</p>
       </div>
 
       <BigButton type="submit"><UserPlus size={18} aria-hidden /> {tr(C.createAccountCta)}</BigButton>
-      <p className="text-center text-[14px] text-muted">
+      <p className="text-center text-[15px] text-muted">
         {tr(C.haveAccount)}{' '}
-        <button type="button" onClick={onSwitch} className="rounded font-semibold text-brand underline decoration-brand/30 underline-offset-[3px] hover:decoration-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30">
+        <button type="button" onClick={onSwitch} className="gov-link">
           {tr(C.signInInstead)}
         </button>
       </p>
@@ -422,70 +426,90 @@ export function SignIn({ notice }: { notice?: 'signedOut' | 'other' }) {
   const reduced = useReduced()
   const { search } = useLocation()
   const [mode, setMode] = useState<Mode>(() => (new URLSearchParams(search).get('mode') === 'signup' ? 'signup' : 'signin'))
-  const tabs: { value: Mode; label: Bilingual; icon: ReactNode }[] = [
-    { value: 'signin', label: C.tabSignIn, icon: <KeyRound size={16} aria-hidden /> },
-    { value: 'signup', label: C.tabSignUp, icon: <UserPlus size={16} aria-hidden /> },
-  ]
-  const switchTo = (m: Mode) => {
+  const firstField = (m: Mode) => document.querySelector<HTMLInputElement>(m === 'signin' ? '[data-testid="signin-doc"]' : '[data-testid="signup-name"]')
+  const open = (m: Mode) => {
     setMode(m)
-    requestAnimationFrame(() => document.getElementById(`account-tab-${m}`)?.focus())
+    requestAnimationFrame(() => {
+      const el = firstField(m)
+      el?.focus({ preventScroll: true })
+      el?.scrollIntoView?.({ block: 'center', behavior: reduced ? 'auto' : 'smooth' })
+    })
   }
+  const panel = (m: Mode, content: ReactNode) => (
+    <AnimatePresence initial={false}>
+      {mode === m && (
+        <motion.div
+          key={m}
+          id={`${m}-panel`}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          transition={{ duration: reduced ? 0.1 : 0.22 }}
+          className="overflow-hidden"
+        >
+          <div className="mt-6 border-t border-line pt-6">{content}</div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
 
   return (
-    <div data-testid="citizen-signin">
-      <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-ink">{tr(C.welcomeTitle)}</h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-muted">{tr(C.welcomeBody)}</p>
+    <div data-testid="citizen-signin" className="mx-auto w-full max-w-[980px]">
+      <div className="text-center">
+        <h1 className="font-display text-[26px] leading-tight font-bold text-ink sm:text-[34px]">{tr(C.welcomeTitle)}</h1>
+        <p className="mt-2 text-[17px] text-muted sm:text-[19px]">{tr(C.welcomeBody)}</p>
+        <p className="mt-3 text-[15px]">
+          <Link to="/help" className="gov-link inline-flex items-center gap-1">{tr(C.whatIsClave)}<ArrowUpRight size={15} aria-hidden /></Link>
+        </p>
+      </div>
 
       {notice && (
-        <p role="status" className="mt-4 flex items-start gap-2 rounded-[14px] bg-warning-soft p-3.5 text-[14px] font-medium leading-snug text-warning" data-testid="signin-notice">
+        <p role="status" className="mx-auto mt-6 flex max-w-[640px] items-start gap-2 rounded-[2px] border-l-4 border-warning bg-warning-soft p-3.5 text-[15px] font-semibold leading-snug text-warning" data-testid="signin-notice">
           <AlertCircle size={18} className="mt-px shrink-0" aria-hidden />
           {tr(notice === 'other' ? C.otherCaseNote : C.signedOutNote)}
         </p>
       )}
 
-      <Tabs.Root value={mode} onValueChange={v => setMode(v as Mode)} className="mt-6">
-        <Tabs.List aria-label={tr(C.accountModes)} className="grid grid-cols-2 rounded-[16px] bg-surface-2 p-1 ring-1 ring-inset ring-line">
-          {tabs.map(t => (
-            <Tabs.Trigger
-              key={t.value}
-              value={t.value}
-              id={`account-tab-${t.value}`}
-              className={cn(
-                'relative z-0 inline-flex h-11 items-center justify-center gap-1.5 rounded-[12px] text-[14px] font-semibold transition-colors',
-                'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30',
-                mode === t.value ? 'text-ink' : 'text-muted hover:text-ink',
-              )}
-            >
-              {mode === t.value && (
-                <motion.span
-                  layoutId="account-tab-pill"
-                  transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
-                  className="absolute inset-0 -z-10 rounded-[12px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.06),0_4px_12px_-6px_rgba(0,0,0,0.12)]"
-                />
-              )}
-              {t.icon}{tr(t.label)}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
+      <div role="group" aria-label={tr(C.methodsLabel)} className="mt-8 grid items-start gap-5 md:grid-cols-2 md:gap-6">
+        <MethodCard
+          testId="method-signin"
+          illustration="password"
+          title={tr(C.methodSignInTitle)}
+          description={tr(C.methodSignInBody)}
+          actionLabel={<><LogIn size={18} aria-hidden />{tr(C.methodSignInCta)}</>}
+          onAction={() => open('signin')}
+          expanded={mode === 'signin'}
+          controls="signin-panel"
+          active={mode === 'signin'}
+        >
+          {panel('signin', <SignInForm onSwitch={() => open('signup')} />)}
+        </MethodCard>
+        <MethodCard
+          testId="method-signup"
+          illustration="new-account"
+          tag={tr(C.methodTagNew)}
+          title={tr(C.methodSignUpTitle)}
+          description={tr(C.methodSignUpBody)}
+          actionLabel={<><UserPlus size={18} aria-hidden />{tr(C.methodSignUpCta)}</>}
+          onAction={() => open('signup')}
+          expanded={mode === 'signup'}
+          controls="signup-panel"
+          active={mode === 'signup'}
+        >
+          {panel('signup', <SignUpForm onSwitch={() => open('signin')} />)}
+        </MethodCard>
+      </div>
 
-        <div className="mt-5">
-          <Tabs.Content value="signin" forceMount className="rounded-[16px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas data-[state=inactive]:hidden">
-            <SignInForm onSwitch={() => switchTo('signup')} />
-          </Tabs.Content>
-          <Tabs.Content value="signup" forceMount className="rounded-[16px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas data-[state=inactive]:hidden">
-            <SignUpForm onSwitch={() => switchTo('signin')} />
-          </Tabs.Content>
-        </div>
-      </Tabs.Root>
-
-      <aside aria-labelledby="proto-title" className="mt-6 flex gap-3 rounded-[16px] bg-sim-soft p-4 text-[13px] leading-relaxed text-ink" data-testid="prototype-note">
-        <FlaskConical size={18} className="mt-0.5 shrink-0 text-sim" aria-hidden />
+      <aside aria-labelledby="security-title" className="mx-auto mt-8 flex max-w-[980px] gap-3 rounded-[2px] border border-line bg-band p-4 text-[15px] leading-relaxed text-ink" data-testid="security-note">
+        <ShieldCheck size={20} className="mt-0.5 shrink-0 text-brand" aria-hidden />
         <div>
-          <p id="proto-title" className="font-semibold text-sim">{tr(C.protoTitle)}</p>
-          <p className="mt-0.5 text-ink/90">{tr(C.protoBody)}</p>
+          <p id="security-title" className="font-bold">{tr(C.protoTitle)}</p>
+          <p className="mt-0.5 text-muted">{tr(C.protoBody)} {tr(C.fictional)}</p>
+          <p className="mt-2">
+            {tr(C.needHelp)} <Link to="/help?s=documents" className="gov-link">{tr(C.helpLink)}</Link>
+          </p>
         </div>
       </aside>
-      <p className="mt-4 text-center text-xs text-muted">{tr(C.fictional)}</p>
     </div>
   )
 }

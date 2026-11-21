@@ -14,13 +14,13 @@ function Tile({ icon, title, children, delay }: { icon: ReactNode; title: string
       initial={reduce ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: reduce ? 0 : delay, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+      className="flex flex-col rounded-[2px] border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
     >
       <div className="flex items-center justify-between gap-2">
-        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">{icon}</span>
+        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[2px] bg-brand-soft text-brand">{icon}</span>
         <Sim />
       </div>
-      <h3 className="mt-3 text-sm font-semibold leading-snug text-ink">{title}</h3>
+      <h3 className="mt-3 text-sm font-bold leading-snug text-ink">{title}</h3>
       <div className="mt-3 flex flex-1 flex-col">{children}</div>
     </motion.article>
   )
@@ -49,13 +49,13 @@ export function Kpis() {
         <dl className="mt-2 grid grid-cols-2 items-end gap-3">
           <div>
             <dt className="text-xs text-muted">{tr(COPY.kpiTimeForeigners)}</dt>
-            <dd className="text-3xl font-semibold tracking-tight text-ink">
+            <dd className="text-3xl font-bold tracking-tight text-ink">
               <CountUp value={fNow} format={v => `${f.num(v)} ${h}`} />
             </dd>
           </div>
           <div>
             <dt className="text-xs text-muted">{tr(COPY.kpiTimeSpaniards)}</dt>
-            <dd className="text-3xl font-semibold tracking-tight text-ink">
+            <dd className="text-3xl font-bold tracking-tight text-ink">
               <CountUp value={sNow} format={v => `${f.num(v)} ${h}`} />
             </dd>
           </div>
@@ -71,7 +71,7 @@ export function Kpis() {
 
       <Tile icon={<Building2 className="size-4" />} title={tr(COPY.kpiOfficeTitle)} delay={0.06}>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">{tr(COPY.kpiLatestWeek)} · {D.weeks[last]}</p>
-        <p className="mt-2 text-4xl font-semibold tracking-tight text-ink">
+        <p className="mt-2 text-4xl font-bold tracking-tight text-ink">
           <CountUp value={officeNow} format={v => f.pct(v)} />
         </p>
         <p className="mt-auto flex items-center gap-1.5 pt-4 text-sm text-ink">
@@ -84,11 +84,11 @@ export function Kpis() {
       </Tile>
 
       <Tile icon={<RotateCcw className="size-4" />} title={tr(COPY.kpiCorrectedTitle)} delay={0.12}>
-        <p className="text-4xl font-semibold tracking-tight text-ink">
+        <p className="text-4xl font-bold tracking-tight text-ink">
           <CountUp value={Math.round(corrPct * 10) / 10} format={v => f.pct1(v)} />
         </p>
         <p className="mt-1 text-sm text-muted">
-          <strong className="font-semibold text-ink tabular-nums">{f.num(correctedAndApproved)}</strong> {tr(COPY.kpiCorrectedOf)}{' '}
+          <strong className="font-bold text-ink tabular-nums">{f.num(correctedAndApproved)}</strong> {tr(COPY.kpiCorrectedOf)}{' '}
           <span className="tabular-nums">{f.num(total)}</span> {tr(COPY.kpiCorrectedRejections)}
         </p>
         <div className="mt-auto pt-4" aria-hidden="true">
@@ -99,7 +99,7 @@ export function Kpis() {
       </Tile>
 
       <Tile icon={<Scale className="size-4" />} title={tr(COPY.kpiAppealsTitle)} delay={0.18}>
-        <p className="text-4xl font-semibold tracking-tight text-ink">
+        <p className="text-4xl font-bold tracking-tight text-ink">
           <CountUp value={A.filed} format={v => f.num(v)} />
           <span className="ml-2 text-sm font-normal text-muted">{tr(COPY.appealsFiled).toLowerCase()}</span>
         </p>
@@ -111,7 +111,7 @@ export function Kpis() {
           ].map(([label, v]) => (
             <div key={tr(label as typeof COPY.appealsOpen)} className="flex items-baseline justify-between py-1">
               <dt className="text-muted">{tr(label as typeof COPY.appealsOpen)}</dt>
-              <dd className="font-semibold text-ink tabular-nums">{f.num(v as number)}</dd>
+              <dd className="font-bold text-ink tabular-nums">{f.num(v as number)}</dd>
             </div>
           ))}
         </dl>
