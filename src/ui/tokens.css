@@ -1,0 +1,101 @@
+/* =============================================================================
+ * Design tokens — owned by Design agent (E). Tailwind v4 @theme.
+ *
+ * Use as Tailwind classes: bg-canvas, bg-surface, bg-surface-2, text-ink, text-muted,
+ * border-line, border-line-strong, bg-brand, text-brand-ink, bg-brand-soft, text-success,
+ * bg-success-soft, text-warning, bg-warning-soft, text-danger, bg-danger-soft, text-info,
+ * bg-info-soft, text-sim, bg-sim-soft, font-display, shadow-card, shadow-pop, rounded-card …
+ * The dark "stage" palette (bg-stage, text-stage-ink …) is only for the presenter /demo page.
+ *
+ * CONTRAST CHECK (WCAG 2.1 relative luminance, computed with a node script) — all pass AA:
+ *   ink        on canvas 16.30 · surface 17.76 · surface-2 15.33 · brand-soft 15.31
+ *   muted      on canvas  6.05 · surface  6.59 · surface-2  5.69 · brand-soft  5.68
+ *   brand      on surface 7.94 · canvas 7.29 · brand-soft 6.84 ; brand-ink on brand 7.94
+ *   success    on success-soft 5.66 · surface 6.58
+ *   warning    on warning-soft 5.76 · surface 6.56
+ *   danger     on danger-soft  5.68 · surface 6.74 ; white on danger 6.74
+ *   sim        on sim-soft     6.30 · surface 7.44
+ *   line-strong (state borders / input outlines) on surface 3.59 · canvas 3.29  (≥ 3:1 UI)
+ *   stage-ink  on stage 16.64 · stage-2 14.95 ; stage-muted on stage 7.81 · stage-2 7.02
+ * `line` (#e6e2d8) is a decorative hairline only — never the sole indicator of state.
+ * ============================================================================= */
+@theme static {
+  /* typography */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* neutrals — warm paper */
+  --color-canvas: #f7f5f0;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1eee7;
+  --color-ink: #16181d;
+  --color-muted: #585d69;
+  --color-line: #e6e2d8;
+  --color-line-strong: #8b877c;
+
+  /* the one accent — cobalt */
+  --color-brand: #1d47b8;
+  --color-brand-strong: #163894;
+  --color-brand-ink: #ffffff;
+  --color-brand-soft: #e9eefc;
+  --color-brand-tint: #c9d6f7;
+
+  /* semantic */
+  --color-success: #0e6b3d;
+  --color-success-soft: #e1f2e7;
+  --color-warning: #8a4f00;
+  --color-warning-soft: #fcefd4;
+  --color-danger: #b0241c;
+  --color-danger-soft: #fce7e4;
+  --color-info: #1d47b8;
+  --color-info-soft: #e9eefc;
+
+  /* reserved for "Simulated" only */
+  --color-sim: #6533c4;
+  --color-sim-soft: #f0e9fd;
+
+  /* presenter stage (demo page only) */
+  --color-stage: #101317;
+  --color-stage-2: #1a1e24;
+  --color-stage-line: #2b313a;
+  --color-stage-ink: #f4f2ec;
+  --color-stage-muted: #a3a8b3;
+
+  /* radii */
+  --radius-card: 18px;
+  --radius-field: 12px;
+  --radius-pill: 999px;
+  --radius-phone: 46px;
+
+  /* layered shadows */
+  --shadow-hairline: 0 0 0 1px rgb(22 24 29 / 0.06);
+  --shadow-card: 0 1px 2px rgb(22 24 29 / 0.04), 0 2px 6px -2px rgb(22 24 29 / 0.06), 0 0 0 1px rgb(22 24 29 / 0.05);
+  --shadow-raised: 0 2px 4px rgb(22 24 29 / 0.04), 0 8px 24px -8px rgb(22 24 29 / 0.14), 0 0 0 1px rgb(22 24 29 / 0.05);
+  --shadow-pop: 0 4px 8px rgb(22 24 29 / 0.05), 0 24px 56px -16px rgb(22 24 29 / 0.28), 0 0 0 1px rgb(22 24 29 / 0.06);
+  --shadow-brand: 0 1px 2px rgb(29 71 184 / 0.3), 0 6px 16px -6px rgb(29 71 184 / 0.55);
+  --shadow-device: 0 2px 4px rgb(0 0 0 / 0.2), 0 30px 80px -20px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06);
+
+  /* motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-pulse-ring: pulse-ring 1.8s var(--ease-out-soft) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+:root {
+  /* motion durations (ms) — mirrored in src/ui/motion.ts */
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

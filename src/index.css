@@ -1,0 +1,53 @@
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "tailwindcss";
+@import "./ui/tokens.css";
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+  html, body, #root { min-height: 100%; }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection { background: var(--color-brand-tint); color: var(--color-ink); }
+
+  /* Visible focus ring on everything focusable (WCAG 2.4.7) */
+  :focus-visible {
+    outline: 2.5px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .on-dark :focus-visible, .on-dark:focus-visible { outline-color: #9db4ff; }
+
+  h1, h2, h3, h4 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
+}
+
+/* Thin, quiet scrollbars */
+@utility scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-ink) 18%, transparent) transparent;
+}
+
+/* Reduced motion: kill large motion and CSS animation everywhere */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Embed mode (demo-stage iframes): keep scrolling, hide the scrollbar chrome so recordings look clean. */
+html[data-embed], html[data-embed] * { scrollbar-width: none; }
+html[data-embed] ::-webkit-scrollbar { display: none; }

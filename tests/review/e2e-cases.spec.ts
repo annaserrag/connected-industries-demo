@@ -1,0 +1,247 @@
+/**
+ * CHECK 1 — E2E per library case. Citizen page 390x844 and officer page 1440x900 in ONE context,
+ * driven through the real UI; no reloads; live sync both ways.
+ */
+import { test, expect, type Page } from '@playwright/test'
+import {
+  citizenAssistant, citizenChipAndFace, citizenConsent, citizenToStatus, officerOpenFromQueue, officerRefuse,
+  officerSignIn, shot, state, twoViews,
+} from './helpers'
+import fs from 'node:fs'
+
+const LOG = '/tmp/review-shots/e2e-problems.json'
+const all: Record<string, unknown> = {}
+test.afterAll(() => { fs.writeFileSync(LOG, JSON.stringify(all, null, 2)) })
+
+async function decide(officer: Page, label: RegExp | string) {
+  const btn = officer.getByRole('button', { name: label })
+  await expect(btn).toBeEnabled()
+  await btn.click()
+  await expect(officer).toHaveURL(/#\/officer\/?$/)
+}
+
+test.describe('1. E2E per case', () => {
+  test('1a Giulia: basic auto, advanced by officer', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    const rec = await citizenAssistant(citizen, 'giulia')
+    expect(rec).toContain('Passport or TIE chip + face check')
+    await citizenConsent(citizen)
+    await citizenChipAndFace(citizen)
+    // engine auto-approves basic; advanced to officer
+    await expect(citizen.getByText('All done: you have Cl@ve.')).toBeVisible({ timeout: 20_000 })
+    await citizenToStatus(citizen)
+    await expect(citizen.getByTestId('levels')).toContainText('Basic')
+    await expect(citizen.getByTestId('levels')).toContainText('Advanced: pending review by a person')
+    let s = await state(citizen)
+    expect(s.cases.giulia.decisions[0]).toMatchObject({ outcome: 'approved_basic', by: { kind: 'system' } })
+    // officer sees it appear live
+    await officerOpenFromQueue(officer, 'Giulia Ferraro')
+    await shot(officer, '1a-giulia-officer-case')
+    await decide(officer, /Grant advanced level/)
+    await expect(citizen.getByTestId('levels')).toContainText('Advanced level granted', { timeout: 10_000 })
+    s = await state(citizen)
+    expect(s.cases.giulia.level).toBe('advanced')
+    expect(s.cases.giulia.decisions.at(-1)).toMatchObject({ outcome: 'approved_advanced', by: { kind: 'officer' } })
+    await shot(citizen, '1a-giulia-citizen-advanced')
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.giulia = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1b Daniel (non-EU, TIE): auto basic, officer grants advanced', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    const rec = await citizenAssistant(citizen, 'daniel')
+    expect(rec).toContain('Passport or TIE chip + face check')
+    await citizenConsent(citizen)
+    await expect(citizen.getByTestId('tie-assumption')).toContainText('pending confirmation')
+    await citizenChipAndFace(citizen)
+    await citizenToStatus(citizen)
+    await officerOpenFromQueue(officer, 'Daniel Mwangi')
+    await decide(officer, /Grant advanced level/)
+    await expect(citizen.getByTestId('levels')).toContainText('Advanced level granted', { timeout: 10_000 })
+    await shot(citizen, '1b-daniel-citizen')
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.daniel = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1c Rafael (neighbour, assisted on daughter phone)', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    await citizenAssistant(citizen, 'rafael')
+    await expect(citizen.getByText('Lucía Medina').first()).toBeVisible()
+    await citizenConsent(citizen)
+    await citizenChipAndFace(citizen)
+    await citizenToStatus(citizen)
+    await officerOpenFromQueue(officer, 'Rafael Medina')
+    await expect(officer.getByText(/Assisted mode on Lucía Medina/).first()).toBeVisible()
+    await shot(officer, '1c-rafael-officer-case')
+    await decide(officer, /Grant advanced level/)
+    await expect(citizen.getByTestId('levels')).toContainText('Advanced level granted', { timeout: 10_000 })
+    const s = await state(citizen)
+    expect(s.cases.rafael.answers.assisted).toBe(true)
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.rafael = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1d Noah (minor with parent): request info round trip, then officer approves', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    await citizenAssistant(citizen, 'noah')
+    await citizenConsent(citizen)
+    // guardian step: simulated eIDAS for the mother
+    await citizen.getByRole('button', { name: 'Approve sign-in' }).click({ timeout: 10_000 })
+    await citizen.getByRole('checkbox').check()
+    await citizen.getByRole('button', { name: 'Continue', exact: true }).click()
+    await citizenChipAndFace(citizen)
+    await expect(citizen.getByText(/A person will review your application/)).toBeVisible({ timeout: 20_000 })
+    await citizenToStatus(citizen)
+    let s = await state(citizen)
+    expect(s.cases.noah.level).toBe('none') // never automatic for a minor
+    await officerOpenFromQueue(officer, 'Noah Becker')
+    await expect(officer.getByText(/Minor \(16\) registering with mother Anke Becker/).first()).toBeVisible()
+    // request info
+    await officer.getByRole('button', { name: /Request more information/ }).click()
+    const dlg = officer.getByRole('dialog')
+    await dlg.getByRole('textbox').fill('Please confirm your mother is your legal guardian.')
+    await dlg.getByRole('button', { name: 'Send request' }).click()
+    await expect(citizen.getByTestId('need-info')).toContainText('legal guardian', { timeout: 10_000 })
+    await shot(citizen, '1d-noah-citizen-need-info')
+    await citizen.getByLabel(/answer|reply/i).first().fill('Yes, she is my mother and legal guardian.')
+    await citizen.getByRole('button', { name: 'Send answer' }).click()
+    await officerOpenFromQueue(officer, 'Noah Becker')
+    await expect(officer.getByText('Yes, she is my mother and legal guardian.').first()).toBeVisible({ timeout: 10_000 })
+    await decide(officer, /Grant basic level/)
+    await expect(citizen.getByTestId('result-approved')).toBeVisible({ timeout: 10_000 })
+    s = await state(citizen)
+    expect(s.cases.noah.decisions.at(-1)).toMatchObject({ outcome: 'approved_basic', by: { kind: 'officer' } })
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.noah = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1e Yusuf (red card): marked Policy proposal, video call, officer approves', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    const rec = await citizenAssistant(citizen, 'yusuf')
+    expect(rec).toContain('Video call with an officer, then office')
+    expect(rec).toContain('Policy proposal')
+    await citizenConsent(citizen)
+    await expect(citizen.getByText('Policy proposal').first()).toBeVisible()
+    await citizen.getByRole('button', { name: 'Book this time' }).click()
+    await citizen.getByRole('button', { name: 'Send for checks' }).click()
+    await citizenToStatus(citizen)
+    await officerOpenFromQueue(officer, 'Yusuf Haddad')
+    await expect(officer.getByText('Policy proposal').first()).toBeVisible()
+    await shot(officer, '1e-yusuf-officer-policy')
+    await expect(officer.getByRole('button', { name: /Grant basic level/ })).toBeDisabled()
+    await officer.getByRole('button', { name: 'Start video call' }).click()
+    await officer.getByRole('button', { name: 'Back to the decision' }).click({ timeout: 15_000 })
+    await decide(officer, /Grant basic level/)
+    await expect(citizen.getByTestId('result-approved')).toBeVisible({ timeout: 10_000 })
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.yusuf = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1f Deepfake: never auto-approved, officer refuses with reason, citizen sees reason + appeal', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    await citizenAssistant(citizen, 'deepfake')
+    await citizenConsent(citizen)
+    await citizenChipAndFace(citizen)
+    await expect(citizen.getByText(/A person will review your application/)).toBeVisible({ timeout: 20_000 })
+    await citizenToStatus(citizen)
+    let s = await state(citizen)
+    expect(s.cases.deepfake.level).toBe('none')
+    expect(s.cases.deepfake.decisions).toHaveLength(0)
+    expect(s.cases.deepfake.risk).toBe('high')
+    await officerOpenFromQueue(officer, 'Ivo Petrov (claimed)')
+    await expect(officer.getByText(/Liveness 0\.22 is below the 0\.85 minimum/).first()).toBeVisible()
+    await officerRefuse(officer, 'Liveness failed')
+    await expect(citizen.getByTestId('refusal-reason')).toContainText('We could not confirm that a real person was in front of the camera.', { timeout: 10_000 })
+    await expect(citizen.getByRole('button', { name: 'Appeal' })).toBeVisible()
+    await shot(citizen, '1f-deepfake-citizen-refused')
+    s = await state(citizen)
+    expect(s.cases.deepfake.status).toBe('not_approved')
+    expect(s.cases.deepfake.decisions.at(-1)).toMatchObject({ outcome: 'refused', reasonId: 'liveness_failed', by: { kind: 'officer' } })
+    // appeal reaches the officer live
+    await citizen.getByRole('button', { name: 'Appeal' }).click()
+    await citizen.getByRole('dialog').getByRole('textbox').fill('That was really me.')
+    await citizen.getByRole('button', { name: 'Send appeal' }).click()
+    await officerOpenFromQueue(officer, 'Ivo Petrov (claimed)')
+    await expect(officer.getByText('That was really me.').first()).toBeVisible()
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.deepfake = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1g Fake document: chip check flags it, officer refuses "Chip signature invalid"', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    await citizenAssistant(citizen, 'fakedoc')
+    await citizenConsent(citizen)
+    await citizenChipAndFace(citizen)
+    await citizenToStatus(citizen)
+    const s = await state(citizen)
+    expect(s.cases.fakedoc.checks.find((c: { id: string }) => c.id === 'chip_signature').outcome).toBe('fail')
+    expect(s.cases.fakedoc.flags.map((f: { code: string }) => f.code)).toContain('chip_signature_failed')
+    expect(s.cases.fakedoc.level).toBe('none')
+    await officerOpenFromQueue(officer, 'Hana Kovač (claimed)')
+    await expect(officer.getByText(/Chip signature failed/).first()).toBeVisible()
+    await shot(officer, '1g-fakedoc-officer-case')
+    await officerRefuse(officer, 'Chip signature invalid')
+    await expect(citizen.getByTestId('refusal-reason')).toContainText('did not carry a valid signature', { timeout: 10_000 })
+    await expect(citizen.getByRole('button', { name: 'Appeal' })).toBeVisible()
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.fakedoc = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+
+  test('1h Lin Wei: refused (residence), corrects, officer re-approves', async ({ browser }) => {
+    const { citizen, officer, problems, loads, context } = await twoViews(browser)
+    await officerSignIn(officer)
+    await citizenAssistant(citizen, 'linwei')
+    await citizenConsent(citizen)
+    await citizenChipAndFace(citizen)
+    await citizenToStatus(citizen)
+    await officerOpenFromQueue(officer, 'Lin Wei')
+    await officerRefuse(officer, 'Residence not found')
+    await expect(citizen.getByTestId('refusal-reason')).toContainText('We could not find you registered', { timeout: 10_000 })
+    await shot(citizen, '1h-linwei-citizen-refused')
+    await citizen.getByRole('button', { name: 'I have corrected it' }).click()
+    await citizen.getByRole('button', { name: 'Use a suggested answer' }).click()
+    await citizen.getByRole('button', { name: 'Check again' }).click()
+    await officerOpenFromQueue(officer, 'Lin Wei')
+    let s = await state(officer)
+    expect(s.cases.linwei.attempt).toBe(2)
+    expect(s.cases.linwei.level).toBe('none') // not auto-approved after a refusal
+    await decide(officer, /Grant basic level/)
+    await expect(citizen.getByTestId('result-approved')).toBeVisible({ timeout: 10_000 })
+    s = await state(citizen)
+    expect(s.cases.linwei.correctedAfterRefusal).toBe(true)
+    await shot(citizen, '1h-linwei-citizen-approved')
+    expect(loads).toEqual({ citizen: 1, officer: 1 })
+    all.linwei = problems
+    expect(problems.console, "console errors/warnings").toEqual([])
+    expect(problems.external, "external requests").toEqual([])
+    await context.close()
+  })
+})

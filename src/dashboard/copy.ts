@@ -1,0 +1,126 @@
+import type { Bilingual } from '@/contract/types'
+
+/** Every dashboard label, in both languages. Numbers are never written here. */
+export const COPY = {
+  eyebrow: { en: 'Get your Cl@ve · Public performance', es: 'Get your Cl@ve · Rendimiento público' },
+  title: { en: 'Service performance', es: 'Rendimiento del servicio' },
+  subtitle: {
+    en: 'How the new registration is doing for foreigners and Spaniards: time to the advanced level, office visits, corrected rejections and appeals.',
+    es: 'Cómo funciona el nuevo registro para personas extranjeras y españolas: tiempo hasta el nivel avanzado, visitas a oficina, denegaciones corregidas y recursos.',
+  },
+  bannerTitle: { en: 'Simulated data', es: 'Datos simulados' },
+  bannerBody: {
+    en: 'Every number in the charts and tiles below is invented for a student prototype. They show what we would measure after launch, not real results.',
+    es: 'Todas las cifras de los gráficos e indicadores son inventadas para un prototipo de estudiantes. Muestran lo que mediríamos tras el lanzamiento, no resultados reales.',
+  },
+  bannerAside: {
+    en: 'Real published figures appear only in the “Context” section, with year and source.',
+    es: 'Las cifras reales publicadas aparecen solo en la sección «Contexto», con año y fuente.',
+  },
+  period: { en: '12 simulated weeks · launch in week 5', es: '12 semanas simuladas · lanzamiento en la semana 5' },
+
+  /* ---- KPI tiles ---- */
+  kpiSection: { en: 'Headline indicators', es: 'Indicadores principales' },
+  kpiTimeTitle: { en: 'Median time to advanced level', es: 'Mediana hasta el nivel avanzado' },
+  kpiTimeForeigners: { en: 'Foreigners', es: 'Personas extranjeras' },
+  kpiTimeSpaniards: { en: 'Spaniards', es: 'Personas españolas' },
+  kpiLatestWeek: { en: 'Latest week', es: 'Última semana' },
+  kpiGapBefore: { en: 'Gap before launch', es: 'Diferencia antes del lanzamiento' },
+  kpiGapNow: { en: 'Gap now', es: 'Diferencia ahora' },
+  kpiOfficeTitle: { en: 'Registrations needing an office', es: 'Registros que necesitan oficina' },
+  kpiNow: { en: 'now', es: 'ahora' },
+  kpiBefore: { en: 'Before launch', es: 'Antes del lanzamiento' },
+  kpiPoints: { en: 'points less', es: 'puntos menos' },
+  kpiCorrectedTitle: { en: 'Rejections later corrected', es: 'Denegaciones corregidas después' },
+  kpiCorrectedOf: { en: 'corrected and approved, out of', es: 'corregidas y aprobadas, de' },
+  kpiCorrectedRejections: { en: 'rejections', es: 'denegaciones' },
+  kpiAppealsTitle: { en: 'Appeals', es: 'Recursos' },
+  appealsFiled: { en: 'Filed', es: 'Presentados' },
+  appealsUpheld: { en: 'Upheld', es: 'Estimados' },
+  appealsDismissed: { en: 'Dismissed', es: 'Desestimados' },
+  appealsOpen: { en: 'Open', es: 'Abiertos' },
+  hoursShort: { en: 'h', es: 'h' },
+  hours: { en: 'hours', es: 'horas' },
+  days: { en: 'days', es: 'días' },
+
+  /* ---- charts ---- */
+  chartsSection: { en: 'Trends and breakdowns', es: 'Evolución y desglose' },
+  launch: { en: 'Launch', es: 'Lanzamiento' },
+  beforeLaunch: { en: 'Before launch', es: 'Antes' },
+  week: { en: 'Week', es: 'Semana' },
+  showTable: { en: 'Show data table', es: 'Ver tabla de datos' },
+  hideTable: { en: 'Hide data table', es: 'Ocultar tabla de datos' },
+  timeChartTitle: { en: 'Time to advanced level, foreigners vs Spaniards', es: 'Tiempo hasta el nivel avanzado: personas extranjeras frente a españolas' },
+  timeChartTakeaway: {
+    en: 'Before launch a foreigner waited weeks for an appointment; after launch both groups reach the advanced level within about a day.',
+    es: 'Antes del lanzamiento, una persona extranjera esperaba semanas por una cita; después, ambos grupos llegan al nivel avanzado en torno a un día.',
+  },
+  timeChartUnit: { en: 'Median hours from application to advanced level', es: 'Mediana de horas desde la solicitud hasta el nivel avanzado' },
+  officeChartTitle: { en: 'Share of registrations still needing an office visit', es: 'Registros que aún necesitan ir a una oficina' },
+  officeChartTakeaway: {
+    en: 'Chip read and face check replace the appointment for most people; the office stays for the cases that need it.',
+    es: 'La lectura del chip y la comprobación facial sustituyen la cita para la mayoría; la oficina queda para los casos que la necesitan.',
+  },
+  officeChartUnit: { en: '% of registrations that week', es: '% de registros de esa semana' },
+  correctedChartTitle: { en: 'Rejections later corrected', es: 'Denegaciones corregidas después' },
+  correctedChartTakeaway: {
+    en: 'A refusal is not the end: the citizen sees the reason, fixes it (for example, the padrón) and is approved.',
+    es: 'Una denegación no es el final: la persona ve el motivo, lo corrige (por ejemplo, el padrón) y queda aprobada.',
+  },
+  corrected: { en: 'Corrected and approved', es: 'Corregidas y aprobadas' },
+  notCorrected: { en: 'Not corrected (yet)', es: 'Sin corregir (aún)' },
+  appealsChartTitle: { en: 'Appeals and their outcome', es: 'Recursos y su resultado' },
+  appealsChartTakeaway: {
+    en: 'Every refusal comes with a reason and a way to appeal; an officer reviews each appeal.',
+    es: 'Cada denegación llega con un motivo y una forma de recurrir; una persona funcionaria revisa cada recurso.',
+  },
+  routesChartTitle: { en: 'Registrations by route', es: 'Registros por vía' },
+  routesChartTakeaway: {
+    en: 'Eight weeks after launch. Route B (chip + face check) is the new door for foreigners; the Fallback stays small.',
+    es: 'Ocho semanas tras el lanzamiento. La vía B (chip + comprobación facial) es la nueva puerta para personas extranjeras; la alternativa es minoritaria.',
+  },
+  route: { en: 'Route', es: 'Vía' },
+  registrations: { en: 'Registrations', es: 'Registros' },
+  outcome: { en: 'Outcome', es: 'Resultado' },
+  count: { en: 'Count', es: 'Número' },
+  share: { en: 'Share', es: 'Porcentaje' },
+  total: { en: 'Total', es: 'Total' },
+  ofTotal: { en: 'of total', es: 'del total' },
+
+  /* ---- live session ---- */
+  liveSection: { en: 'This demo session (live)', es: 'Esta sesión de demostración (en directo)' },
+  liveBadge: { en: 'Demo session', es: 'Sesión de demostración' },
+  liveIntro: {
+    en: 'Counted from the cases in this browser right now. Run a case in the citizen or officer view, in any tab, and these numbers move.',
+    es: 'Contado a partir de los casos de este navegador en este momento. Ejecuta un caso en la vista ciudadana o funcionaria, en cualquier pestaña, y estas cifras cambian.',
+  },
+  liveTotal: { en: 'Cases in this session', es: 'Casos en esta sesión' },
+  liveAuto: { en: 'Approved automatically', es: 'Aprobados automáticamente' },
+  liveOfficer: { en: 'Decided by an officer', es: 'Decididos por una persona funcionaria' },
+  liveAwaiting: { en: 'Awaiting an officer', es: 'Esperando a una persona funcionaria' },
+  liveCorrected: { en: 'Corrected after refusal', es: 'Corregidos tras una denegación' },
+  liveByStatus: { en: 'By status', es: 'Por estado' },
+  liveDraft: { en: 'Not started', es: 'Sin empezar' },
+  liveNotPart: { en: 'not part of the simulated weekly data.', es: 'no forma parte de los datos semanales simulados.' },
+  liveUpdated: { en: 'Updates live across tabs', es: 'Se actualiza en directo entre pestañas' },
+
+  /* ---- published figures ---- */
+  contextSection: { en: 'Context: published figures', es: 'Contexto: cifras publicadas' },
+  contextIntro: {
+    en: 'Real, published numbers about Cl@ve and digital government in Spain, quoted exactly with their year and source. They are context only and are not part of the simulation.',
+    es: 'Cifras reales y publicadas sobre Cl@ve y la administración digital en España, citadas literalmente con su año y fuente. Son solo contexto y no forman parte de la simulación.',
+  },
+  publishedBadge: { en: 'Published figure', es: 'Cifra publicada' },
+  year: { en: 'Year', es: 'Año' },
+  source: { en: 'Source', es: 'Fuente' },
+  opensNewTab: { en: '(opens in a new tab)', es: '(se abre en una pestaña nueva)' },
+
+  /* ---- footnote ---- */
+  notes: { en: 'Notes', es: 'Notas' },
+  footRule: { en: 'The key rule', es: 'La regla clave' },
+  footProposals: { en: 'What we propose to change in the rules', es: 'Lo que proponemos cambiar en las normas' },
+  footProposalsNote: {
+    en: 'These are proposals for a rule change, not something the app solves by itself.',
+    es: 'Son propuestas de cambio normativo, no algo que la aplicación resuelva por sí sola.',
+  },
+} satisfies Record<string, Bilingual>

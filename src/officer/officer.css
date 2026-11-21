@@ -1,0 +1,13 @@
+/* Officer-area keyframes (scoped by name prefix "ofc-"). */
+@keyframes ofc-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ofc-pop { from { opacity: 0; transform: translate(-50%, -48%) scale(.97) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
+@keyframes ofc-flash-kf {
+  0% { box-shadow: inset 0 0 0 9999px color-mix(in oklab, var(--color-warning) 22%, transparent) }
+  100% { box-shadow: inset 0 0 0 9999px transparent }
+}
+.ofc-flash { animation: ofc-flash-kf 1.8s ease-out }
+@media (prefers-reduced-motion: reduce) {
+  .ofc-flash { animation: none; outline: 2px solid var(--color-warning); outline-offset: -2px }
+}
+/* Embed (?embed=1, demo laptop frame): no outer page scrollbar; the officer main panel scrolls instead. */
+html:has(.ofc-embed), html:has(.ofc-embed) body { overflow: hidden; height: 100%; }
