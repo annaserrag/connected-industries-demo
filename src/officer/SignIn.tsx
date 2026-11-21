@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Building2, ShieldCheck } from 'lucide-react'
 import { KEY_RULE, OFFICERS, SERVICE_NAME } from '@/contract/seed'
 import { actions, ClaveRuleError } from '@/core/store'
-import { Avatar, LangToggle, LogoGlyph } from '@/ui'
+import { Avatar, HomeLink, LangToggle, LogoGlyph } from '@/ui'
 import { toast } from 'sonner'
 import { C } from './copy'
 import { useTr } from './lib'
@@ -26,11 +26,13 @@ export function SignIn() {
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="relative w-full max-w-2xl">
         <div className="mb-8 flex items-center gap-3">
-          <LogoGlyph size={44} />
-          <div>
-            <p className="text-lg font-semibold tracking-tight">{SERVICE_NAME}</p>
-            <p className="text-sm text-white/60">{tr(C.appName)}</p>
-          </div>
+          <HomeLink className="gap-3 focus-visible:ring-2 focus-visible:ring-white/60">
+            <LogoGlyph size={44} />
+            <span className="block text-left">
+              <span className="block text-lg font-semibold tracking-tight">{SERVICE_NAME}</span>
+              <span className="block text-sm text-white/70">{tr(C.appName)}</span>
+            </span>
+          </HomeLink>
           <span className="ml-auto"><Sim /></span>
         </div>
 
