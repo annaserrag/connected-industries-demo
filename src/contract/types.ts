@@ -165,6 +165,77 @@ export interface Officer {
   office: string
 }
 
+/* ------------------------------------------------------------ staff access
+ * Modelled on how Cl@ve registration staff really get in (researched Nov 2026):
+ *  - they are public employees of a body enabled as a Cl@ve Registration Authority (AEAT, Social Security,
+ *    SEPE, Government Delegations/Subdelegations, and many regional and local bodies);
+ *  - they open the registration application with an electronic certificate: a public-employee certificate
+ *    (on a cryptocard, it carries their identity, post and employing body), a DNIe, or another accepted
+ *    personal certificate;
+ *  - access works only if their organisation has authorised that person for Cl@ve registration.
+ * Everything here is SIMULATED with fictional people and "DEMO-" identifiers.
+ */
+export type StaffCredential = 'employee_certificate' | 'dnie' | 'personal_certificate'
+
+export interface RegistrationAuthority {
+  id: string
+  name: Bilingual
+  /** Short label, e.g. "AEAT". */
+  short: string
+}
+
+export interface StaffOffice {
+  /** DIR3-style unit code, fake: "DEMO-E0…" */
+  code: string
+  name: Bilingual
+  authorityId: string
+  city: string
+}
+
+/** A certificate the simulated certificate picker offers (like the browser's certificate dialog). */
+export interface StaffCertificate {
+  id: string
+  credential: StaffCredential
+  holderName: string
+  /** Fake personal ID read from the certificate. Always "DEMO-…". */
+  holderId: string
+  /** Employing body printed in the certificate (employee certificates only). */
+  authorityId?: string
+  /** Post printed in the certificate (employee certificates only). */
+  post?: Bilingual
+  validUntil: string
+  /** Officer record this certificate belongs to, if the person is staff at all. */
+  officerId?: string
+  /** Simulated authorisation list: the person's organisation has authorised them for Cl@ve registration. */
+  authorisedForClave: boolean
+}
+
+export type OfficerRole = 'registrar' | 'supervisor'
+
+/** Job details an officer confirms the first time they sign in. */
+export interface OfficerProfile {
+  officerId: string
+  authorityId: string
+  officeCode: string
+  post: string
+  /** Personnel registration number (NRP), fake: "DEMO-NRP-…" */
+  personnelNumber: string
+  role: OfficerRole
+  /** Which certificate they signed in with. */
+  certificateId: string
+  completedAt: string
+}
+
+export type OfficerProfileInput = Omit<OfficerProfile, 'officerId' | 'completedAt' | 'certificateId'>
+
+export type StaffSignInResult =
+  | { status: 'signed_in'; officerId: string }
+  | { status: 'needs_profile'; officerId: string; certificateId: string }
+  | { status: 'not_authorised'; reason: 'not_staff' | 'not_authorised_for_clave' | 'expired' }
+
+/** Queue priority tiers, highest first. Each queued case gets exactly one. */
+export type PriorityTier = 'p1_high_risk' | 'p2_appeal' | 'p3_citizen_replied' | 'p4_medium_risk' | 'p5_video_call' | 'p6_advanced_review'
+
 export type DecisionOutcome = 'approved_basic' | 'approved_advanced' | 'refused' | 'revoked'
 
 export interface Decision {
@@ -300,6 +371,9 @@ export type AuditAction =
   | 'appeal_filed'
   | 'correction_submitted'
   | 'video_call_booked'
+  | 'staff_signed_in'
+  | 'staff_access_denied'
+  | 'staff_profile_completed'
   | 'demo_reset'
 
 export interface AuditEvent {
@@ -364,6 +438,8 @@ export interface AppState {
   lang: Lang
   /** Officer currently signed in (simulated login), or null. */
   officerId: string | null
+  /** Officer job profiles, keyed by officerId (filled the first time each officer signs in). */
+  officerProfiles: Record<string, OfficerProfile>
   /** Case the citizen view currently has open, or null. */
   activeCitizenCaseId: string | null
 }
