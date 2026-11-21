@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Building, CalendarClock, Clock, FileText, Laptop, LayoutDashboard, Play, Scale, Smartphone, Timer, UserRound } from 'lucide-react'
-import { LangToggle, cn } from '@/ui'
+import { HomeLink, LangToggle, cn } from '@/ui'
 import { KEY_RULE, REFERENCE_FIGURES, ROUTES, ROUTE_ORDER } from '@/contract/seed'
 import { C } from './copy'
 import { LogoMark, RouteCode, Wordmark } from './components/basics'
@@ -20,8 +20,10 @@ export function LandingPage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_45%_at_85%_0%,var(--color-brand-soft),transparent_70%),radial-gradient(40%_35%_at_0%_60%,var(--color-sim-soft),transparent_70%)]" />
 
       <header className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-8">
-        <LogoMark size={32} />
-        <Wordmark className="text-lg" />
+        <HomeLink>
+          <LogoMark size={32} />
+          <Wordmark className="text-lg" />
+        </HomeLink>
         <nav className="ml-auto flex items-center gap-1 text-sm" aria-label="Demo">
           <Link to="/dashboard" className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 sm:inline-flex">
             <LayoutDashboard size={15} aria-hidden /> {tr(C.dashboardLink)}

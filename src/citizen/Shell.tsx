@@ -1,12 +1,12 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { ArrowRight, Laptop, LogOut } from 'lucide-react'
-import { Avatar, LangToggle, PhoneFrame, cn } from '@/ui'
+import { Avatar, HomeLink, LangToggle, PhoneFrame, cn } from '@/ui'
 import { actions, useClave } from '@/core/store'
 import type { Case } from '@/contract/types'
 import { C, fill } from './copy'
 import { LogoMark, Wordmark } from './components/basics'
-import { useEmbed, useGo, useMedia, useTr, withEmbed } from './hooks'
+import { useEmbed, useGo, useMedia, useTr } from './hooks'
 
 /** Where a case currently is in the citizen flow. */
 export function flowPath(c: Case): string {
@@ -25,15 +25,14 @@ export function safe(fn: () => void) {
 function Header() {
   const { tr } = useTr()
   const go = useGo()
-  const embed = useEmbed()
   const activeId = useClave(s => s.activeCitizenCaseId)
   const active = useClave(s => (activeId ? s.cases[activeId] : undefined))
   return (
     <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line/70 bg-surface/85 px-4 py-3 backdrop-blur-md">
-      <Link to={withEmbed('/citizen', embed)} className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30">
+      <HomeLink>
         <LogoMark size={28} />
         <Wordmark className="truncate text-[15px]" />
-      </Link>
+      </HomeLink>
       <div className="ml-auto flex items-center gap-1.5">
         {active && (
           <button
@@ -91,10 +90,10 @@ export function CitizenShell({ children }: { children: ReactNode }) {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_75%_20%,var(--color-brand-soft),transparent_70%),radial-gradient(40%_40%_at_10%_90%,var(--color-sim-soft),transparent_70%)]" />
       <div className="relative mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-16 px-10 py-10">
         <aside className="max-w-sm">
-          <div className="flex items-center gap-2">
+          <HomeLink>
             <LogoMark size={36} />
             <Wordmark className="text-2xl" />
-          </div>
+          </HomeLink>
           <p className="mt-2 text-sm font-semibold uppercase tracking-wider text-brand">{tr(C.citizenView)}</p>
           <p className="mt-4 text-lg leading-relaxed text-muted">{tr(C.sideCaption)}</p>
           <a

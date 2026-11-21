@@ -6,6 +6,7 @@ import { actions, useClave } from '@/core/store'
 import { Avatar, Button, Kbd, LiveDot } from './primitives'
 import { Dialog, DialogClose } from './forms'
 import { LangToggle, LaptopFrame, Logo, PhoneStatusBar } from './layout'
+import { HomeLink } from './HomeLink'
 import { toast } from './feedback'
 import { cn, useTr, SPRING } from './utils'
 
@@ -161,7 +162,7 @@ export function DemoPanel() {
       <div aria-hidden className="pointer-events-none fixed inset-0 bg-[radial-gradient(60%_50%_at_30%_0%,rgb(29_71_184/0.22),transparent_70%),radial-gradient(50%_40%_at_90%_100%,rgb(157_180_255/0.08),transparent_70%)]" />
 
       <header className="relative z-10 flex flex-wrap items-center gap-3 border-b border-stage-line px-5 py-3 lg:px-8">
-        <Logo tone="light" size="md" />
+        <HomeLink className="focus-visible:ring-2 focus-visible:ring-white/60"><Logo tone="light" size="md" /></HomeLink>
         <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/[0.08] px-3 text-xs font-bold tracking-wide text-stage-ink uppercase ring-1 ring-white/10">
           <Clapperboard className="size-3.5" aria-hidden />{tr('Demo mode', 'Modo demo')}
         </span>
