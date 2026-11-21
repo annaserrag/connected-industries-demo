@@ -181,3 +181,24 @@ export function downloadText(filename: string, text: string, mime = 'text/csv;ch
   a.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
+/** Fill "{name}" placeholders in a translated string. */
+export function fill(s: string, vars: Record<string, string | number>): string {
+  return s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''))
+}
+
+/** True for `ms` after `value` changes (not on first render) — used to flash live numbers. */
+export function useFlash(value: unknown, ms = 1600): boolean {
+  const prev = useRef<string | null>(null)
+  const [on, setOn] = useState(false)
+  const key = JSON.stringify(value)
+  useEffect(() => {
+    // Compare with the last value seen (not "first run"), so StrictMode's double effect never flashes.
+    if (prev.current === null || prev.current === key) { prev.current = key; return }
+    prev.current = key
+    setOn(true)
+    const id = window.setTimeout(() => setOn(false), ms)
+    return () => window.clearTimeout(id)
+  }, [key, ms])
+  return on
+}

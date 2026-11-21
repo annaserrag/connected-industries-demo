@@ -11,3 +11,12 @@
 }
 /* Embed (?embed=1, demo laptop frame): no outer page scrollbar; the officer main panel scrolls instead. */
 html:has(.ofc-embed), html:has(.ofc-embed) body { overflow: hidden; height: 100%; }
+/* Live KPI flash on the staff dashboard. */
+@keyframes ofc-kpi-kf {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-success) 55%, transparent), 0 0 0 9999px color-mix(in oklab, var(--color-success) 9%, transparent) inset }
+  100% { box-shadow: 0 0 0 10px transparent, 0 0 0 9999px transparent inset }
+}
+.ofc-kpi-flash { animation: ofc-kpi-kf 1.6s ease-out }
+@media (prefers-reduced-motion: reduce) {
+  .ofc-kpi-flash { animation: none; outline: 2px solid var(--color-success); outline-offset: -2px }
+}

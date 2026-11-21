@@ -7,6 +7,12 @@
  *  - UI kit        : implemented by Design (src/ui/index.ts), used by Citizen/Officer/Dashboard.
  */
 import type {
+  SignInResult,
+  SignUpInput,
+  SignUpResult,
+  OfficerProfileInput,
+  PriorityTier,
+  StaffSignInResult,
   AppState,
   AssistantAnswers,
   AuditEvent,
@@ -66,6 +72,31 @@ export interface ClaveActions {
   /** Red-card / Fallback: officer completes the simulated video call (sets officer_video = pass). */
   officerCompleteVideoCall(caseId: string): void
 
+  /* ---- citizen accounts (branch feature/citizen-accounts) ---- */
+  /** Sign in with document number (case/spaces ignored) + password. On success sets activeCitizenCaseId. */
+  citizenSignIn(documentNumber: string, password: string): SignInResult
+  /**
+   * Create an account + a new draft application (origin 'signup'). Assigns a fake "DEMO-…" document number,
+   * generated initials/hue, presetAnswers from the country group, and an empty simulation script (every check
+   * passes by default). Signs the new citizen in. Audits 'account_created'.
+   */
+  citizenSignUp(input: SignUpInput): SignUpResult
+  /** Ends the citizen session (activeCitizenCaseId = null). */
+  citizenSignOut(): void
+  /* ---- staff access (branch feature/staff-console) ---- */
+  /**
+   * Simulated certificate sign-in. Expired → not_authorised/expired. No officerId → not_authorised/not_staff.
+   * authorisedForClave false → not_authorised/not_authorised_for_clave. Officer with a saved profile →
+   * signed_in (sets officerId). Otherwise → needs_profile (does NOT sign in yet). Audits every attempt.
+   */
+  officerSignInWithCertificate(certificateId: string): StaffSignInResult
+  /**
+   * First sign-in: save the officer's job details and sign them in. Throws ClaveRuleError when the
+   * personnel number doesn't match PERSONNEL_NUMBER_PATTERN, the office doesn't belong to the authority,
+   * or the certificate doesn't belong to that officer.
+   */
+  officerCompleteProfile(officerId: string, certificateId: string, input: OfficerProfileInput): void
+
   /* ---- demo ---- */
   /** Reset everything to buildSeedState(new Date()). Broadcast to all tabs. */
   resetDemo(): void
@@ -75,8 +106,10 @@ export interface ClaveActions {
 
 /** Derived selectors exported from '@/core/selectors'. */
 export interface ClaveSelectors {
-  /** Cases waiting for an officer, sorted: risk high→low, then oldest first. */
+  /** Cases waiting for an officer, sorted by priority tier (PRIORITY_TIERS, with the age bump), then oldest first. */
   officerQueue(state: AppState): Case[]
+  /** The tier a queued case sits in (with the PRIORITY_AGE_BUMP_HOURS bump applied). */
+  priorityOf(c: Case, now?: Date): PriorityTier
   caseAudit(state: AppState, caseId: string): AuditEvent[]
   /** Human relative time ("3 min ago" / "hace 3 min"). */
   relativeTime(iso: string, lang: Lang): string
@@ -95,6 +128,10 @@ export const PATHS = {
   officer: '/officer',                           // screens 6–8 — officer area exports <OfficerApp/> (handles /officer/*)
   officerCase: (id: string) => `/officer/case/${id}`,
   officerAudit: '/officer/audit',
+  officerDashboard: '/officer/dashboard',       // live dashboard inside the staff console
+  officerDocuments: '/officer/documents',       // applications organised by document used
+  officerProfile: '/officer/profile',           // the officer's job details
+  officerAll: '/officer/applications',          // every application, searchable
   dashboard: '/dashboard',                       // screen 9   — dashboard area exports <DashboardPage/>
   demo: '/demo',                                 // demo mode  — design area exports <DemoPanel/>
 } as const

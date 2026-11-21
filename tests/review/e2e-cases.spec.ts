@@ -5,11 +5,11 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   citizenAssistant, citizenChipAndFace, citizenConsent, citizenToStatus, officerOpenFromQueue, officerRefuse,
-  officerSignIn, shot, state, twoViews,
+  officerSignIn, shot, SHOTS, state, twoViews,
 } from './helpers'
 import fs from 'node:fs'
 
-const LOG = '/tmp/review-shots/e2e-problems.json'
+const LOG = SHOTS + '/e2e-problems.json'
 const all: Record<string, unknown> = {}
 test.afterAll(() => { fs.writeFileSync(LOG, JSON.stringify(all, null, 2)) })
 

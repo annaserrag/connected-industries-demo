@@ -1,19 +1,42 @@
-import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowRight, Building, CalendarClock, Clock, FileText, Laptop, LayoutDashboard, Play, Scale, Smartphone, Timer, UserRound } from 'lucide-react'
-import { HomeLink, LangToggle, cn } from '@/ui'
-import { KEY_RULE, REFERENCE_FIGURES, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { Link, useSearchParams } from 'react-router-dom'
+import * as Tabs from '@radix-ui/react-tabs'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowRight, BadgeCheck, Building, CalendarClock, Check, Clock, FileText, KeyRound, Scale, ShieldCheck, Smartphone, Timer, UserRound } from 'lucide-react'
+import type { Bilingual } from '@/contract/types'
+import { HomeLink, LangToggle, SimulatedBadge, cn } from '@/ui'
+import { KEY_RULE, REFERENCE_FIGURES, REGISTRATION_AUTHORITIES, ROUTES, ROUTE_ORDER } from '@/contract/seed'
 import { C } from './copy'
 import { LogoMark, RouteCode, Wordmark } from './components/basics'
 import { useReduced, useTr } from './hooks'
 
 const FIGURE_IDS = ['users', 'eidas', 'online']
 
+const b = (en: string, es: string): Bilingual => ({ en, es })
+/** Landing-only copy (the rest of the citizen copy lives in ./copy). */
+const L = {
+  modes: b('How do you want to start?', '¿Cómo quieres empezar?'),
+  tabApply: b('Apply', 'Solicitar'),
+  tabStaff: b('Staff access', 'Acceso para personal'),
+  apply: b('Apply', 'Solicitar'),
+  applySub: b('From your phone, no appointment', 'Desde tu móvil, sin cita'),
+  applyPoints: [b('Any document you live in Spain with', 'Con el documento con el que vives en España'), b('Minutes, not weeks', 'Minutos, no semanas'), b('Already applied? Follow it here', '¿Ya lo pediste? Síguelo aquí')],
+  staffTitle: b('For registration staff', 'Para el personal de registro'),
+  staffBody: b(
+    'For staff of bodies enabled as Cl@ve registration authorities, such as the Tax Agency, Social Security, SEPE or a Government Delegation. Sign in with your work certificate or DNIe; access opens only if your organisation has authorised you.',
+    'Para el personal de organismos habilitados como autoridades de registro de Cl@ve, como la Agencia Tributaria, la Seguridad Social, el SEPE o una Delegación del Gobierno. Entra con tu certificado de empleado público o tu DNIe; solo accedes si tu organismo te ha autorizado.',
+  ),
+  staffCta: b('Sign in with your certificate', 'Entrar con tu certificado'),
+  staffNote: b('No accounts are created here. Organisation names appear as text only.', 'Aquí no se crean cuentas. Los nombres de organismos aparecen solo como texto.'),
+}
+
 export function LandingPage() {
   const { tr } = useTr()
   const reduced = useReduced()
   const rise = (d = 0) => (reduced ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: d, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] as const } })
   const figures = REFERENCE_FIGURES.filter(f => FIGURE_IDS.includes(f.id))
+  const [params, setParams] = useSearchParams()
+  const mode = params.get('access') === 'staff' ? 'staff' : 'apply'
+  const setMode = (m: string) => setParams(m === 'staff' ? { access: 'staff' } : {}, { replace: true })
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-canvas text-ink">
@@ -24,13 +47,7 @@ export function LandingPage() {
           <LogoMark size={32} />
           <Wordmark className="text-lg" />
         </HomeLink>
-        <nav className="ml-auto flex items-center gap-1 text-sm" aria-label="Demo">
-          <Link to="/dashboard" className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 sm:inline-flex">
-            <LayoutDashboard size={15} aria-hidden /> {tr(C.dashboardLink)}
-          </Link>
-          <Link to="/demo" className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-muted hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/30 sm:inline-flex">
-            <Play size={15} aria-hidden /> {tr(C.demoLink)}
-          </Link>
+        <nav className="ml-auto flex items-center gap-1 text-sm" aria-label={tr(b('Language', 'Idioma'))}>
           <LangToggle />
         </nav>
       </header>
@@ -48,32 +65,78 @@ export function LandingPage() {
             </motion.h1>
             <motion.p {...rise(0.1)} className="mt-5 max-w-xl text-lg leading-relaxed text-muted">{tr(C.heroBody)}</motion.p>
 
-            <motion.div {...rise(0.15)} className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Link
-                to="/citizen"
-                data-testid="landing-citizen"
-                className="group relative overflow-hidden rounded-3xl bg-brand p-5 text-brand-ink shadow-[0_18px_40px_-18px_var(--color-brand)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/40"
-              >
-                <Smartphone size={26} aria-hidden />
-                <span className="mt-4 block text-xl font-semibold">{tr(C.iAmCitizen)}</span>
-                <span className="mt-1 block text-sm text-white/80">{tr(C.iAmCitizenSub)}</span>
-                <ArrowRight size={20} aria-hidden className="absolute right-5 top-5 transition group-hover:translate-x-1" />
-              </Link>
-              <Link
-                to="/officer"
-                data-testid="landing-officer"
-                className="group relative overflow-hidden rounded-3xl bg-surface p-5 text-ink ring-1 ring-line transition hover:-translate-y-0.5 hover:ring-brand/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/40"
-              >
-                <Laptop size={26} aria-hidden className="text-brand" />
-                <span className="mt-4 block text-xl font-semibold">{tr(C.iAmOfficer)}</span>
-                <span className="mt-1 block text-sm text-muted">{tr(C.iAmOfficerSub)}</span>
-                <ArrowRight size={20} aria-hidden className="absolute right-5 top-5 text-muted transition group-hover:translate-x-1 group-hover:text-brand" />
-              </Link>
+            <motion.div {...rise(0.15)} className="mt-8 max-w-xl">
+              <Tabs.Root value={mode} onValueChange={setMode}>
+                <Tabs.List aria-label={tr(L.modes)} className="relative inline-flex rounded-full bg-surface p-1 ring-1 ring-line" data-testid="landing-tabs">
+                  {([['apply', L.tabApply, Smartphone], ['staff', L.tabStaff, BadgeCheck]] as const).map(([v, label, Icon]) => (
+                    <Tabs.Trigger
+                      key={v}
+                      value={v}
+                      data-testid={`landing-tab-${v}`}
+                      className="relative inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold text-muted outline-none transition-colors hover:text-ink focus-visible:ring-4 focus-visible:ring-brand/30 data-[state=active]:text-surface"
+                    >
+                      {mode === v && (
+                        <motion.span layoutId="landing-tab-pill" transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-full bg-ink" aria-hidden />
+                      )}
+                      <Icon size={16} aria-hidden className="relative" />
+                      <span className="relative">{tr(label)}</span>
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+
+                <AnimatePresence mode="wait" initial={false}>
+                  {mode === 'apply' ? (
+                    <Tabs.Content key="apply" value="apply" forceMount asChild>
+                      <motion.div initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.2 }} tabIndex={-1} className="mt-4 outline-none">
+                        <Link
+                          to="/citizen"
+                          data-testid="landing-citizen"
+                          className="group relative flex items-center gap-4 overflow-hidden rounded-3xl bg-brand p-5 text-brand-ink shadow-[0_18px_40px_-18px_var(--color-brand)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/40 motion-reduce:transition-none sm:p-6"
+                        >
+                          <span aria-hidden className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-white/15 blur-2xl" />
+                          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/15"><Smartphone size={26} aria-hidden /></span>
+                          <span className="relative min-w-0 flex-1">
+                            <span className="block text-[28px] leading-none font-semibold tracking-tight sm:text-3xl">{tr(L.apply)}</span>
+                            <span className="mt-1.5 block text-[15px] text-white/85">{tr(L.applySub)}</span>
+                          </span>
+                          <span className="relative grid size-11 shrink-0 place-items-center rounded-full bg-white text-brand transition group-hover:translate-x-1 motion-reduce:transition-none"><ArrowRight size={20} aria-hidden /></span>
+                        </Link>
+                        <ul className="mt-4 grid gap-2 text-sm text-muted sm:grid-cols-3">
+                          {L.applyPoints.map((p, i) => (
+                            <li key={i} className="flex items-start gap-1.5"><Check size={15} className="mt-0.5 shrink-0 text-success" aria-hidden />{tr(p)}</li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    </Tabs.Content>
+                  ) : (
+                    <Tabs.Content key="staff" value="staff" forceMount asChild>
+                      <motion.div initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.2 }} tabIndex={-1} className="mt-4 rounded-3xl bg-ink p-5 text-surface outline-none sm:p-6" data-testid="landing-staff-panel">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="grid size-10 place-items-center rounded-xl bg-white/10"><ShieldCheck size={20} aria-hidden /></span>
+                          <h2 className="text-xl font-semibold tracking-tight text-white">{tr(L.staffTitle)}</h2>
+                          <span className="ml-auto"><SimulatedBadge /></span>
+                        </div>
+                        <p className="mt-3 text-[15px] leading-relaxed text-white/80">{tr(L.staffBody)}</p>
+                        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={tr(b('Registration authorities (examples)', 'Autoridades de registro (ejemplos)'))}>
+                          {REGISTRATION_AUTHORITIES.map(a => (
+                            <li key={a.id} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">{a.short}</li>
+                          ))}
+                        </ul>
+                        <Link
+                          to="/officer"
+                          data-testid="landing-officer"
+                          className="group mt-5 inline-flex h-12 items-center gap-2.5 rounded-xl bg-white px-5 text-[15px] font-semibold text-ink outline-none transition hover:bg-white/90 focus-visible:ring-4 focus-visible:ring-white/50"
+                        >
+                          <KeyRound size={18} aria-hidden />{tr(L.staffCta)}
+                          <ArrowRight size={16} aria-hidden className="transition group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                        </Link>
+                        <p className="mt-3 text-[12.5px] text-white/70">{tr(L.staffNote)}</p>
+                      </motion.div>
+                    </Tabs.Content>
+                  )}
+                </AnimatePresence>
+              </Tabs.Root>
             </motion.div>
-            <div className="mt-4 flex gap-4 text-sm sm:hidden">
-              <Link to="/dashboard" className="font-medium text-muted underline-offset-2 hover:underline">{tr(C.dashboardLink)}</Link>
-              <Link to="/demo" className="font-medium text-muted underline-offset-2 hover:underline">{tr(C.demoLink)}</Link>
-            </div>
           </div>
 
           {/* before / after */}
