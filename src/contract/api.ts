@@ -76,7 +76,7 @@ export interface ClaveActions {
   /** Sign in with document number (case/spaces ignored) + password. On success sets activeCitizenCaseId. */
   citizenSignIn(documentNumber: string, password: string): SignInResult
   /**
-   * Create an account + a new draft application (origin 'signup'). Assigns a fake "DEMO-…" document number,
+   * Create an account + a new draft application (origin 'signup'). Assigns a fictional document number (realistic shape; DNI/NIE-shaped ones use fictionalDniNie),
    * generated initials/hue, presetAnswers from the country group, and an empty simulation script (every check
    * passes by default). Signs the new citizen in. Audits 'account_created'.
    */
@@ -85,17 +85,24 @@ export interface ClaveActions {
   citizenSignOut(): void
   /* ---- staff access (branch feature/staff-console) ---- */
   /**
-   * Simulated certificate sign-in. Expired → not_authorised/expired. No officerId → not_authorised/not_staff.
+   * Simulated certificate sign-in. Wrong PIN → invalid_credentials (generic). Expired → not_authorised/expired.
+   * No officerId → not_authorised/not_staff.
    * authorisedForClave false → not_authorised/not_authorised_for_clave. Officer with a saved profile →
    * signed_in (sets officerId). Otherwise → needs_profile (does NOT sign in yet). Audits every attempt.
    */
-  officerSignInWithCertificate(certificateId: string): StaffSignInResult
+  officerSignInWithCertificate(certificateId: string, pin: string): StaffSignInResult
+  /**
+   * Staff user + password (STAFF_ACCOUNTS). Wrong user or password → invalid_credentials (generic).
+   * Then the same authorisation rules and outcomes as the certificate method. Audits every attempt
+   * (never the password).
+   */
+  officerSignInWithPassword(userId: string, password: string): StaffSignInResult
   /**
    * First sign-in: save the officer's job details and sign them in. Throws ClaveRuleError when the
    * personnel number doesn't match PERSONNEL_NUMBER_PATTERN, the office doesn't belong to the authority,
    * or the certificate doesn't belong to that officer.
    */
-  officerCompleteProfile(officerId: string, certificateId: string, input: OfficerProfileInput): void
+  officerCompleteProfile(officerId: string, method: 'certificate' | 'password', certificateId: string | null, input: OfficerProfileInput): void
 
   /* ---- demo ---- */
   /** Reset everything to buildSeedState(new Date()). Broadcast to all tabs. */

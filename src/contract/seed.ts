@@ -5,6 +5,7 @@
  * Real figures appear only in REFERENCE_FIGURES, exactly as in the plan's reference sheet.
  */
 import type {
+  StaffAccount,
   PriorityTier,
   RegistrationAuthority,
   StaffCertificate,
@@ -39,7 +40,7 @@ export const FOOTER_DISCLAIMER: Bilingual = {
 }
 export const SIMULATED_LABEL: Bilingual = { en: 'Simulated', es: 'Simulado' }
 export const POLICY_PROPOSAL_LABEL: Bilingual = { en: 'Policy proposal', es: 'Propuesta normativa' }
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 /* ------------------------------------------------------------- key rule */
 
@@ -541,9 +542,9 @@ export const SIMULATED_DASHBOARD = {
 /* ---------------------------------------------------------------- officers */
 
 export const OFFICERS: Officer[] = [
-  { id: 'OF-DEMO-07', name: 'Laura Navarro', office: 'Registration office (demo) · Madrid' },
-  { id: 'OF-DEMO-12', name: 'Javier Prieto', office: 'Registration office (demo) · Valencia' },
-  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: 'Registration office (demo) · Sevilla' },
+  { id: 'OF-DEMO-07', name: 'Laura Navarro', office: 'Registration office · Madrid' },
+  { id: 'OF-DEMO-12', name: 'Javier Prieto', office: 'Registration office · Valencia' },
+  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: 'Registration office · Sevilla' },
 ]
 
 /* ------------------------------------------------------------ staff access (simulated) */
@@ -557,10 +558,10 @@ export const REGISTRATION_AUTHORITIES: RegistrationAuthority[] = [
 ]
 
 export const STAFF_OFFICES: StaffOffice[] = [
-  { code: 'DEMO-E04000101', name: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' }, authorityId: 'aeat', city: 'Madrid' },
-  { code: 'DEMO-E04000214', name: { en: 'Registration office · Valencia Ruzafa', es: 'Oficina de registro · Valencia Ruzafa' }, authorityId: 'seg_social', city: 'Valencia' },
-  { code: 'DEMO-E04000377', name: { en: 'Registration office · Sevilla Triana', es: 'Oficina de registro · Sevilla Triana' }, authorityId: 'delegacion', city: 'Sevilla' },
-  { code: 'DEMO-E04000452', name: { en: 'Employment office · Zaragoza', es: 'Oficina de empleo · Zaragoza' }, authorityId: 'sepe', city: 'Zaragoza' },
+  { code: 'E04999101', name: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' }, authorityId: 'aeat', city: 'Madrid' },
+  { code: 'E04999214', name: { en: 'Registration office · Valencia Ruzafa', es: 'Oficina de registro · Valencia Ruzafa' }, authorityId: 'seg_social', city: 'Valencia' },
+  { code: 'E04999377', name: { en: 'Registration office · Sevilla Triana', es: 'Oficina de registro · Sevilla Triana' }, authorityId: 'delegacion', city: 'Sevilla' },
+  { code: 'E04999452', name: { en: 'Employment office · Zaragoza', es: 'Oficina de empleo · Zaragoza' }, authorityId: 'sepe', city: 'Zaragoza' },
 ]
 
 export const STAFF_POSTS: Bilingual[] = [
@@ -580,16 +581,72 @@ export const STAFF_CREDENTIAL_LABELS: Record<StaffCertificate['credential'], Bil
  * once their profile exists, one authorised officer signing in for the first time, one person with a valid
  * certificate who is NOT authorised for Cl@ve, and one expired certificate.
  */
+/**
+ * Staff secrets for the team, documented ONLY in the README (never rendered in the app).
+ * Certificate PINs and staff user passwords. Stored in state/seed only as demoHash.
+ */
+export const STAFF_DEMO_SECRETS = {
+  pins: { 'cert-laura': '2580', 'cert-javier': '1357', 'cert-marta': '4826', 'cert-diego': '9031', 'cert-old': '2580' } as Record<string, string>,
+  passwords: { lnavarro: 'Navarro-2026', jprieto: 'Prieto-2026', mgil: 'GilHerrero-2026', dromero: 'Romero-2026' } as Record<string, string>,
+}
+
+/**
+ * Staff user accounts for the "user + password" sign-in method (the second card on the staff sign-in page).
+ * Same authorisation rules as certificates: Diego has an account but is not authorised for Cl@ve registration.
+ */
+export const STAFF_ACCOUNTS: StaffAccount[] = [
+  { userId: 'lnavarro', holderName: 'Laura Navarro', holderId: '50731842J', officerId: 'OF-DEMO-07', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.lnavarro) },
+  { userId: 'jprieto', holderName: 'Javier Prieto', holderId: '29640157H', officerId: 'OF-DEMO-12', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.jprieto) },
+  { userId: 'mgil', holderName: 'Marta Gil Herrero', holderId: '71385096A', officerId: 'OF-DEMO-21', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.mgil) },
+  { userId: 'dromero', holderName: 'Diego Romero', holderId: '33918274C', authorisedForClave: false, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.dromero) },
+]
+
 export const STAFF_CERTIFICATES: StaffCertificate[] = [
-  { id: 'cert-laura', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
-  { id: 'cert-javier', credential: 'dnie', holderName: 'Javier Prieto', holderId: 'DEMO-NIF-0012-J', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true },
-  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: 'DEMO-NIF-0021-M', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true },
-  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: 'DEMO-NIF-0099-D', validUntil: '2027-05-20', authorisedForClave: false },
-  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
+  { id: 'cert-laura', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-laura'])},
+  { id: 'cert-javier', credential: 'dnie', holderName: 'Javier Prieto', holderId: '29640157H', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-javier'])},
+  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: '71385096A', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-marta'])},
+  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: '33918274C', validUntil: '2027-05-20', authorisedForClave: false , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-diego'])},
+  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-old'])},
 ]
 
 /** Fake personnel-number format (NRP). Real formats must never be typed into the prototype. */
-export const PERSONNEL_NUMBER_PATTERN = /^DEMO-NRP-\d{4,8}$/
+/* ------------------------------------------------- fictional identifiers
+ * The app shows realistic-looking identifiers, but every DNI/NIE-shaped value carries a WRONG check letter,
+ * so it can never be a real person's number. Anything a user types in a DNI/NIE/NRP-shaped field must
+ * fail the real check-letter test (isFictionalDniNie), otherwise the app refuses it.
+ */
+const DNI_LETTERS = 'TRWAGMYFPDXBNJZSQVHLCKE'
+/** True when value has DNI (8 digits + letter) or NIE (X/Y/Z + 7 digits + letter) shape. */
+export const hasDniNieShape = (v: string) => /^(\d{8}|[XYZ]\d{7})[A-Z]$/.test(v.trim().toUpperCase())
+/** True when the check letter is the real one (i.e. could be a real person's number). */
+export function hasValidDniNieLetter(v: string): boolean {
+  const s = v.trim().toUpperCase()
+  if (!hasDniNieShape(s)) return false
+  const digits = s[0] >= 'X' && s[0] <= 'Z' ? String('XYZ'.indexOf(s[0])) + s.slice(1, 8) : s.slice(0, 8)
+  return DNI_LETTERS[Number(digits) % 23] === s[8]
+}
+/** Fictional = has the shape but a wrong check letter. */
+export const isFictionalDniNie = (v: string) => hasDniNieShape(v) && !hasValidDniNieLetter(v)
+
+/** Builds a fictional DNI/NIE from digits: same shape as a real one, deliberately wrong check letter. */
+export function fictionalDniNie(prefix: '' | 'X' | 'Y' | 'Z', digits: number): string {
+  const body = prefix ? String(digits).padStart(7, '0').slice(-7) : String(digits).padStart(8, '0').slice(-8)
+  const n = Number((prefix ? String('XYZ'.indexOf(prefix)) : '') + body)
+  const ok = DNI_LETTERS[n % 23]
+  const wrong = DNI_LETTERS[(n % 23 + 7) % 23]
+  return `${prefix}${body}${wrong === ok ? 'Z' : wrong}`
+}
+
+/**
+ * Personnel registration number (NRP) shape used in the prototype: the holder's 8-digit DNI number with its
+ * letter, then "A", then a 4-digit body code, e.g. 50731842J A0611 → typed "50731842JA0611".
+ * Valid only when the embedded DNI part is fictional (wrong check letter).
+ */
+export const PERSONNEL_NUMBER_PATTERN = /^\d{8}[A-Z]A\d{4}$/
+export const isFictionalPersonnelNumber = (v: string) => {
+  const s = v.trim().toUpperCase().replace(/\s+/g, '')
+  return PERSONNEL_NUMBER_PATTERN.test(s) && isFictionalDniNie(s.slice(0, 9))
+}
 
 /** Queue priority tiers, highest first, with the reason shown to officers. */
 export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bilingual }> = [
@@ -619,8 +676,8 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Giulia Ferraro', age: 24, nationality: 'Italian', initials: 'GF', hue: 12,
       profile: { en: "Italian master's student in Madrid", es: 'Estudiante italiana de máster en Madrid' },
     },
-    document: d('PASSPORT', 'DEMO-P-IT-482913', 'Italy', '2031-03-14'),
-    otherDocuments: [d('EU_EID', 'DEMO-EID-IT-77310', 'Italy', '2030-09-01')],
+    document: d('PASSPORT', 'YB4829137', 'Italy', '2031-03-14'),
+    otherDocuments: [d('EU_EID', 'CA77310XK', 'Italy', '2030-09-01')],
     presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
     scenario: {
       en: 'Her Italian eID PIN is at home, so she uses her passport chip + face check. Basic level in minutes; an officer approves the advanced level live.',
@@ -644,7 +701,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Daniel Mwangi', age: 23, nationality: 'Kenyan', initials: 'DM', hue: 150,
       profile: { en: "Kenyan master's student with a TIE", es: 'Estudiante keniano de máster con TIE' },
     },
-    document: d('TIE', 'DEMO-TIE-Y0042719-K', 'Spain', '2027-09-30'),
+    document: d('TIE', 'Y8042719P', 'Spain', '2027-09-30'),
     presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: false },
     scenario: {
       en: 'Non-EU student, TIE chip + face check. Today he would need an office appointment with originals; now it is done from the phone.',
@@ -666,7 +723,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Rafael Medina', age: 80, nationality: 'Argentine', initials: 'RM', hue: 32,
       profile: { en: 'The neighbour: 80, no smartphone, helped by his daughter', es: 'El vecino: 80 años, sin smartphone, le ayuda su hija' },
     },
-    document: d('TIE', 'DEMO-TIE-X0019583-R', 'Spain', '2029-05-12'),
+    document: d('TIE', 'X9019583W', 'Spain', '2029-05-12'),
     presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: true },
     assisted: { helperName: 'Lucía Medina', relation: { en: 'daughter', es: 'hija' }, deviceOwner: 'Lucía Medina' },
     scenario: {
@@ -689,12 +746,12 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Noah Becker', age: 16, nationality: 'German', initials: 'NB', hue: 210,
       profile: { en: 'A minor (16) registering with his mother', es: 'Un menor (16) que se registra con su madre' },
     },
-    document: d('PASSPORT', 'DEMO-P-DE-C01X58', 'Germany', '2030-02-02'),
+    document: d('PASSPORT', 'C01X58RT2', 'Germany', '2030-02-02'),
     presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
     guardian: {
       name: 'Anke Becker',
       relation: { en: 'mother', es: 'madre' },
-      document: d('EU_EID', 'DEMO-EID-DE-L01X44', 'Germany', '2032-07-20'),
+      document: d('EU_EID', 'L01X44TZ7', 'Germany', '2032-07-20'),
       route: 'A',
     },
     scenario: {
@@ -718,7 +775,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Yusuf Haddad', age: 31, nationality: 'Syrian', initials: 'YH', hue: 280,
       profile: { en: 'International protection applicant with a red card', es: 'Solicitante de protección internacional con tarjeta roja' },
     },
-    document: d('RED_CARD', 'DEMO-RC-0117-H', 'Spain', '2027-01-15'),
+    document: d('RED_CARD', 'Y9117004D', 'Spain', '2027-01-15'),
     presetAnswers: { nationalityGroup: 'non_eu', document: 'RED_CARD', hasEuEid: false, assisted: false },
     policyProposal: true,
     scenario: {
@@ -741,7 +798,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Ivo Petrov (claimed)', age: 35, nationality: 'Bulgarian', initials: 'IP', hue: 0,
       profile: { en: 'Deepfake attempt: someone else’s passport, a synthetic face video', es: 'Intento de deepfake: pasaporte ajeno y vídeo facial sintético' },
     },
-    document: d('PASSPORT', 'DEMO-P-BG-391027', 'Bulgaria', '2029-11-08'),
+    document: d('PASSPORT', '391027844', 'Bulgaria', '2029-11-08'),
     presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
     scenario: {
       en: 'The face matches the chip photo, but liveness fails: an injected video. The engine stops it and an officer refuses with a reason.',
@@ -763,7 +820,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Hana Kovač (claimed)', age: 41, nationality: 'Croatian', initials: 'HK', hue: 330,
       profile: { en: 'Fake document: a passport whose chip was cloned and edited', es: 'Documento falso: pasaporte con el chip clonado y modificado' },
     },
-    document: d('PASSPORT', 'DEMO-P-HR-005521', 'Croatia', '2028-04-30'),
+    document: d('PASSPORT', '205521963', 'Croatia', '2028-04-30'),
     presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
     scenario: {
       en: 'The chip reads, but its signature is not from a trusted issuing country. Flagged high risk; the officer refuses with "Chip signature invalid".',
@@ -786,7 +843,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       name: 'Lin Wei', age: 29, nationality: 'Chinese', initials: 'LW', hue: 190,
       profile: { en: 'Engineer with a TIE who moved last month', es: 'Ingeniera con TIE que se mudó el mes pasado' },
     },
-    document: d('TIE', 'DEMO-TIE-Z0088104-W', 'Spain', '2028-12-01'),
+    document: d('TIE', 'Z9088104B', 'Spain', '2028-12-01'),
     presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: false },
     scenario: {
       en: 'Her padrón was not updated after moving, so the officer refuses with "Residence not found". She updates it, presses "I have corrected it" and is approved.',
@@ -834,16 +891,16 @@ interface BackgroundSeed {
 
 const bg = (x: BackgroundSeed) => x
 const BACKGROUND: BackgroundSeed[] = [
-  bg({ id: 'bg-01', name: 'Amélie Laurent', age: 27, nationality: 'French', initials: 'AL', hue: 240, profile: { en: 'French designer', es: 'Diseñadora francesa' }, doc: d('EU_EID', 'DEMO-EID-FR-90213', 'France', '2031-01-10'), route: 'A', status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 14, checks: [['eidas_login', 'pass', undefined, 'French eID confirmed via eIDAS'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-02', name: 'Mateo Rojas', age: 34, nationality: 'Colombian', initials: 'MR', hue: 50, profile: { en: 'Colombian nurse with a TIE', es: 'Enfermero colombiano con TIE' }, doc: d('TIE', 'DEMO-TIE-Y0063377-M', 'Spain', '2028-06-01'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 22, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.96, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Zaragoza']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
-  bg({ id: 'bg-03', name: 'Priya Nair', age: 31, nationality: 'Indian', initials: 'PN', hue: 20, profile: { en: 'Indian data scientist with a passport', es: 'Científica de datos india con pasaporte' }, doc: d('PASSPORT', 'DEMO-P-IN-K77120', 'India', '2033-08-19'), route: 'B', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 9, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.93, 'Live person'], ['face_match', 'warn', 0.86, 'Below threshold: new glasses and beard vs chip photo'], ['residence', 'pass', undefined, 'Registered in Barcelona']], flags: [{ code: 'low_face_match', severity: 'medium', reason: { en: 'Face match 0.86 is below the 0.90 threshold', es: 'Coincidencia facial 0,86 por debajo del umbral 0,90' } }], risk: 'medium' }),
-  bg({ id: 'bg-04', name: 'Oluwaseun Adeyemi', age: 26, nationality: 'Nigerian', initials: 'OA', hue: 120, profile: { en: 'Nigerian MBA student with a TIE', es: 'Estudiante nigeriano de MBA con TIE' }, doc: d('TIE', 'DEMO-TIE-Y0071240-A', 'Spain', '2027-07-15'), route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two padrón records found (old and new address)']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'Residence record ambiguous', es: 'Empadronamiento ambiguo' } }], risk: 'medium', infoRequest: 'Please confirm which of your two addresses is current (Calle Mayor or Calle Alcalá).' }),
-  bg({ id: 'bg-05', name: 'Carmen Ruiz Ortega', age: 45, nationality: 'Spanish', initials: 'CR', hue: 0, profile: { en: 'Spanish teacher with a DNI', es: 'Profesora española con DNI' }, doc: d('DNI', 'DEMO-DNI-0000001-T', 'Spain', '2030-04-04'), route: 'C', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 140, checks: [['dni_video', 'pass', undefined, 'DNI video identification completed']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-06', name: 'Tomás Ferreira', age: 38, nationality: 'Portuguese', initials: 'TF', hue: 100, profile: { en: 'Portuguese chef', es: 'Cocinero portugués' }, doc: d('EU_EID', 'DEMO-EID-PT-21980', 'Portugal', '2029-10-10'), route: 'A', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 31, checks: [['eidas_login', 'warn', undefined, 'Surname order differs from residence record'], ['residence', 'pass', undefined, 'Registered in Sevilla']], flags: [{ code: 'eid_data_mismatch', severity: 'medium', reason: { en: 'eID data does not match the records (surname order)', es: 'Los datos del eID no coinciden con los registros (orden de apellidos)' } }], risk: 'medium' }),
-  bg({ id: 'bg-07', name: 'Aisha Rahman', age: 29, nationality: 'Bangladeshi', initials: 'AR', hue: 160, profile: { en: 'Bangladeshi researcher with a passport', es: 'Investigadora bangladesí con pasaporte' }, doc: d('PASSPORT', 'DEMO-P-BD-A11902', 'Bangladesh', '2026-10-30'), route: 'B', status: 'not_approved', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 1440, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'fail', undefined, 'Passport expired on 30 Oct 2026'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [{ code: 'appeal_filed', severity: 'medium', reason: { en: 'Appeal filed against the refusal', es: 'Recurso presentado contra la denegación' } }], risk: 'medium', refusedWith: 'document_expired', appeal: 'My passport renewal is in progress; I attach the consulate receipt.' }),
-  bg({ id: 'bg-08', name: 'Jonas Lindqvist', age: 52, nationality: 'Swedish', initials: 'JL', hue: 200, profile: { en: 'Swedish retiree in Málaga', es: 'Jubilado sueco en Málaga' }, doc: d('PASSPORT', 'DEMO-P-SE-99821', 'Sweden', '2032-03-03'), route: 'B', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 300, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.94, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Málaga']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-09', name: 'Valentina Costa', age: 19, nationality: 'Brazilian', initials: 'VC', hue: 300, profile: { en: 'Brazilian undergraduate with a TIE', es: 'Estudiante brasileña de grado con TIE' }, doc: d('TIE', 'DEMO-TIE-Y0090011-C', 'Spain', '2027-09-30'), route: 'FALLBACK', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 48, checks: [['chip_read', 'fail', undefined, 'Chip could not be read twice (damaged card)'], ['officer_video', 'pending', undefined, 'Waiting for officer video call']], flags: [{ code: 'second_attempt', severity: 'medium', reason: { en: 'Chip unreadable twice: moved to Fallback', es: 'Chip ilegible dos veces: pasa a vía alternativa' } }], risk: 'medium' }),
-  bg({ id: 'bg-10', name: 'Marek Nowak', age: 40, nationality: 'Polish', initials: 'MN', hue: 260, profile: { en: 'Polish logistics manager', es: 'Responsable de logística polaco' }, doc: d('PASSPORT', 'DEMO-P-PL-E44018', 'Poland', '2030-12-12'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 5, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.96, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Valencia']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
+  bg({ id: 'bg-01', name: 'Amélie Laurent', age: 27, nationality: 'French', initials: 'AL', hue: 240, profile: { en: 'French designer', es: 'Diseñadora francesa' }, doc: d('EU_EID', 'X4RT90213', 'France', '2031-01-10'), route: 'A', status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 14, checks: [['eidas_login', 'pass', undefined, 'French eID confirmed via eIDAS'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-02', name: 'Mateo Rojas', age: 34, nationality: 'Colombian', initials: 'MR', hue: 50, profile: { en: 'Colombian nurse with a TIE', es: 'Enfermero colombiano con TIE' }, doc: d('TIE', 'Y8063377N', 'Spain', '2028-06-01'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 22, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.96, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Zaragoza']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
+  bg({ id: 'bg-03', name: 'Priya Nair', age: 31, nationality: 'Indian', initials: 'PN', hue: 20, profile: { en: 'Indian data scientist with a passport', es: 'Científica de datos india con pasaporte' }, doc: d('PASSPORT', 'K7712093', 'India', '2033-08-19'), route: 'B', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 9, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.93, 'Live person'], ['face_match', 'warn', 0.86, 'Below threshold: new glasses and beard vs chip photo'], ['residence', 'pass', undefined, 'Registered in Barcelona']], flags: [{ code: 'low_face_match', severity: 'medium', reason: { en: 'Face match 0.86 is below the 0.90 threshold', es: 'Coincidencia facial 0,86 por debajo del umbral 0,90' } }], risk: 'medium' }),
+  bg({ id: 'bg-04', name: 'Oluwaseun Adeyemi', age: 26, nationality: 'Nigerian', initials: 'OA', hue: 120, profile: { en: 'Nigerian MBA student with a TIE', es: 'Estudiante nigeriano de MBA con TIE' }, doc: d('TIE', 'Y8071240D', 'Spain', '2027-07-15'), route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two padrón records found (old and new address)']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'Residence record ambiguous', es: 'Empadronamiento ambiguo' } }], risk: 'medium', infoRequest: 'Please confirm which of your two addresses is current (Calle Mayor or Calle Alcalá).' }),
+  bg({ id: 'bg-05', name: 'Carmen Ruiz Ortega', age: 45, nationality: 'Spanish', initials: 'CR', hue: 0, profile: { en: 'Spanish teacher with a DNI', es: 'Profesora española con DNI' }, doc: d('DNI', '48219360M', 'Spain', '2030-04-04'), route: 'C', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 140, checks: [['dni_video', 'pass', undefined, 'DNI video identification completed']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-06', name: 'Tomás Ferreira', age: 38, nationality: 'Portuguese', initials: 'TF', hue: 100, profile: { en: 'Portuguese chef', es: 'Cocinero portugués' }, doc: d('EU_EID', '152198027ZX4', 'Portugal', '2029-10-10'), route: 'A', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 31, checks: [['eidas_login', 'warn', undefined, 'Surname order differs from residence record'], ['residence', 'pass', undefined, 'Registered in Sevilla']], flags: [{ code: 'eid_data_mismatch', severity: 'medium', reason: { en: 'eID data does not match the records (surname order)', es: 'Los datos del eID no coinciden con los registros (orden de apellidos)' } }], risk: 'medium' }),
+  bg({ id: 'bg-07', name: 'Aisha Rahman', age: 29, nationality: 'Bangladeshi', initials: 'AR', hue: 160, profile: { en: 'Bangladeshi researcher with a passport', es: 'Investigadora bangladesí con pasaporte' }, doc: d('PASSPORT', 'A11902588', 'Bangladesh', '2026-10-30'), route: 'B', status: 'not_approved', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 1440, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'fail', undefined, 'Passport expired on 30 Oct 2026'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [{ code: 'appeal_filed', severity: 'medium', reason: { en: 'Appeal filed against the refusal', es: 'Recurso presentado contra la denegación' } }], risk: 'medium', refusedWith: 'document_expired', appeal: 'My passport renewal is in progress; I attach the consulate receipt.' }),
+  bg({ id: 'bg-08', name: 'Jonas Lindqvist', age: 52, nationality: 'Swedish', initials: 'JL', hue: 200, profile: { en: 'Swedish retiree in Málaga', es: 'Jubilado sueco en Málaga' }, doc: d('PASSPORT', '99821470', 'Sweden', '2032-03-03'), route: 'B', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 300, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.94, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Málaga']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-09', name: 'Valentina Costa', age: 19, nationality: 'Brazilian', initials: 'VC', hue: 300, profile: { en: 'Brazilian undergraduate with a TIE', es: 'Estudiante brasileña de grado con TIE' }, doc: d('TIE', 'Y8090011N', 'Spain', '2027-09-30'), route: 'FALLBACK', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 48, checks: [['chip_read', 'fail', undefined, 'Chip could not be read twice (damaged card)'], ['officer_video', 'pending', undefined, 'Waiting for officer video call']], flags: [{ code: 'second_attempt', severity: 'medium', reason: { en: 'Chip unreadable twice: moved to Fallback', es: 'Chip ilegible dos veces: pasa a vía alternativa' } }], risk: 'medium' }),
+  bg({ id: 'bg-10', name: 'Marek Nowak', age: 40, nationality: 'Polish', initials: 'MN', hue: 260, profile: { en: 'Polish logistics manager', es: 'Responsable de logística polaco' }, doc: d('PASSPORT', 'EP4401872', 'Poland', '2030-12-12'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 5, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.96, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Valencia']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
 ]
 
 const both = (s: string): Bilingual => ({ en: s, es: s })

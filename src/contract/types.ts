@@ -61,7 +61,7 @@ export interface DocumentDef {
 
 export interface IdentityDocument {
   type: DocumentType
-  /** Clearly fake, always starts with "DEMO-". */
+  /** Realistic-looking but fictional: DNI/NIE-shaped numbers always carry a wrong check letter (isFictionalDniNie). */
   number: string
   issuingCountry: string
   /** ISO date. */
@@ -173,7 +173,7 @@ export interface Officer {
  *    (on a cryptocard, it carries their identity, post and employing body), a DNIe, or another accepted
  *    personal certificate;
  *  - access works only if their organisation has authorised that person for Cl@ve registration.
- * Everything here is SIMULATED with fictional people and "DEMO-" identifiers.
+ * Everything here is SIMULATED with fictional people and fictional identifiers (wrong check letters).
  */
 export type StaffCredential = 'employee_certificate' | 'dnie' | 'personal_certificate'
 
@@ -185,7 +185,7 @@ export interface RegistrationAuthority {
 }
 
 export interface StaffOffice {
-  /** DIR3-style unit code, fake: "DEMO-E0…" */
+  /** DIR3-style unit code, fictional series "E04999…". */
   code: string
   name: Bilingual
   authorityId: string
@@ -197,7 +197,7 @@ export interface StaffCertificate {
   id: string
   credential: StaffCredential
   holderName: string
-  /** Fake personal ID read from the certificate. Always "DEMO-…". */
+  /** Fictional DNI/NIE read from the certificate (wrong check letter). */
   holderId: string
   /** Employing body printed in the certificate (employee certificates only). */
   authorityId?: string
@@ -208,7 +208,21 @@ export interface StaffCertificate {
   officerId?: string
   /** Simulated authorisation list: the person's organisation has authorised them for Cl@ve registration. */
   authorisedForClave: boolean
+  /** demoHash of the certificate's PIN (the cryptocard / DNIe PIN typed after picking the certificate). */
+  pinHash: string
 }
+
+/** Staff user account for the "user + password" sign-in method. */
+export interface StaffAccount {
+  userId: string
+  holderName: string
+  holderId: string
+  officerId?: string
+  authorisedForClave: boolean
+  passwordHash: string
+}
+
+export type StaffSignInMethod = 'certificate' | 'password'
 
 export type OfficerRole = 'registrar' | 'supervisor'
 
@@ -218,19 +232,22 @@ export interface OfficerProfile {
   authorityId: string
   officeCode: string
   post: string
-  /** Personnel registration number (NRP), fake: "DEMO-NRP-…" */
+  /** Personnel registration number (NRP), fictional: see PERSONNEL_NUMBER_PATTERN / isFictionalPersonnelNumber. */
   personnelNumber: string
   role: OfficerRole
-  /** Which certificate they signed in with. */
-  certificateId: string
+  /** How they signed in when they completed the profile; certificateId only for the certificate method. */
+  signInMethod: StaffSignInMethod
+  certificateId?: string
   completedAt: string
 }
 
-export type OfficerProfileInput = Omit<OfficerProfile, 'officerId' | 'completedAt' | 'certificateId'>
+export type OfficerProfileInput = Omit<OfficerProfile, 'officerId' | 'completedAt' | 'certificateId' | 'signInMethod'>
 
 export type StaffSignInResult =
   | { status: 'signed_in'; officerId: string }
-  | { status: 'needs_profile'; officerId: string; certificateId: string }
+  | { status: 'needs_profile'; officerId: string; method: StaffSignInMethod; certificateId?: string }
+  /** Wrong PIN or wrong user/password. Generic on purpose: never says which part was wrong. */
+  | { status: 'invalid_credentials' }
   | { status: 'not_authorised'; reason: 'not_staff' | 'not_authorised_for_clave' | 'expired' }
 
 /** Queue priority tiers, highest first. Each queued case gets exactly one. */
@@ -439,7 +456,7 @@ export interface SimulatedIndicator {
 export interface CitizenAccount {
   /** Same id as the case it owns. */
   caseId: string
-  /** Sign-in identifier: the case's document number (always "DEMO-…"). */
+  /** Sign-in identifier: the case's (fictional) document number. */
   documentNumber: string
   /** demoHash(password). Demo only, not a secure password store. */
   passwordHash: string
