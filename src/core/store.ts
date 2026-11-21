@@ -19,6 +19,7 @@ import {
 import { checksForCase, decide, deriveFlags, OFFICER_VIDEO_DONE, riskOf, runCheck } from './engine'
 import { seedHistory } from './history'
 import { createAccountActions, resetSignUpCase } from './accounts'
+import { createStaffActions } from './staff'
 
 export class ClaveRuleError extends Error {
   constructor(message: string) {
@@ -474,8 +475,8 @@ export const actions: ClaveActions = {
     const s = useClave.getState()
     const fresh = freshState(new Date())
     const ev = audit(null, SYSTEM_ACTOR, 'demo_reset', 'Demo reset to the seed state.')
-    // Keep the per-tab language and the signed-in officer so the presenter is not logged out.
-    commit({ ...fresh, lang: s.lang, officerId: s.officerId, audit: [...fresh.audit, ev] }, null, 'demo_reset')
+    // Keep the per-tab language, the signed-in officer and staff job details so the presenter is not logged out.
+    commit({ ...fresh, lang: s.lang, officerId: s.officerId, officerProfiles: s.officerProfiles ?? {}, audit: [...fresh.audit, ev] }, null, 'demo_reset')
   },
   resetCase(caseId) {
     const c = getCase(caseId)
@@ -492,6 +493,8 @@ export const actions: ClaveActions = {
 
   /* ---- citizen accounts (src/core/accounts.ts) ---- */
   ...createAccountActions({ get: () => useClave.getState(), commit, audit }),
+  /* ---- staff access (src/core/staff.ts) ---- */
+  ...createStaffActions({ get: () => useClave.getState(), commit, audit, fail: m => { throw new ClaveRuleError(m) } }),
 }
 
 /* ---------------------------------------------------------- translation */

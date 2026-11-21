@@ -1,14 +1,15 @@
 /* Officer console chrome: left nav + top bar. */
 import type { ReactNode } from 'react'
-import { NavLink, useSearchParams } from 'react-router-dom'
-import { Inbox, History, LayoutDashboard, LogOut } from 'lucide-react'
-import { OFFICERS, SERVICE_NAME } from '@/contract/seed'
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { Inbox, History, LayoutDashboard, LogOut, FileStack, Rows3, UserRound } from 'lucide-react'
+import { OFFICERS, SERVICE_NAME, STAFF_OFFICES } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { actions, useClave } from '@/core/store'
 import { officerQueue } from '@/core/selectors'
 import { Avatar, HomeLink, LangToggle, LogoGlyph, cn } from '@/ui'
 import { C } from '../copy'
-import { useTr } from '../lib'
+import { postLabel } from '../ProfileForm'
+import { useLang, useTr } from '../lib'
 import { Kbd, LiveDot } from './ui'
 
 function Brand() {
@@ -29,7 +30,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const officerId = useClave(s => s.officerId)
   const queueCount = useClave(s => officerQueue(s).length)
   const officer = OFFICERS.find(o => o.id === officerId)
+  const profile = useClave(s => (officerId ? s.officerProfiles?.[officerId] : undefined))
+  const lang = useLang()
+  const office = profile ? STAFF_OFFICES.find(o => o.code === profile.officeCode) : undefined
+  const officeText = office ? `${tr(office.name)} · ${office.code}` : officer?.office ?? ''
+  const postText = profile ? postLabel(profile.post, lang) : ''
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const embed = params.get('embed') === '1'
 
   const navItem = (to: string, icon: ReactNode, label: string, extra?: ReactNode, end = false) => (
@@ -58,8 +65,11 @@ export function Shell({ children }: { children: ReactNode }) {
             <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.08em] text-white/70 uppercase">{tr(C.navSection)}</p>
             {navItem(PATHS.officer, <Inbox className="size-[18px]" />, tr(C.navQueue),
               <span className="rounded-full bg-white/12 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white" aria-label={`${queueCount} ${tr(C.inQueue)}`}>{queueCount}</span>, true)}
+            {navItem(PATHS.officerDashboard, <LayoutDashboard className="size-[18px]" />, tr(C.navStaffDashboard))}
+            {navItem(PATHS.officerDocuments, <FileStack className="size-[18px]" />, tr(C.navDocuments))}
+            {navItem(PATHS.officerAll, <Rows3 className="size-[18px]" />, tr(C.navAll))}
             {navItem(PATHS.officerAudit, <History className="size-[18px]" />, tr(C.navAudit))}
-            {navItem(PATHS.dashboard, <LayoutDashboard className="size-[18px]" />, tr(C.navDashboard))}
+            {navItem(PATHS.officerProfile, <UserRound className="size-[18px]" />, tr(C.navProfile))}
           </nav>
 
           <div className="mt-auto space-y-4">
@@ -85,7 +95,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 <Avatar initials={officer.name.split(' ').map(p => p[0]).join('')} hue={226} size={36} />
                 <div className="min-w-0 flex-1 leading-tight">
                   <p className="truncate text-sm font-semibold">{officer.name}</p>
-                  <p className="truncate text-[11px] text-white/50">{officer.id}</p>
+                  <p className="truncate text-[11px] text-white/70">{postText || officer.id}</p>
                 </div>
               </div>
             )}
@@ -95,24 +105,32 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className={cn('flex min-w-0 flex-1 flex-col', embed && 'h-dvh overflow-y-auto')}>
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-line bg-surface/85 px-6 backdrop-blur">
-          <HomeLink className="lg:hidden"><span className="font-semibold">{SERVICE_NAME}</span></HomeLink>
-          <nav className="flex gap-1 lg:hidden" aria-label={tr(C.navSection)}>
-            <NavLink end to={PATHS.officer} className={({ isActive }) => cn('rounded-lg px-2.5 py-1.5 text-sm', isActive ? 'bg-surface-2 font-semibold' : 'text-muted')}>{tr(C.navQueue)}</NavLink>
-            <NavLink to={PATHS.officerAudit} className={({ isActive }) => cn('rounded-lg px-2.5 py-1.5 text-sm', isActive ? 'bg-surface-2 font-semibold' : 'text-muted')}>{tr(C.navAudit)}</NavLink>
+          <HomeLink className="shrink-0 lg:hidden"><span className="font-semibold">{SERVICE_NAME}</span></HomeLink>
+          <nav className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 lg:hidden" aria-label={tr(C.navSection)}>
+            {([
+              [PATHS.officer, C.navQueue, true],
+              [PATHS.officerDashboard, C.navStaffDashboard, false],
+              [PATHS.officerDocuments, C.navDocuments, false],
+              [PATHS.officerAll, C.navAll, false],
+              [PATHS.officerAudit, C.navAudit, false],
+              [PATHS.officerProfile, C.navProfile, false],
+            ] as const).map(([to, label, end]) => (
+              <NavLink key={to} end={end} to={to} className={({ isActive }) => cn('shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand', isActive ? 'bg-surface-2 font-semibold' : 'text-muted')}>{tr(label)}</NavLink>
+            ))}
           </nav>
           <div title={tr(C.liveHint)}><LiveDot label={tr(C.live)} /></div>
-          <span className="hidden text-xs text-muted xl:inline">{tr(C.liveHint)}</span>
+          <span className="hidden text-xs text-muted 2xl:inline">{tr(C.liveHint)}</span>
           <div className="ml-auto flex items-center gap-3">
             <LangToggle />
             {officer && (
               <>
-                <div className="hidden text-right leading-tight sm:block">
-                  <p className="text-[11px] text-muted">{tr(C.signedInAs)}</p>
-                  <p className="text-sm font-semibold">{officer.name}</p>
+                <div className="hidden min-w-0 text-right leading-tight sm:block" data-testid="officer-identity">
+                  <p className="text-sm font-semibold">{officer.name}{postText && <span className="font-normal text-muted"> · {postText}</span>}</p>
+                  <p className="max-w-[340px] truncate text-[12px] text-muted" title={officeText}>{officeText}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => actions.officerSignOut()}
+                  onClick={() => { navigate(PATHS.officer); actions.officerSignOut() }}
                   className="inline-flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   <LogOut className="size-4" aria-hidden />

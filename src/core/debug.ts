@@ -1,6 +1,6 @@
 /* window.__clave — exposed in DEV builds and with `?debug=1` (tests, presenter console). */
 import { actions, getState, setEngineSpeed, useClave } from './store'
-import { officerQueue, caseAudit } from './selectors'
+import { officerQueue, caseAudit, priorityOf } from './selectors'
 
 declare global {
   interface Window {
@@ -10,6 +10,7 @@ declare global {
       setEngineSpeed: typeof setEngineSpeed
       officerQueue: () => ReturnType<typeof officerQueue>
       caseAudit: (id: string) => ReturnType<typeof caseAudit>
+      priorityOf: (id: string, nowIso?: string) => ReturnType<typeof priorityOf>
       subscribe: typeof useClave.subscribe
     }
   }
@@ -27,6 +28,7 @@ export function installDebugHandle() {
     setEngineSpeed,
     officerQueue: () => officerQueue(getState()),
     caseAudit: (id: string) => caseAudit(getState(), id),
+    priorityOf: (id: string, nowIso?: string) => priorityOf(getState().cases[id], nowIso ? new Date(nowIso) : new Date()),
     subscribe: useClave.subscribe,
   }
 }

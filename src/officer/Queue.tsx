@@ -1,16 +1,16 @@
 /* Screen 6: the officer case queue. */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Ban, CircleCheck, Clock, Cpu, FilterX, Hourglass, Inbox, Layers, ShieldAlert, ShieldCheck, ShieldQuestion, Sparkles, Undo2 } from 'lucide-react'
-import type { Case, RiskLevel, RouteId } from '@/contract/types'
-import { CHECKS, DOCUMENTS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { ArrowUp, Ban, CircleCheck, Clock, Cpu, FilterX, Hourglass, Inbox, Info, Layers, ListOrdered, ShieldAlert, ShieldCheck, ShieldQuestion, Sparkles, Undo2 } from 'lucide-react'
+import type { AppState, Case, PriorityTier, RiskLevel, RouteId } from '@/contract/types'
+import { CHECKS, DOCUMENTS, PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
-import { officerQueue, relativeTime } from '@/core/selectors'
+import { baseTierOf, isAgeBumped, officerQueue, priorityOf, relativeTime, waitingSince } from '@/core/selectors'
 import { Avatar, RouteBadge, SimulatedBadge, StatusPill, cn } from '@/ui'
-import { C, DECISION_LABEL, OUTCOME_LABEL, RISK_LABEL } from './copy'
-import { effectiveOutcome, lastDecisionAt, RISK_RANK, reviewKind, useHotkeys, useLang, useTick, useTr } from './lib'
+import { C, DECISION_LABEL, OUTCOME_LABEL, RISK_LABEL, S } from './copy'
+import { effectiveOutcome, fill, lastDecisionAt, RISK_RANK, reviewKind, useHotkeys, useLang, useTick, useTr } from './lib'
 import { useLive } from './live'
 import { CheckIcon, Kbd, LiveDot, RiskTag, Sim, Tip } from './components/ui'
 
@@ -18,9 +18,158 @@ type View = 'all' | 'decision' | 'advanced'
 
 export const shortDoc = (c: Case, lang: 'en' | 'es') => DOCUMENTS[c.document.type].label[lang].split(' (')[0]
 
+export const TIER_TONE: Record<PriorityTier, string> = {
+  p1_high_risk: 'bg-danger-soft text-danger ring-danger/25',
+  p2_appeal: 'bg-warning-soft text-warning ring-warning/25',
+  p3_citizen_replied: 'bg-brand-soft text-brand ring-brand/25',
+  p4_medium_risk: 'bg-surface-2 text-ink ring-line',
+  p5_video_call: 'bg-sim-soft text-sim ring-sim/25',
+  p6_advanced_review: 'bg-success-soft text-success ring-success/25',
+}
+export const TIER_BAR: Record<PriorityTier, string> = {
+  p1_high_risk: 'bg-danger',
+  p2_appeal: 'bg-warning',
+  p3_citizen_replied: 'bg-brand',
+  p4_medium_risk: 'bg-muted',
+  p5_video_call: 'bg-sim',
+  p6_advanced_review: 'bg-success',
+}
+export const tierDef = (t: PriorityTier) => PRIORITY_TIERS.find(x => x.id === t)!
+
+/** "P1" pill with the tier label; colour is never the only cue (code + text). */
+export function TierTag({ tier, short }: { tier: PriorityTier; short?: boolean }) {
+  const tr = useTr()
+  const label = tr(tierDef(tier).label)
+  return (
+    <span className={cn('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset', TIER_TONE[tier])} title={tr(tierDef(tier).why)}>
+      {short ? label.split(' · ')[0] : label}
+    </span>
+  )
+}
+
 function topFlag(c: Case) {
   return [...c.flags].sort((a, b) => RISK_RANK[a.severity] - RISK_RANK[b.severity])[0]
 }
+
+/* Rows are memoised: a store change re-renders (and re-measures for layout animation) only the rows whose case changed. */
+const TierHeaderRow = memo(function TierHeaderRow({ tier, count }: { tier: PriorityTier; count: number }) {
+  const tr = useTr()
+  const def = tierDef(tier)
+  return (
+    <motion.tr layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} data-testid={`tier-row-${tier}`} className="border-b border-line/70 bg-canvas/70">
+                          <th colSpan={7} scope="colgroup" className="py-2 pr-5 pl-5 text-left font-normal">
+                            <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                              <TierTag tier={tier} />
+                              <span className="text-[12px] font-semibold text-muted tabular-nums">{count} {tr(count === 1 ? S.caseOne : S.casesN)}</span>
+                              <span className="text-[12.5px] text-muted">{tr(def.why)}</span>
+                              <Tip content={<><b>{tr(def.label)}</b><br />{tr(def.why)}</>}>
+                                <button type="button" aria-label={`${tr(S.whyTier)}: ${tr(def.label)}`} className="grid size-6 place-items-center rounded-md text-muted outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-brand">
+                                  <Info className="size-3.5" aria-hidden />
+                                </button>
+                              </Tip>
+                            </span>
+                          </th>
+                        </motion.tr>
+  )
+})
+
+const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flashed, onSelect, registerRow }: {
+  c: Case; i: number; tier: PriorityTier; bumped: boolean; isSel: boolean; /** re-render tick for the waiting time */ minute: number; isNew: boolean; flashed: boolean
+  onSelect: (i: number) => void; registerRow: (id: string, el: HTMLTableRowElement | null) => void
+}) {
+  const tr = useTr()
+  const lang = useLang()
+  const navigate = useNavigate()
+  const f = topFlag(c)
+  return (
+    <motion.tr
+                        data-tier={tier}
+                        data-case-id={c.id}
+                        ref={el => registerRow(c.id, el)}
+                        layout="position"
+                        initial={{ opacity: 0, x: -24, backgroundColor: 'rgba(31,79,214,0.14)' }}
+                        animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(31,79,214,0)' }}
+                        exit={{ opacity: 0, x: 24, transition: { duration: 0.25 } }}
+                        transition={{ duration: isNew ? 0.6 : 0.3, backgroundColor: { duration: 2.4 } }}
+                        onClick={() => navigate(PATHS.officerCase(c.id))}
+                        onMouseEnter={() => onSelect(i)}
+                        aria-selected={isSel}
+                        className={cn(
+                          'group relative cursor-pointer border-b border-line/70 last:border-b-0',
+                          isSel ? 'bg-brand-soft/45' : 'hover:bg-canvas/60',
+                          flashed && 'ofc-flash',
+                        )}
+                      >
+                        <td className="relative py-3 pr-3 pl-5">
+                          <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1 rounded-r', c.risk === 'high' ? 'bg-danger' : c.risk === 'medium' ? 'bg-warning' : 'bg-success/60', isSel && 'w-1.5')} />
+                          <div className="flex items-center gap-3">
+                            <Avatar initials={c.persona.initials} hue={c.persona.hue} size={36} />
+                            <div className="min-w-0">
+                              <Link
+                                to={PATHS.officerCase(c.id)}
+                                onClick={e => e.stopPropagation()}
+                                onFocus={() => onSelect(i)}
+                                className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand"
+                              >
+                                {c.persona.name}
+                              </Link>
+                              <p className="truncate text-xs text-muted">{c.persona.nationality} · {shortDoc(c, lang)} · {c.persona.age}<span className="sr-only"> · {tr(S.priority)}: {tr(tierDef(tier).label)}</span></p>
+                            </div>
+                            {isNew && <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">{tr(C.newCase)}</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">{c.route && <Tip content={tr(ROUTES[c.route].name)}><span className="inline-flex"><RouteBadge route={c.route} compact /></span></Tip>}</td>
+                        <td className="px-3 py-3"><RiskTag risk={c.risk} /></td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusPill status={c.status} />
+                            {reviewKind(c) === 'advanced' && <span className="text-[11px] font-medium text-brand">{tr(C.advancedReviews)}</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {f ? (
+                            <p className="flex items-start gap-1.5 text-[13px] leading-snug text-ink">
+                              <span aria-hidden className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', f.severity === 'high' ? 'bg-danger' : f.severity === 'medium' ? 'bg-warning' : 'bg-muted')} />
+                              <span className="line-clamp-2">{tr(f.reason)}{c.flags.length > 1 && <span className="ml-1 text-xs font-semibold text-muted">+{c.flags.length - 1}</span>}</span>
+                            </p>
+                          ) : <span className="text-xs text-muted">{tr(C.noFlags)}</span>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <ul className="flex items-center gap-1" aria-label={tr(C.checks)}>
+                            {c.checks.map(k => {
+                              const o = effectiveOutcome(k)
+                              const text = `${tr(CHECKS[k.id].label)}: ${tr(OUTCOME_LABEL[o])}${k.score !== undefined ? ` (${k.score.toFixed(2)})` : ''}`
+                              return (
+                                <li key={k.id}>
+                                  <Tip content={<><b>{tr(CHECKS[k.id].label)}</b> · {tr(OUTCOME_LABEL[o])}{k.score !== undefined && ` · ${k.score.toFixed(2)}`}<br /><span className="opacity-75">{tr(k.detail)}</span></>}>
+                                    <span className="block rounded p-0.5" aria-label={text} role="img"><CheckIcon outcome={o} /></span>
+                                  </Tip>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </td>
+                        <td className="py-3 pr-5 pl-3 text-right whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-[13px] text-muted tabular-nums">
+                            <Clock className="size-3.5" aria-hidden />
+                            {relativeTime(waitingSince(c), lang)}
+                          </span>
+                          {bumped && (
+                            <Tip content={fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}>
+                              <span data-testid="age-bump" tabIndex={0} className="mt-1 ml-auto flex w-fit items-center gap-0.5 rounded-full bg-warning-soft px-1.5 py-0.5 text-[11px] font-bold text-warning outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                                <ArrowUp className="size-3" aria-hidden />{tr(S.bumpedShort)}
+                                <span className="sr-only">: {fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}</span>
+                              </span>
+                            </Tip>
+                          )}
+                          {isSel && <span className="mt-1 hidden justify-end group-hover:flex"><Kbd>↵</Kbd></span>}
+                        </td>
+                      </motion.tr>
+  )
+}, (a, b) =>
+  // Cross-tab sync replaces every case object, so compare by identity + last update instead of reference.
+  a.c.id === b.c.id && a.c.updatedAt === b.c.updatedAt && a.i === b.i && a.tier === b.tier && a.bumped === b.bumped &&
+  a.minute === b.minute && a.isSel === b.isSel && a.isNew === b.isNew && a.flashed === b.flashed && a.onSelect === b.onSelect && a.registerRow === b.registerRow)
 
 export function QueuePage() {
   const tr = useTr()
@@ -28,9 +177,9 @@ export function QueuePage() {
   useTick()
   const navigate = useNavigate()
   const { arrived, flashed } = useLive()
-  const state = useClave(s => s)
-  const queue = useMemo(() => officerQueue(state), [state])
-  const all = state.cases
+  const all = useClave(s => s.cases)
+  const queue = useMemo(() => officerQueue({ cases: all } as AppState), [all])
+  const registerRow = useCallback((id: string, el: HTMLTableRowElement | null) => { rowRefs.current[id] = el }, [])
 
   const [view, setView] = useState<View>('all')
   const [risk, setRisk] = useState<RiskLevel | 'all'>('all')
@@ -50,6 +199,9 @@ export function QueuePage() {
     advanced: queue.filter(c => reviewKind(c) === 'advanced').length,
     decision: queue.filter(c => reviewKind(c) === 'decision').length,
   }
+  const now = new Date()
+  const tierOf = new Map(filtered.map(c => [c.id, priorityOf(c, now)] as const))
+  const tierCount = (t: PriorityTier) => filtered.filter(c => tierOf.get(c.id) === t).length
   const selIdx = Math.min(sel, Math.max(0, filtered.length - 1))
   const selected = filtered[selIdx]
 
@@ -80,13 +232,17 @@ export function QueuePage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-ink">{tr(C.queueTitle)}</h1>
             <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{queue.length}</span>
             <LiveDot label={tr(C.live)} />
             <SimulatedBadge label={tr({ en: 'AI flags and scores simulated', es: 'Alertas y puntuaciones de IA simuladas' })} />
           </div>
           <p className="mt-1 max-w-2xl text-sm text-muted">{tr(C.queueSubtitle)}</p>
+          <p data-testid="priority-legend" className="mt-1.5 flex max-w-3xl items-start gap-1.5 text-[13px] font-medium text-ink">
+            <ListOrdered className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            {fill(tr(S.legend), { h: PRIORITY_AGE_BUMP_HOURS })}
+          </p>
         </div>
         <div className="hidden items-center gap-3 text-xs text-muted md:flex" aria-hidden>
           <span className="flex items-center gap-1"><Kbd>J</Kbd><Kbd>K</Kbd> {tr(C.kbdMove)}</span>
@@ -252,86 +408,28 @@ export function QueuePage() {
               </thead>
               <tbody>
                 <AnimatePresence initial={false}>
-                  {filtered.map((c, i) => {
-                    const f = topFlag(c)
-                    const isSel = i === selIdx
-                    const isNew = arrived.has(c.id)
-                    return (
-                      <motion.tr
+                  {filtered.flatMap((c, i) => {
+                    const tier = tierOf.get(c.id)!
+                    const out = []
+                    if (i === 0 || tierOf.get(filtered[i - 1].id) !== tier) {
+                      out.push(<TierHeaderRow key={`tier-${tier}`} tier={tier} count={tierCount(tier)} />)
+                    }
+                    out.push(
+                      <QueueRow
                         key={c.id}
-                        ref={el => { rowRefs.current[c.id] = el }}
-                        layout="position"
-                        initial={{ opacity: 0, x: -24, backgroundColor: 'rgba(31,79,214,0.14)' }}
-                        animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(31,79,214,0)' }}
-                        exit={{ opacity: 0, x: 24, transition: { duration: 0.25 } }}
-                        transition={{ duration: isNew ? 0.6 : 0.3, backgroundColor: { duration: 2.4 } }}
-                        onClick={() => navigate(PATHS.officerCase(c.id))}
-                        onMouseEnter={() => setSel(i)}
-                        aria-selected={isSel}
-                        className={cn(
-                          'group relative cursor-pointer border-b border-line/70 last:border-b-0',
-                          isSel ? 'bg-brand-soft/45' : 'hover:bg-canvas/60',
-                          flashed.has(c.id) && 'ofc-flash',
-                        )}
-                      >
-                        <td className="relative py-3 pr-3 pl-5">
-                          <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1 rounded-r', c.risk === 'high' ? 'bg-danger' : c.risk === 'medium' ? 'bg-warning' : 'bg-success/60', isSel && 'w-1.5')} />
-                          <div className="flex items-center gap-3">
-                            <Avatar initials={c.persona.initials} hue={c.persona.hue} size={36} />
-                            <div className="min-w-0">
-                              <Link
-                                to={PATHS.officerCase(c.id)}
-                                onClick={e => e.stopPropagation()}
-                                onFocus={() => setSel(i)}
-                                className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand"
-                              >
-                                {c.persona.name}
-                              </Link>
-                              <p className="truncate text-xs text-muted">{c.persona.nationality} · {shortDoc(c, lang)} · {c.persona.age}</p>
-                            </div>
-                            {isNew && <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">{tr(C.newCase)}</span>}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">{c.route && <Tip content={tr(ROUTES[c.route].name)}><span className="inline-flex"><RouteBadge route={c.route} compact /></span></Tip>}</td>
-                        <td className="px-3 py-3"><RiskTag risk={c.risk} /></td>
-                        <td className="px-3 py-3">
-                          <div className="flex flex-col items-start gap-1">
-                            <StatusPill status={c.status} />
-                            {reviewKind(c) === 'advanced' && <span className="text-[11px] font-medium text-brand">{tr(C.advancedReviews)}</span>}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          {f ? (
-                            <p className="flex items-start gap-1.5 text-[13px] leading-snug text-ink">
-                              <span aria-hidden className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', f.severity === 'high' ? 'bg-danger' : f.severity === 'medium' ? 'bg-warning' : 'bg-muted')} />
-                              <span className="line-clamp-2">{tr(f.reason)}{c.flags.length > 1 && <span className="ml-1 text-xs font-semibold text-muted">+{c.flags.length - 1}</span>}</span>
-                            </p>
-                          ) : <span className="text-xs text-muted">{tr(C.noFlags)}</span>}
-                        </td>
-                        <td className="px-3 py-3">
-                          <ul className="flex items-center gap-1" aria-label={tr(C.checks)}>
-                            {c.checks.map(k => {
-                              const o = effectiveOutcome(k)
-                              const text = `${tr(CHECKS[k.id].label)}: ${tr(OUTCOME_LABEL[o])}${k.score !== undefined ? ` (${k.score.toFixed(2)})` : ''}`
-                              return (
-                                <li key={k.id}>
-                                  <Tip content={<><b>{tr(CHECKS[k.id].label)}</b> · {tr(OUTCOME_LABEL[o])}{k.score !== undefined && ` · ${k.score.toFixed(2)}`}<br /><span className="opacity-75">{tr(k.detail)}</span></>}>
-                                    <span className="block rounded p-0.5" aria-label={text} role="img"><CheckIcon outcome={o} /></span>
-                                  </Tip>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </td>
-                        <td className="py-3 pr-5 pl-3 text-right whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 text-[13px] text-muted tabular-nums">
-                            <Clock className="size-3.5" aria-hidden />
-                            {relativeTime(c.submittedAt ?? c.updatedAt, lang)}
-                          </span>
-                          {isSel && <span className="mt-1 hidden justify-end group-hover:flex"><Kbd>↵</Kbd></span>}
-                        </td>
-                      </motion.tr>
+                        c={c}
+                        i={i}
+                        tier={tier}
+                        bumped={isAgeBumped(c, now)}
+                        minute={Math.floor(now.getTime() / 60_000)}
+                        isSel={i === selIdx}
+                        isNew={arrived.has(c.id)}
+                        flashed={flashed.has(c.id)}
+                        onSelect={setSel}
+                        registerRow={registerRow}
+                      />,
                     )
+                    return out
                   })}
                 </AnimatePresence>
               </tbody>

@@ -27,9 +27,13 @@ test('live: citizen runs Giulia, officer sees her arrive and approves advanced',
     window.__clave!.actions.officerSignOut()
   })
 
-  // Officer: simulated sign-in by picking a card.
+  // Officer: simulated certificate sign-in (first time: job details form).
   await officer.goto('/?debug=1#/officer')
-  await officer.getByRole('button', { name: /Laura Navarro/ }).click()
+  await officer.getByRole('button', { name: 'Sign in with your electronic certificate' }).click()
+  await officer.getByTestId('cert-cert-laura').click()
+  await officer.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true }).click()
+  await officer.getByLabel(/Personnel number/).fill('DEMO-NRP-20481')
+  await officer.getByRole('button', { name: 'Save and open the console' }).click()
   await expect(officer.getByRole('heading', { name: 'Case queue' })).toBeVisible()
   await expect(officer.getByRole('link', { name: 'Giulia Ferraro', exact: true })).toHaveCount(0)
 

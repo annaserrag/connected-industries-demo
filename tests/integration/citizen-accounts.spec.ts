@@ -5,7 +5,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import { C } from '../../src/citizen/copy'
-import { CASE_LIBRARY, DEMO_ACCOUNT_PASSWORDS, SIGNUP_COUNTRIES, STORAGE_KEY } from '../../src/contract/seed'
+import { CASE_LIBRARY, DEMO_ACCOUNT_PASSWORDS, SIGNUP_COUNTRIES, STATE_VERSION, STORAGE_KEY } from '../../src/contract/seed'
 
 const PHONE = { width: 390, height: 844 }
 const NAMES = CASE_LIBRARY.map(c => c.persona.name)
@@ -149,8 +149,9 @@ test.describe('citizen accounts', () => {
     const errors = [...trackErrors(citizen), ...trackErrors(officer)]
     await fresh(citizen)
     await citizen.evaluate(() => window.__clave!.setEngineSpeed(0.3))
-    await officer.goto('/#/officer')
-    await officer.getByRole('button', { name: /Laura Navarro/ }).click()
+    await officer.goto('/?debug=1#/officer')
+    await officer.waitForFunction(() => Boolean(window.__clave))
+    await officer.evaluate(() => window.__clave!.actions.officerSignIn('OF-DEMO-07'))
 
     await citizen.bringToFront()
     await citizen.getByRole('tab', { name: 'Create account' }).click()
@@ -363,7 +364,7 @@ test.describe('citizen accounts', () => {
     await page.reload()
     await page.waitForFunction(() => Boolean(window.__clave))
     const s = await page.evaluate(() => { const s = window.__clave!.getState(); return { v: s.version, n: Object.keys(s.accounts).length, active: s.activeCitizenCaseId } })
-    expect(s).toEqual({ v: 2, n: 8, active: null })
+    expect(s).toEqual({ v: STATE_VERSION, n: 8, active: null })
     await page.goto(`${D}#/citizen`)
     await expect(page.getByTestId('signin-form')).toBeVisible()
     expect(errors).toEqual([])

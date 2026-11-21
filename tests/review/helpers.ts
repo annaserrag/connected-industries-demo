@@ -1,4 +1,4 @@
-import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { expect, type Browser, type BrowserContext, type FrameLocator, type Page } from '@playwright/test'
 
 /** Override with REVIEW_BASE / REVIEW_SHOTS to run a second copy on another port (defaults unchanged). */
 export const BASE = process.env.REVIEW_BASE ?? 'http://localhost:4180'
@@ -73,9 +73,27 @@ export async function twoViews(browser: Browser) {
   return { context, citizen, officer, problems, loads }
 }
 
+/**
+ * Staff sign-in through the UI: simulated certificate picker, then the job-details form if this is the
+ * officer's first sign-in. Works on a page or inside the demo iframe.
+ */
+export async function staffCertificateSignIn(p: Page | FrameLocator, certId = 'cert-laura', nrp = 'DEMO-NRP-20481') {
+  await p.getByRole('button', { name: 'Sign in with your electronic certificate' }).click()
+  await p.getByTestId(`cert-${certId}`).click()
+  await p.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true }).click()
+  const form = p.getByTestId('staff-profile-form')
+  const queue = p.getByRole('heading', { name: 'Case queue' })
+  await expect(form.or(queue)).toBeVisible({ timeout: 10_000 })
+  if (await form.isVisible()) {
+    await p.getByLabel(/Personnel number/).fill(nrp)
+    await p.getByRole('button', { name: 'Save and open the console' }).click()
+  }
+  await expect(queue).toBeVisible()
+}
+
 export async function officerSignIn(officer: Page) {
   await officer.goto(`${BASE}/#/officer`)
-  await officer.getByRole('button', { name: /Laura Navarro/ }).click()
+  await staffCertificateSignIn(officer)
   await expect(officer.getByRole('heading', { level: 1 }).first()).toBeVisible()
 }
 

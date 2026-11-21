@@ -2,17 +2,23 @@
  * CHECK 8 — demo readiness: entry points from the landing page, /#/demo side by side, case library, reset.
  */
 import { test, expect } from '@playwright/test'
-import { BASE, DEMO_LOGINS, attachConsole, shot, type Problems } from './helpers'
+import { BASE, DEMO_LOGINS, attachConsole, shot, staffCertificateSignIn, type Problems } from './helpers'
 
-test('8a landing has clear entry points (citizen, officer, demo, dashboard)', async ({ page }) => {
+test('8a landing leads with Apply; Staff access tab leads to sign-in; /demo by URL only', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE}/#/`)
   await expect(page.getByTestId('landing-citizen')).toBeVisible()
+  await expect(page.getByTestId('landing-citizen')).toContainText('Apply')
+  // the dashboard now lives in the staff console; demo mode is reachable by URL only
+  await expect(page.getByRole('link', { name: /Demo mode|dashboard/i })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Staff access' }).click()
   await expect(page.getByTestId('landing-officer')).toBeVisible()
-  await expect(page.getByRole('link', { name: /Demo/ }).first()).toBeVisible()
-  await expect(page.getByRole('link', { name: /dashboard/i }).first()).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByRole('link', { name: /Demo/ }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByTestId('landing-officer')).toBeVisible()
+  await page.getByTestId('landing-officer').click()
+  await expect(page.getByRole('button', { name: 'Sign in with your electronic certificate' })).toBeVisible()
+  await page.goto(`${BASE}/#/demo`)
+  await expect(page.locator('iframe')).toHaveCount(2)
   await page.goto(`${BASE}/#/citizen`)
   // sign in / create account, and no persona list (demo logins live only in the README)
   await expect(page.getByTestId('signin-form')).toBeVisible()
@@ -36,7 +42,7 @@ test('8b /#/demo: citizen + officer side by side, live sync inside iframes, rese
   const phone = page.frameLocator('iframe').first()
   const laptop = page.frameLocator('iframe').nth(1)
   // officer signs in inside the laptop frame
-  await laptop.getByRole('button', { name: /Laura Navarro/ }).click()
+  await staffCertificateSignIn(laptop)
   // no case library on the stage: the phone shows the citizen sign-in; Giulia signs in on the phone
   await expect(page.getByRole('button', { name: 'Choose a case from the library' })).toHaveCount(0)
   for (const l of Object.values(DEMO_LOGINS)) await expect(page.getByText(l.name)).toHaveCount(0)

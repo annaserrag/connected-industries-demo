@@ -5,6 +5,10 @@
  * Real figures appear only in REFERENCE_FIGURES, exactly as in the plan's reference sheet.
  */
 import type {
+  PriorityTier,
+  RegistrationAuthority,
+  StaffCertificate,
+  StaffOffice,
   AppState,
   CitizenAccount,
   SignUpCountry,
@@ -35,7 +39,7 @@ export const FOOTER_DISCLAIMER: Bilingual = {
 }
 export const SIMULATED_LABEL: Bilingual = { en: 'Simulated', es: 'Simulado' }
 export const POLICY_PROPOSAL_LABEL: Bilingual = { en: 'Policy proposal', es: 'Propuesta normativa' }
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
 /* ------------------------------------------------------------- key rule */
 
@@ -539,7 +543,65 @@ export const SIMULATED_DASHBOARD = {
 export const OFFICERS: Officer[] = [
   { id: 'OF-DEMO-07', name: 'Laura Navarro', office: 'Registration office (demo) · Madrid' },
   { id: 'OF-DEMO-12', name: 'Javier Prieto', office: 'Registration office (demo) · Valencia' },
+  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: 'Registration office (demo) · Sevilla' },
 ]
+
+/* ------------------------------------------------------------ staff access (simulated) */
+
+/** Bodies enabled as Cl@ve Registration Authorities (names as text only, no logos). */
+export const REGISTRATION_AUTHORITIES: RegistrationAuthority[] = [
+  { id: 'aeat', short: 'AEAT', name: { en: 'Tax Agency (Agencia Tributaria)', es: 'Agencia Tributaria' } },
+  { id: 'seg_social', short: 'Seg. Social', name: { en: 'Social Security', es: 'Seguridad Social' } },
+  { id: 'sepe', short: 'SEPE', name: { en: 'State Public Employment Service (SEPE)', es: 'Servicio Público de Empleo Estatal (SEPE)' } },
+  { id: 'delegacion', short: 'Delegación', name: { en: 'Government Delegation / Subdelegation, citizen information office', es: 'Delegación / Subdelegación del Gobierno, oficina de información' } },
+]
+
+export const STAFF_OFFICES: StaffOffice[] = [
+  { code: 'DEMO-E04000101', name: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' }, authorityId: 'aeat', city: 'Madrid' },
+  { code: 'DEMO-E04000214', name: { en: 'Registration office · Valencia Ruzafa', es: 'Oficina de registro · Valencia Ruzafa' }, authorityId: 'seg_social', city: 'Valencia' },
+  { code: 'DEMO-E04000377', name: { en: 'Registration office · Sevilla Triana', es: 'Oficina de registro · Sevilla Triana' }, authorityId: 'delegacion', city: 'Sevilla' },
+  { code: 'DEMO-E04000452', name: { en: 'Employment office · Zaragoza', es: 'Oficina de empleo · Zaragoza' }, authorityId: 'sepe', city: 'Zaragoza' },
+]
+
+export const STAFF_POSTS: Bilingual[] = [
+  { en: 'Cl@ve registration officer', es: 'Registrador/a Cl@ve' },
+  { en: 'Citizen information officer', es: 'Técnico/a de información al ciudadano' },
+  { en: 'Office supervisor', es: 'Jefe/a de oficina' },
+]
+
+export const STAFF_CREDENTIAL_LABELS: Record<StaffCertificate['credential'], Bilingual> = {
+  employee_certificate: { en: 'Public employee certificate (cryptocard)', es: 'Certificado de empleado público (tarjeta criptográfica)' },
+  dnie: { en: 'Electronic DNI (DNIe)', es: 'DNI electrónico (DNIe)' },
+  personal_certificate: { en: 'Personal electronic certificate', es: 'Certificado electrónico personal' },
+}
+
+/**
+ * What the simulated certificate picker offers. Covers every outcome: two staff who sign in directly
+ * once their profile exists, one authorised officer signing in for the first time, one person with a valid
+ * certificate who is NOT authorised for Cl@ve, and one expired certificate.
+ */
+export const STAFF_CERTIFICATES: StaffCertificate[] = [
+  { id: 'cert-laura', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
+  { id: 'cert-javier', credential: 'dnie', holderName: 'Javier Prieto', holderId: 'DEMO-NIF-0012-J', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true },
+  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: 'DEMO-NIF-0021-M', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true },
+  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: 'DEMO-NIF-0099-D', validUntil: '2027-05-20', authorisedForClave: false },
+  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
+]
+
+/** Fake personnel-number format (NRP). Real formats must never be typed into the prototype. */
+export const PERSONNEL_NUMBER_PATTERN = /^DEMO-NRP-\d{4,8}$/
+
+/** Queue priority tiers, highest first, with the reason shown to officers. */
+export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bilingual }> = [
+  { id: 'p1_high_risk', label: { en: 'P1 · High risk', es: 'P1 · Riesgo alto' }, why: { en: 'Possible fraud: decide before anything else so nothing is granted by mistake.', es: 'Posible fraude: se decide antes que nada para no conceder nada por error.' } },
+  { id: 'p2_appeal', label: { en: 'P2 · Appeal', es: 'P2 · Recurso' }, why: { en: 'A citizen contested a refusal and is waiting for a person.', es: 'Una persona recurrió una denegación y espera respuesta.' } },
+  { id: 'p3_citizen_replied', label: { en: 'P3 · Citizen replied', es: 'P3 · Respuesta recibida' }, why: { en: 'The citizen answered your request for information.', es: 'La persona respondió a tu petición de información.' } },
+  { id: 'p4_medium_risk', label: { en: 'P4 · Needs a check', es: 'P4 · Requiere revisión' }, why: { en: 'A check was below its threshold or the case needs a human by rule.', es: 'Una comprobación quedó bajo el umbral o la norma exige revisión humana.' } },
+  { id: 'p5_video_call', label: { en: 'P5 · Video call', es: 'P5 · Videollamada' }, why: { en: 'Fallback route: the citizen is waiting for a video call.', es: 'Vía alternativa: la persona espera una videollamada.' } },
+  { id: 'p6_advanced_review', label: { en: 'P6 · Advanced level', es: 'P6 · Nivel avanzado' }, why: { en: 'Basic level already granted; advanced level always gets a human review.', es: 'Nivel básico ya concedido; el avanzado siempre lo revisa una persona.' } },
+]
+/** A case waiting longer than this moves up one priority tier. */
+export const PRIORITY_AGE_BUMP_HOURS = 24
 export const SYSTEM_ACTOR = { kind: 'system' as const, id: 'ENGINE', name: 'Verification engine (simulated)' }
 
 /* -------------------------------------------------------------- the cases */
@@ -946,6 +1008,7 @@ export function buildSeedState(now: Date = new Date()): AppState {
     officerId: null,
     activeCitizenCaseId: null,
     accounts,
+    officerProfiles: {},
   }
 }
 

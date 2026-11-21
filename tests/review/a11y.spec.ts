@@ -132,7 +132,7 @@ test.describe('5. Accessibility', () => {
     const log: unknown[] = []
     await page.goto(`${BASE}/#/`)
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await tabTo(page, /I am a citizen|citizen/i, log)
+    await tabTo(page, /^Apply\s+From your phone/i, log)
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/#\/citizen/)
     // sign in with the keyboard only (saved demo account; credentials are only in the README)
@@ -173,8 +173,22 @@ test.describe('5. Accessibility', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     const log: unknown[] = []
     await page.goto(`${BASE}/#/officer`)
-    await tabTo(page, /Laura Navarro/, log)
+    // Certificate sign-in by keyboard: open the picker, pick Laura's valid certificate, sign in,
+    // then complete the first-time job details form.
+    await tabTo(page, /Sign in with your electronic certificate/, log)
     await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await tabTo(page, /^Laura Navarro, Public employee/, log) // first radio = Laura's valid certificate
+    await page.keyboard.press('Space')
+    await tabTo(page, /^Sign in$/, log)
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('staff-profile-form')).toBeVisible({ timeout: 10_000 })
+    // the form focuses the first field still to fill (the NRP: the rest is prefilled from the certificate)
+    await expect(page.getByLabel(/Personnel number/)).toBeFocused()
+    await page.keyboard.type('DEMO-NRP-20481')
+    await tabTo(page, /Save and open the console/, log)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Case queue' })).toBeVisible()
     await tabTo(page, /^Priya Nair$/, log)
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/officer\/case\/bg-03/)
@@ -232,6 +246,8 @@ test.describe('5. Accessibility', () => {
       ['citizen-assistant', '/#/citizen/start/daniel', 390], ['citizen-status-approved', '/#/citizen/case/giulia', 390],
       ['citizen-status-refused', '/#/citizen/case/deepfake', 390], ['officer-signin', '/#/officer', 1440],
       ['officer-queue', '/#/officer', 1440], ['officer-case', '/#/officer/case/deepfake', 1440], ['officer-audit', '/#/officer/audit', 1440],
+      ['officer-dashboard', '/#/officer/dashboard', 1440], ['officer-documents', '/#/officer/documents', 1440],
+      ['officer-applications', '/#/officer/applications', 1440], ['officer-profile', '/#/officer/profile', 1440],
       ['dashboard', '/#/dashboard', 1440], ['demo', '/#/demo', 1440],
     ]
     const signIn: Record<string, [string, string]> = {
