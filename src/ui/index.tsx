@@ -6,6 +6,7 @@ export {
   Spinner, Kbd, Skeleton, LiveDot, Divider, Callout, TextLink,
 } from './primitives'
 export type { ButtonProps, ButtonVariant, ButtonSize, Tone } from './primitives'
+export { HomeLink } from './HomeLink'
 export { Logo, LogoGlyph, PhoneFrame, PhoneStatusBar, LaptopFrame, Footer, LangToggle, PageHeader } from './layout'
 export { EmptyState, LoadingState, ErrorState, Toaster, toast } from './feedback'
 export { Stepper, CheckRow, OutcomeIcon, ScoreBar, CheckTick, CountUp } from './steps'

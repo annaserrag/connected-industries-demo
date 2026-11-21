@@ -5,7 +5,13 @@
  * Real figures appear only in REFERENCE_FIGURES, exactly as in the plan's reference sheet.
  */
 import type {
+  PriorityTier,
+  RegistrationAuthority,
+  StaffCertificate,
+  StaffOffice,
   AppState,
+  CitizenAccount,
+  SignUpCountry,
   AssistantAnswers,
   Bilingual,
   Case,
@@ -33,7 +39,7 @@ export const FOOTER_DISCLAIMER: Bilingual = {
 }
 export const SIMULATED_LABEL: Bilingual = { en: 'Simulated', es: 'Simulado' }
 export const POLICY_PROPOSAL_LABEL: Bilingual = { en: 'Policy proposal', es: 'Propuesta normativa' }
-export const STATE_VERSION = 1
+export const STATE_VERSION = 3
 
 /* ------------------------------------------------------------- key rule */
 
@@ -537,7 +543,65 @@ export const SIMULATED_DASHBOARD = {
 export const OFFICERS: Officer[] = [
   { id: 'OF-DEMO-07', name: 'Laura Navarro', office: 'Registration office (demo) · Madrid' },
   { id: 'OF-DEMO-12', name: 'Javier Prieto', office: 'Registration office (demo) · Valencia' },
+  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: 'Registration office (demo) · Sevilla' },
 ]
+
+/* ------------------------------------------------------------ staff access (simulated) */
+
+/** Bodies enabled as Cl@ve Registration Authorities (names as text only, no logos). */
+export const REGISTRATION_AUTHORITIES: RegistrationAuthority[] = [
+  { id: 'aeat', short: 'AEAT', name: { en: 'Tax Agency (Agencia Tributaria)', es: 'Agencia Tributaria' } },
+  { id: 'seg_social', short: 'Seg. Social', name: { en: 'Social Security', es: 'Seguridad Social' } },
+  { id: 'sepe', short: 'SEPE', name: { en: 'State Public Employment Service (SEPE)', es: 'Servicio Público de Empleo Estatal (SEPE)' } },
+  { id: 'delegacion', short: 'Delegación', name: { en: 'Government Delegation / Subdelegation, citizen information office', es: 'Delegación / Subdelegación del Gobierno, oficina de información' } },
+]
+
+export const STAFF_OFFICES: StaffOffice[] = [
+  { code: 'DEMO-E04000101', name: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' }, authorityId: 'aeat', city: 'Madrid' },
+  { code: 'DEMO-E04000214', name: { en: 'Registration office · Valencia Ruzafa', es: 'Oficina de registro · Valencia Ruzafa' }, authorityId: 'seg_social', city: 'Valencia' },
+  { code: 'DEMO-E04000377', name: { en: 'Registration office · Sevilla Triana', es: 'Oficina de registro · Sevilla Triana' }, authorityId: 'delegacion', city: 'Sevilla' },
+  { code: 'DEMO-E04000452', name: { en: 'Employment office · Zaragoza', es: 'Oficina de empleo · Zaragoza' }, authorityId: 'sepe', city: 'Zaragoza' },
+]
+
+export const STAFF_POSTS: Bilingual[] = [
+  { en: 'Cl@ve registration officer', es: 'Registrador/a Cl@ve' },
+  { en: 'Citizen information officer', es: 'Técnico/a de información al ciudadano' },
+  { en: 'Office supervisor', es: 'Jefe/a de oficina' },
+]
+
+export const STAFF_CREDENTIAL_LABELS: Record<StaffCertificate['credential'], Bilingual> = {
+  employee_certificate: { en: 'Public employee certificate (cryptocard)', es: 'Certificado de empleado público (tarjeta criptográfica)' },
+  dnie: { en: 'Electronic DNI (DNIe)', es: 'DNI electrónico (DNIe)' },
+  personal_certificate: { en: 'Personal electronic certificate', es: 'Certificado electrónico personal' },
+}
+
+/**
+ * What the simulated certificate picker offers. Covers every outcome: two staff who sign in directly
+ * once their profile exists, one authorised officer signing in for the first time, one person with a valid
+ * certificate who is NOT authorised for Cl@ve, and one expired certificate.
+ */
+export const STAFF_CERTIFICATES: StaffCertificate[] = [
+  { id: 'cert-laura', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
+  { id: 'cert-javier', credential: 'dnie', holderName: 'Javier Prieto', holderId: 'DEMO-NIF-0012-J', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true },
+  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: 'DEMO-NIF-0021-M', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true },
+  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: 'DEMO-NIF-0099-D', validUntil: '2027-05-20', authorisedForClave: false },
+  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: 'DEMO-NIF-0007-L', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true },
+]
+
+/** Fake personnel-number format (NRP). Real formats must never be typed into the prototype. */
+export const PERSONNEL_NUMBER_PATTERN = /^DEMO-NRP-\d{4,8}$/
+
+/** Queue priority tiers, highest first, with the reason shown to officers. */
+export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bilingual }> = [
+  { id: 'p1_high_risk', label: { en: 'P1 · High risk', es: 'P1 · Riesgo alto' }, why: { en: 'Possible fraud: decide before anything else so nothing is granted by mistake.', es: 'Posible fraude: se decide antes que nada para no conceder nada por error.' } },
+  { id: 'p2_appeal', label: { en: 'P2 · Appeal', es: 'P2 · Recurso' }, why: { en: 'A citizen contested a refusal and is waiting for a person.', es: 'Una persona recurrió una denegación y espera respuesta.' } },
+  { id: 'p3_citizen_replied', label: { en: 'P3 · Citizen replied', es: 'P3 · Respuesta recibida' }, why: { en: 'The citizen answered your request for information.', es: 'La persona respondió a tu petición de información.' } },
+  { id: 'p4_medium_risk', label: { en: 'P4 · Needs a check', es: 'P4 · Requiere revisión' }, why: { en: 'A check was below its threshold or the case needs a human by rule.', es: 'Una comprobación quedó bajo el umbral o la norma exige revisión humana.' } },
+  { id: 'p5_video_call', label: { en: 'P5 · Video call', es: 'P5 · Videollamada' }, why: { en: 'Fallback route: the citizen is waiting for a video call.', es: 'Vía alternativa: la persona espera una videollamada.' } },
+  { id: 'p6_advanced_review', label: { en: 'P6 · Advanced level', es: 'P6 · Nivel avanzado' }, why: { en: 'Basic level already granted; advanced level always gets a human review.', es: 'Nivel básico ya concedido; el avanzado siempre lo revisa una persona.' } },
+]
+/** A case waiting longer than this moves up one priority tier. */
+export const PRIORITY_AGE_BUMP_HOURS = 24
 export const SYSTEM_ACTOR = { kind: 'system' as const, id: 'ENGINE', name: 'Verification engine (simulated)' }
 
 /* -------------------------------------------------------------- the cases */
@@ -784,6 +848,77 @@ const BACKGROUND: BackgroundSeed[] = [
 
 const both = (s: string): Bilingual => ({ en: s, es: s })
 
+/* ------------------------------------------------------- citizen accounts */
+
+/**
+ * Tiny deterministic hash (FNV-1a, 32-bit, hex) so the store never keeps passwords in plain text.
+ * DEMO ONLY: this is not a secure password hash. Never reuse a real password in the prototype.
+ */
+export function demoHash(input: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
+
+/** Normalises a typed document number for sign-in (case and spaces don't matter). */
+export const normaliseDocNumber = (s: string) => s.trim().toUpperCase().replace(/\s+/g, '')
+
+/**
+ * Saved demo accounts for the 8 library personas: sign in with the document number + this password.
+ * These credentials are documented ONLY in the README for the team. They must never be rendered in the UI.
+ */
+export const DEMO_ACCOUNT_PASSWORDS: Record<string, string> = {
+  giulia: 'giulia-demo',
+  daniel: 'daniel-demo',
+  rafael: 'rafael-demo',
+  noah: 'noah-demo',
+  yusuf: 'yusuf-demo',
+  deepfake: 'ivo-demo',
+  fakedoc: 'hana-demo',
+  linwei: 'linwei-demo',
+}
+
+export const PASSWORD_MIN_LENGTH = 8
+export const SIGNUP_MIN_AGE = 18
+
+/** Countries offered in sign-up (fictional applicants only). Group decides the route assistant defaults. */
+export const SIGNUP_COUNTRIES: SignUpCountry[] = [
+  { name: { en: 'Spain', es: 'España' }, nationality: 'Spanish', group: 'spanish' },
+  { name: { en: 'Italy', es: 'Italia' }, nationality: 'Italian', group: 'eu' },
+  { name: { en: 'France', es: 'Francia' }, nationality: 'French', group: 'eu' },
+  { name: { en: 'Germany', es: 'Alemania' }, nationality: 'German', group: 'eu' },
+  { name: { en: 'Portugal', es: 'Portugal' }, nationality: 'Portuguese', group: 'eu' },
+  { name: { en: 'Poland', es: 'Polonia' }, nationality: 'Polish', group: 'eu' },
+  { name: { en: 'Romania', es: 'Rumanía' }, nationality: 'Romanian', group: 'eu' },
+  { name: { en: 'Netherlands', es: 'Países Bajos' }, nationality: 'Dutch', group: 'eu' },
+  { name: { en: 'Morocco', es: 'Marruecos' }, nationality: 'Moroccan', group: 'non_eu' },
+  { name: { en: 'Colombia', es: 'Colombia' }, nationality: 'Colombian', group: 'non_eu' },
+  { name: { en: 'Venezuela', es: 'Venezuela' }, nationality: 'Venezuelan', group: 'non_eu' },
+  { name: { en: 'Argentina', es: 'Argentina' }, nationality: 'Argentine', group: 'non_eu' },
+  { name: { en: 'Mexico', es: 'México' }, nationality: 'Mexican', group: 'non_eu' },
+  { name: { en: 'United States', es: 'Estados Unidos' }, nationality: 'American', group: 'non_eu' },
+  { name: { en: 'United Kingdom', es: 'Reino Unido' }, nationality: 'British', group: 'non_eu' },
+  { name: { en: 'China', es: 'China' }, nationality: 'Chinese', group: 'non_eu' },
+  { name: { en: 'India', es: 'India' }, nationality: 'Indian', group: 'non_eu' },
+  { name: { en: 'Ukraine', es: 'Ucrania' }, nationality: 'Ukrainian', group: 'non_eu' },
+  { name: { en: 'Nigeria', es: 'Nigeria' }, nationality: 'Nigerian', group: 'non_eu' },
+  { name: { en: 'Other country outside the EU', es: 'Otro país fuera de la UE' }, nationality: 'Non-EU national', group: 'non_eu' },
+]
+
+/** Which documents a sign-up may choose, by nationality group (DNI only for Spaniards, EU eID only for EU). */
+export const SIGNUP_DOCUMENTS: Record<SignUpCountry['group'], DocumentType[]> = {
+  spanish: ['DNI', 'PASSPORT'],
+  eu: ['EU_EID', 'PASSPORT', 'TIE'],
+  non_eu: ['PASSPORT', 'TIE', 'NIE_PAPER', 'RED_CARD'],
+}
+
+function libraryAccount(c: { id: string; document: IdentityDocument }, at: string): CitizenAccount {
+  return { caseId: c.id, documentNumber: c.document.number, passwordHash: demoHash(DEMO_ACCOUNT_PASSWORDS[c.id]), createdAt: at, origin: 'library' }
+}
+
 /**
  * Builds the initial state. Deterministic for a given `now`.
  * Library cases start as 'draft' (the citizen runs them). Background cases start mid-flow.
@@ -862,6 +997,9 @@ export function buildSeedState(now: Date = new Date()): AppState {
     }
   }
 
+  const accounts: Record<string, CitizenAccount> = {}
+  for (const c of CASE_LIBRARY) accounts[c.id] = libraryAccount(c, iso(0))
+
   return {
     version: STATE_VERSION,
     cases,
@@ -869,6 +1007,8 @@ export function buildSeedState(now: Date = new Date()): AppState {
     lang: 'en',
     officerId: null,
     activeCitizenCaseId: null,
+    accounts,
+    officerProfiles: {},
   }
 }
 
