@@ -149,7 +149,7 @@ test.describe('citizen accounts', () => {
     const errors = [...trackErrors(citizen), ...trackErrors(officer)]
     await fresh(citizen)
     await citizen.evaluate(() => window.__clave!.setEngineSpeed(0.3))
-    await officer.goto('/#/officer')
+    await officer.goto('/?debug=1#/officer')
     await officer.waitForFunction(() => Boolean(window.__clave))
     await officer.evaluate(() => window.__clave!.actions.officerSignIn('OF-DEMO-07'))
 
