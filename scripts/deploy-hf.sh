@@ -61,4 +61,4 @@ git -c user.name="deploy" -c user.email="deploy@localhost" commit -q -m "Deploy 
 git -c http.extraHeader="Authorization: Bearer $HF_TOKEN" push -q --force "https://huggingface.co/spaces/$HF_SPACE" main
 
 echo "Done: https://huggingface.co/spaces/$HF_SPACE"
-echo "Direct link (best for two windows side by side): https://${OWNER,,}-${NAME,,}.hf.space"
+echo "Direct link (best for two windows side by side): https://${OWNER,,}-${NAME,,}.static.hf.space"

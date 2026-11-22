@@ -366,7 +366,6 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
                     checked={doc === d}
                     onChange={v => { setDoc(v as DocumentType); setDocCleared(false); setTouched(t => ({ ...t, doc: true })) }}
                     title={tr(DOCUMENTS[d].label)}
-                    sub={tr(DOCUMENTS[d].hasChip ? C.hasChip : C.noChip)}
                     icon={docIcon(d)}
                   />
                 </motion.div>

@@ -203,6 +203,7 @@ test.describe('citizen accounts', () => {
     await citizen.getByRole('button', { name: 'See my route' }).click()
     await expect(citizen.getByTestId('recommended-route')).toContainText('Passport or TIE chip')
     await citizen.getByRole('button', { name: 'Continue with this route' }).click()
+    await citizen.getByTestId('consent-checkbox').check()
     await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
     await citizen.getByRole('button', { name: 'Start reading the chip' }).click()
     await citizen.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })

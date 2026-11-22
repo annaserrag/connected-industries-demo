@@ -129,7 +129,7 @@ export function DocumentsPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 py-3"><StatusPill status={c.status} /></td>
+                            <td className="px-3 py-3"><StatusPill status={c.status} advanced={c.advanced} /></td>
                             <td className="px-3 py-3">{c.route ? <RouteBadge route={c.route} compact /> : <span className="text-muted">—</span>}</td>
                             <td className="px-3 py-3"><RiskTag risk={c.risk} size="sm" /></td>
                             <td className="px-3 py-3">{c.awaitingOfficer ? <TierTag tier={priorityOf(c, now)} /> : <span className="text-[12px] text-muted">{tr(S.notInQueue)}</span>}</td>

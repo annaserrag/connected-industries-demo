@@ -7,11 +7,11 @@ import {
   History, ListChecks, MessageSquareText, ScanFace, Scale, Smartphone, Sparkles, Undo2,
 } from 'lucide-react'
 import type { Case, CheckResult } from '@/contract/types'
-import { CHECKS, DOCUMENTS, ENGINE, LEVEL_LABELS, REJECTION_REASONS, ROUTES } from '@/contract/seed'
+import { CHECKS, DOCUMENTS, ENGINE, LEVEL_LABELS, REJECTION_REASONS, ROUTES, isProposedRule } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { caseAudit, officerQueue, relativeTime } from '@/core/selectors'
-import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
+import { Avatar, ProposedRuleTag, RouteBadge, SimulatedValuesNote, StatusPill, cn } from '@/ui'
 import { C, DECISION_LABEL, OUTCOME_LABEL } from './copy'
 import { effectiveOutcome, formatDate, formatDateTime, isExpired, RISK_RANK, SCORED, useHotkeys, useLang, useTick, useTr } from './lib'
 import { useLive } from './live'
@@ -82,12 +82,13 @@ export function CaseDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-[22px] font-bold sm:text-[26px]">{c.persona.name}</h1>
               <RiskTag risk={c.risk} />
-              <StatusPill status={c.status} />
+              <StatusPill status={c.status} advanced={c.advanced} />
               
             </div>
             <p className="mt-0.5 text-sm text-muted">{tr(c.persona.profile)}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               {c.route && <RouteBadge route={c.route} />}
+              {isProposedRule(c.route, c.answers ?? c.presetAnswers) && <ProposedRuleTag />}
               <span className="text-line" aria-hidden>|</span>
               <span className="inline-flex items-center gap-1.5">
                 <BadgeCheck className={cn('size-4', c.level === 'none' ? 'text-muted' : 'text-success')} aria-hidden />
@@ -261,6 +262,7 @@ function Evidence({ c }: { c: Case }) {
                 <>
                   <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', (face.score ?? 0) >= ENGINE.faceMatchMin ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning')}>{face.score?.toFixed(2)}</span>
                   <span className="text-[10px] font-medium text-muted">{tr(CHECKS.face_match.label)}</span>
+                  <SimulatedValuesNote />
                   <span className="h-px w-8 bg-line" />
                 </>
               )}

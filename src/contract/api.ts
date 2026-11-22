@@ -21,6 +21,7 @@ import type {
   Lang,
   RejectionReasonId,
   RouteId,
+  SimFailure,
 } from './types'
 
 /* ================================================================ STORE API
@@ -58,6 +59,17 @@ export interface ClaveActions {
   fileAppeal(caseId: string, text: string): void
   /** Status 5: citizen says they corrected the cause (e.g. padrón). Runs attempt N+1 of the script. */
   submitCorrection(caseId: string, note: string): Promise<void>
+  /** Assisted mode: who is helping and whose phone it is. Draft cases only. */
+  setAssistedHelper(caseId: string, helper: { helperName: string; relation: Bilingual; deviceOwner: string }): void
+  /** Assisted mode: the applicant's own mobile (or none), so the result never goes to the helper. */
+  setApplicantContact(caseId: string, contact: { phone?: string; noOwnPhone?: boolean }): void
+  /**
+   * "I am registering a minor in my care": the signed-in adult becomes the guardian and the application
+   * becomes the minor's. Draft cases only; age must be under 18.
+   */
+  setMinorApplicant(caseId: string, minor: { name: string; age: number }): void
+  /** Prototype control on the verification screen: make the next check run fail in a chosen way (null = normal run). Draft cases only. */
+  setSimulatedFailure(caseId: string, failure: SimFailure | null): void
   /** Citizen books one of the simulated video-call slots; officers see it on the case. */
   bookVideoCall(caseId: string, slotIso: string): void
 
@@ -136,6 +148,8 @@ export const PATHS = {
   officerCase: (id: string) => `/officer/case/${id}`,
   officerAudit: '/officer/audit',
   officerDashboard: '/officer/dashboard',       // live dashboard inside the staff console
+  officerAppeals: '/officer/appeals',            // queue filtered to open appeals
+  officerAdvanced: '/officer/advanced',          // queue filtered to advanced-level reviews
   officerDocuments: '/officer/documents',       // applications organised by document used
   officerProfile: '/officer/profile',           // the officer's job details
   officerAll: '/officer/applications',          // every application, searchable

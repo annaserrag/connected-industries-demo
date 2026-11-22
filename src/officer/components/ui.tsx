@@ -4,7 +4,7 @@ import * as RDialog from '@radix-ui/react-dialog'
 import * as RTooltip from '@radix-ui/react-tooltip'
 import { CircleCheck, CircleDashed, CircleMinus, CircleX, ShieldAlert, ShieldCheck, ShieldQuestion, TriangleAlert, X } from 'lucide-react'
 import type { CheckOutcome, RiskLevel } from '@/contract/types'
-import { cn } from '@/ui'
+import { cn, SimulatedValuesNote } from '@/ui'
 import { OUTCOME_LABEL, RISK_LABEL } from '../copy'
 import { useTr } from '../lib'
 
@@ -134,6 +134,7 @@ export function ScoreBar({ score, threshold, label }: { score: number; threshold
       </div>
       <div className="relative mt-1 h-4 text-[11px] text-muted" aria-hidden>
         <span className={cn('font-semibold tabular-nums', ok ? 'text-success' : 'text-danger')}>{score.toFixed(2)}</span>
+        <SimulatedValuesNote className="ml-1.5" />
         <span className="absolute -translate-x-1/2 whitespace-nowrap tabular-nums" style={{ left: `${threshold * 100}%` }}>
           ▲ {threshold.toFixed(2)}
         </span>

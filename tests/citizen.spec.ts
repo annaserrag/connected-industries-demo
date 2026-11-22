@@ -87,6 +87,7 @@ async function runPersona(citizen: Page, officer: Page, plan: Plan, lang: Lang) 
   // no "Simulated" labels on the public platform (disclosed on the About page)
   await expect(citizen.getByText(tr({ en: 'Simulated', es: 'Simulado' }), { exact: true })).toHaveCount(0)
   if (plan.id === 'giulia') await shot(citizen, `${tag}-03-consent`)
+  await page.getByTestId('consent-checkbox').check()
   await btn(CITIZEN_MESSAGES.consentAccept).click()
 
   if (plan.id === 'noah') {

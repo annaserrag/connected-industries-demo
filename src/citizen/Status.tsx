@@ -2,20 +2,21 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  CalendarClock, Check, Clock, MessageSquare, PartyPopper, RotateCcw, Scale, Send, ShieldCheck, Undo2, UserRound, Video, X,
+  CalendarClock, Check, Clock, FileDown, MessageSquare, PartyPopper, RotateCcw, Scale, Send, ShieldCheck, Smartphone, Undo2, UserRound, Video, X,
 } from 'lucide-react'
-import { Avatar, StatusPill, cn } from '@/ui'
+import { Avatar, ProposedRuleTag, StatusPill, cn } from '@/ui'
 import { actions, ClaveRuleError } from '@/core/store'
 import { LiveIndicator, useRecentRemote } from '@/core/LiveIndicator'
 import type { Case, Decision, RejectionReasonId, StatusId } from '@/contract/types'
-import { CITIZEN_MESSAGES, KEY_RULE, LEVEL_LABELS, REJECTION_REASONS, ROUTES, STATUSES, STATUS_ORDER } from '@/contract/seed'
+import { CITIZEN_MESSAGES, KEY_RULE, LEVEL_LABELS, REJECTION_REASONS, ROUTES, STATUSES, STATUS_ORDER, statusLabel, isProposedRule } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, LiveToast, Modal, OptionCard } from './components/basics'
 import { CheckList, CheckListHeader } from './components/checks'
 import { Confetti } from './components/animations'
 import { expectedChecks } from './Verify'
 import { flowPath } from './Shell'
-import { fmtDate, fmtTime, readSlot, rel, todaySlots, useCase, useGo, useReduced, useTick, useTr } from './hooks'
+import { downloadReceipt } from './receipt'
+import { fmtDate, fmtTime, readSlot, rel, saveSlot, todaySlots, useCase, useGo, useReduced, useTick, useTr } from './hooks'
 
 type StepState = 'done' | 'now' | 'next' | 'notNeeded' | 'ifNeeded' | 'notReached'
 
@@ -83,7 +84,7 @@ function Tracker({ c }: { c: Case }) {
             </span>
             <div className="min-w-0 flex-1 pt-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className={cn('text-[15px] font-bold', isNow ? 'text-ink' : dim ? 'text-muted' : 'text-ink/90')}>{tr(def.label)}</span>
+                <span className={cn('text-[15px] font-bold', isNow ? 'text-ink' : dim ? 'text-muted' : 'text-ink/90')}>{tr(s === 'approved' && isNow ? statusLabel(s, c.advanced) : def.label)}</span>
                 <span className={cn('text-[11px] font-bold uppercase tracking-wide', isNow ? (bad ? 'text-danger' : good ? 'text-success' : 'text-brand-strong') : 'text-muted')}>
                   {tr(C.stepState[st])}{time ? ` · ${rel(time, lang)}` : ''}
                 </span>
@@ -188,7 +189,8 @@ function BookCallDialog({ open, onOpenChange, onBooked }: { open: boolean; onOpe
 
 /* -------------------------------------------------------------- results */
 function Approved({ c }: { c: Case }) {
-  const { tr } = useTr()
+  const { tr, lang } = useTr()
+  const [movil, setMovil] = useState(false)
   const basicDecision = c.decisions.find(d => d.outcome === 'approved_basic')
   const advRefusal = c.advanced === 'not_requested' ? (() => {
     const r = lastRefusal(c)
@@ -221,6 +223,18 @@ function Approved({ c }: { c: Case }) {
           </div>
         )}
       </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <BigButton variant="secondary" onClick={() => downloadReceipt(c, lang)} testId="download-receipt">
+          <span className="inline-flex items-center gap-2"><FileDown size={18} aria-hidden />{tr(C.downloadReceipt)}</span>
+        </BigButton>
+        <BigButton onClick={() => setMovil(true)} testId="open-clave-movil">
+          <span className="inline-flex items-center gap-2"><Smartphone size={18} aria-hidden />{tr(C.openClaveMovil)}</span>
+        </BigButton>
+      </div>
+      <Modal open={movil} onOpenChange={setMovil} title={tr(C.claveMovilTitle)} closeLabel={tr(C.close)}>
+        <p className="text-[15px] leading-relaxed text-ink">{tr(C.claveMovilBody)}</p>
+        <div className="mt-4"><BigButton onClick={() => setMovil(false)}>{tr(C.close2)}</BigButton></div>
+      </Modal>
       {advRefusal?.reasonId && (
         <div className="mt-3">
           <p className="mb-2 text-sm font-bold text-ink">{tr(LEVEL_LABELS.advanced)} · {tr(STATUSES.not_approved.label)}</p>
@@ -382,6 +396,8 @@ export function StatusPage() {
   const remote = useRecentRemote(id, 2500)
   const [toast, setToast] = useState(false)
   const [fire, setFire] = useState(0)
+  const [bookFallback, setBookFallback] = useState(false)
+  const [, setBookedNow] = useState<string | null>(null)
   const prev = useRef<{ status?: string; adv?: string; updatedAt?: string }>({})
 
   const status = c?.status
@@ -411,18 +427,19 @@ export function StatusPage() {
       <motion.div
         animate={remote ? { boxShadow: ['0 0 0 0 rgba(18,120,74,0)', '0 0 0 6px rgba(18,120,74,0.25)', '0 0 0 0 rgba(18,120,74,0)'] } : {}}
         transition={{ duration: 1.4 }}
-        className={cn('mb-5 flex items-center gap-3 rounded-card border border-line border-t-4 border-t-brand bg-surface p-4 transition-colors', remote && 'bg-success-soft')}
+        className={cn('mb-5 flex flex-wrap items-center gap-3 rounded-card border border-line border-t-4 border-t-brand bg-surface p-4 transition-colors', remote && 'bg-success-soft')}
         data-live-flash={remote ? '1' : undefined}
       >
         <Avatar initials={c.persona.initials} hue={c.persona.hue} size={44} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[60%]">
           <h1 className="truncate font-display text-[20px] font-bold text-ink">{tr(C.statusTitle)}</h1>
           <p className="truncate text-[14px] text-muted">
             {c.persona.name}{route ? ` · ${tr(C.routeLabel)} ${route.code}` : ''}{c.submittedAt ? ` · ${tr(C.submitted)} ${rel(c.submittedAt, lang)}` : ''}
           </p>
+          {isProposedRule(c.route, c.answers) && <ProposedRuleTag className="mt-1" />}
         </div>
-        <div className="flex flex-col items-end gap-1" aria-live="polite">
-          <StatusPill status={c.status} />
+        <div className="flex basis-full flex-wrap items-center justify-between gap-2 sm:basis-auto sm:flex-col sm:items-end sm:justify-start" aria-live="polite">
+          <StatusPill status={c.status} advanced={c.advanced} />
           <LiveIndicator caseId={c.id} className="!px-0 text-[10px]" />
         </div>
       </motion.div>
@@ -457,6 +474,14 @@ export function StatusPage() {
                 <p className="text-[13px] text-muted">{fill(tr(C.todayAt), { time: fmtTime(new Date(slot), lang) })}</p>
               </div>
               <span className="ml-auto"></span>
+            </div>
+          )}
+          {c.route === 'FALLBACK' && !slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
+            <div className="rounded-card border-2 border-brand bg-brand-soft p-4" data-testid="fallback-book">
+              <p className="flex items-center gap-2 font-display text-[18px] font-bold text-ink"><Video size={20} className="text-brand" aria-hidden />{tr(C.fallbackBookTitle)}</p>
+              <p className="mt-1 text-[14px] leading-snug text-ink">{tr(C.fallbackBookBody)}</p>
+              <div className="mt-3"><BigButton onClick={() => setBookFallback(true)}>{tr(C.bookVideoCall)}</BigButton></div>
+              <BookCallDialog open={bookFallback} onOpenChange={setBookFallback} onBooked={iso => { saveSlot(c.id, iso); setBookedNow(iso); setBookFallback(false) }} />
             </div>
           )}
           <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">

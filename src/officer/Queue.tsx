@@ -14,7 +14,7 @@ import { effectiveOutcome, fill, lastDecisionAt, RISK_RANK, reviewKind, useHotke
 import { useLive } from './live'
 import { CheckIcon, Kbd, LiveDot, RiskTag , Tip } from './components/ui'
 
-type View = 'all' | 'decision' | 'advanced'
+type View = 'all' | 'decision' | 'advanced' | 'appeals'
 
 export const shortDoc = (c: Case, lang: 'en' | 'es') => DOCUMENTS[c.document.type].label[lang].split(' (')[0]
 
@@ -122,7 +122,7 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                         <td className="px-3 py-3"><RiskTag risk={c.risk} /></td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col items-start gap-1">
-                            <StatusPill status={c.status} />
+                            <StatusPill status={c.status} advanced={c.advanced} />
                             {reviewKind(c) === 'advanced' && <span className="text-[11px] font-medium text-brand">{tr(C.advancedReviews)}</span>}
                           </div>
                         </td>
@@ -171,7 +171,7 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
   a.c.id === b.c.id && a.c.updatedAt === b.c.updatedAt && a.i === b.i && a.tier === b.tier && a.bumped === b.bumped &&
   a.minute === b.minute && a.isSel === b.isSel && a.isNew === b.isNew && a.flashed === b.flashed && a.onSelect === b.onSelect && a.registerRow === b.registerRow)
 
-export function QueuePage() {
+export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) {
   const tr = useTr()
   const lang = useLang()
   useTick()
@@ -181,14 +181,14 @@ export function QueuePage() {
   const queue = useMemo(() => officerQueue({ cases: all } as AppState), [all])
   const registerRow = useCallback((id: string, el: HTMLTableRowElement | null) => { rowRefs.current[id] = el }, [])
 
-  const [view, setView] = useState<View>('all')
+  const [view, setView] = useState<View>(preset ?? 'all')
   const [risk, setRisk] = useState<RiskLevel | 'all'>('all')
   const [route, setRoute] = useState<RouteId | 'all'>('all')
   const [sel, setSel] = useState(0)
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
 
   const filtered = queue.filter(c =>
-    (view === 'all' || reviewKind(c) === view) &&
+    (view === 'all' || (view === 'appeals' ? c.appeal?.state === 'open' : reviewKind(c) === view)) &&
     (risk === 'all' || c.risk === risk) &&
     (route === 'all' || c.route === route),
   )
@@ -224,8 +224,8 @@ export function QueuePage() {
     .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
     .slice(0, 8)
 
-  const filtersOn = view !== 'all' || risk !== 'all' || route !== 'all'
-  const clear = () => { setView('all'); setRisk('all'); setRoute('all') }
+  const filtersOn = view !== (preset ?? 'all') || risk !== 'all' || route !== 'all'
+  const clear = () => { setView(preset ?? 'all'); setRisk('all'); setRoute('all') }
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-6 xl:px-8">
@@ -233,11 +233,11 @@ export function QueuePage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-[28px] font-bold text-ink">{tr(C.queueTitle)}</h1>
-            <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{queue.length}</span>
+            <h1 className="font-display text-[28px] font-bold text-ink">{tr(preset === 'appeals' ? C.navAppeals : preset === 'advanced' ? C.navAdvanced : C.queueTitle)}</h1>
+            <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{preset ? filtered.length : queue.length}</span>
             <LiveDot label={tr(C.live)} />
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(C.queueSubtitle)}</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(preset === 'appeals' ? C.appealsSubtitle : preset === 'advanced' ? C.advancedSubtitle : C.queueSubtitle)}</p>
           <p data-testid="priority-legend" className="mt-1.5 flex max-w-3xl items-start gap-1.5 text-[13px] font-medium text-ink">
             <ListOrdered className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
             {fill(tr(S.legend), { h: PRIORITY_AGE_BUMP_HOURS })}

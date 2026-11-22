@@ -40,7 +40,7 @@ const DEFAULT_PASS: Record<CheckId, Omit<CheckResult, 'id'>> = {
   document_validity: { outcome: 'pass', detail: { en: 'Document in date', es: 'Documento en vigor' } },
   liveness: { outcome: 'pass', score: 0.95, detail: { en: 'Live person in front of the camera', es: 'Persona real ante la cámara' } },
   face_match: { outcome: 'pass', score: 0.93, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-  residence: { outcome: 'pass', detail: { en: 'Residence record found (padrón)', es: 'Empadronamiento encontrado' } },
+  residence: { outcome: 'pass', detail: { en: 'Residence details confirmed', es: 'Datos de residencia confirmados' } },
   guardian_link: { outcome: 'pass', detail: { en: 'Parent or guardian link confirmed', es: 'Vínculo con madre, padre o tutor confirmado' } },
   dni_video: { outcome: 'pass', detail: { en: 'DNI video identification completed', es: 'Videoidentificación con DNI completada' } },
   officer_video: { outcome: 'pending', detail: { en: 'Waiting for officer video call', es: 'Esperando videollamada con una persona funcionaria' } },
@@ -118,15 +118,15 @@ export function deriveFlags(c: Case, checks: CheckResult[]): Flag[] {
         else if (r.outcome === 'warn') flags.push(flag('chip_signature_failed', 'medium', { en: `Chip signature warning: ${d.en}`, es: `Aviso en la firma del chip: ${d.es}` }))
         break
       case 'chip_read':
-        if (r.outcome === 'fail') flags.push(flag('chip_unreadable', 'high', { en: `Chip could not be read: ${d.en}`, es: `No se pudo leer el chip: ${d.es}` }))
+        if (r.outcome === 'fail') flags.push(flag('chip_unreadable', 'medium', { en: `Chip could not be read: ${d.en}`, es: `No se pudo leer el chip: ${d.es}` }))
         break
       case 'document_validity':
         if (r.outcome === 'fail') flags.push(flag('document_invalid', 'high', { en: `Document not valid: ${d.en}`, es: `Documento no válido: ${d.es}` }))
         else if (r.outcome === 'warn') flags.push(flag('document_invalid', 'medium', { en: `Document data inconsistent: ${d.en}`, es: `Datos del documento incoherentes: ${d.es}` }))
         break
       case 'residence':
-        if (r.outcome === 'fail') flags.push(flag('residence_not_found', 'high', { en: `Residence check failed: ${d.en}`, es: `Falla el empadronamiento: ${d.es}` }))
-        else if (r.outcome === 'warn') flags.push(flag('residence_not_found', 'medium', { en: `Residence record needs a look: ${d.en}`, es: `El empadronamiento necesita revisión: ${d.es}` }))
+        if (r.outcome === 'fail') flags.push(flag('residence_not_found', 'high', { en: `Residence check failed: ${d.en}`, es: `Fallan los datos de residencia: ${d.es}` }))
+        else if (r.outcome === 'warn') flags.push(flag('residence_not_found', 'medium', { en: `Residence record needs a look: ${d.en}`, es: `Los datos de residencia necesitan revisión: ${d.es}` }))
         break
       case 'eidas_login':
         if (r.outcome === 'fail') flags.push(flag('eid_data_mismatch', 'high', { en: `eID login failed: ${d.en}`, es: `Falla el acceso con eID: ${d.es}` }))
@@ -209,11 +209,13 @@ export function decide(c: Case, checks: CheckResult[]): EngineOutcome {
 
   // Rule 2: any fail / low liveness / low face match / high flag → officer.
   if (failed.length || lowLive || lowFace || anyHigh) {
-    const toFallback = c.attempt >= ENGINE.maxAttemptsBeforeFallback && c.route !== 'FALLBACK'
+    // An unreadable chip already failed twice on the phone: go straight to the video call.
+    const chipUnreadable = failed.some(r => r.id === 'chip_read')
+    const toFallback = (chipUnreadable || c.attempt >= ENGINE.maxAttemptsBeforeFallback) && c.route !== 'FALLBACK'
     if (toFallback) {
       flags = [...flags.filter(f => f.code !== 'second_attempt'), flag('second_attempt', 'medium', {
-        en: `Checks failed ${c.attempt} times: moved to Fallback (video call with an officer)`,
-        es: `Comprobaciones fallidas ${c.attempt} veces: pasa a la vía alternativa (videollamada con una persona funcionaria)`,
+        en: chipUnreadable ? 'Chip unreadable twice: moved to Fallback (video call with an officer)' : `Checks failed ${c.attempt} times: moved to Fallback (video call with an officer)`,
+        es: chipUnreadable ? 'Chip ilegible dos veces: pasa a la vía alternativa (videollamada con una persona funcionaria)' : `Comprobaciones fallidas ${c.attempt} veces: pasa a la vía alternativa (videollamada con una persona funcionaria)`,
       })]
     }
     const reasons = [

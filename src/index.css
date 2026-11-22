@@ -66,3 +66,8 @@
 /* Embed mode (?embed=1): keep scrolling, hide the scrollbar chrome. */
 html[data-embed], html[data-embed] * { scrollbar-width: none; }
 html[data-embed] ::-webkit-scrollbar { display: none; }
+
+/* Assisted mode (case 3): large text while the applicant does their part. Unlayered, so it wins over utilities. */
+.assisted-large h1 { font-size: 30px; line-height: 1.2; }
+.assisted-large p { font-size: 19px; line-height: 1.5; }
+.assisted-large button { min-height: 4.5rem; font-size: 21px; }

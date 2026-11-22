@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, Check, KeyRound, LoaderCircle, ShieldCheck, Video } from 'lucide-react'
-import { StatusPill, cn } from '@/ui'
+import { CalendarClock, Check, FlaskConical, HandHeart, KeyRound, LoaderCircle, ShieldCheck, TriangleAlert, Video } from 'lucide-react'
+import { ProposedRuleTag, StatusPill, cn } from '@/ui'
 import { actions, plannedChecks } from '@/core/store'
-import type { Case, CheckId } from '@/contract/types'
-import { CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES } from '@/contract/seed'
+import type { Case, CheckId, SimFailure } from '@/contract/types'
+import { CHECKS, CITIZEN_MESSAGES, DOCUMENTS, HELPER_RELATIONS, ROUTES, SIM_FAILURES, SIM_FAILURE_ORDER, isProposedRule } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar } from './components/basics'
 import { ChipReadAnimation, FaceScanAnimation, useProgress } from './components/animations'
@@ -13,15 +13,18 @@ import { CheckList, CheckListHeader } from './components/checks'
 import { safe } from './Shell'
 import { fmtTime, saveSlot, todaySlots, useCase, useGo, useReduced, useTr } from './hooks'
 
-type Phase = 'consent' | 'guardian' | 'eidas' | 'chip' | 'face' | 'dni' | 'book' | 'checks'
+type Phase = 'consent' | 'helper' | 'handover' | 'guardian' | 'eidas' | 'chip' | 'face' | 'dni' | 'book' | 'contact' | 'checks'
 
 function phasesFor(c: Case): Phase[] {
   const route = c.route ?? 'B'
+  const assisted = Boolean(c.answers?.assisted)
   const p: Phase[] = c.consentGiven ? [] : ['consent']
+  if (assisted) p.push('helper', 'handover')
   if (route === 'A') p.push('eidas')
   if (route === 'B') p.push(...(c.guardian ? (['guardian'] as Phase[]) : []), 'chip', 'face')
   if (route === 'C') p.push('dni')
   if (route === 'FALLBACK') p.push('book')
+  if (assisted) p.push('contact')
   p.push('checks')
   return p
 }
@@ -48,6 +51,7 @@ function StepHeading({ title, body, badges }: { title: string; body?: ReactNode;
 /* ------------------------------------------------------------------ consent */
 function Consent({ c, onDone }: { c: Case; onDone: () => void }) {
   const { tr } = useTr()
+  const [agreed, setAgreed] = useState(false)
   return (
     <div>
       <div className="mb-4 grid size-12 place-items-center rounded-[2px] bg-brand-soft text-brand"><ShieldCheck size={24} aria-hidden /></div>
@@ -66,9 +70,12 @@ function Consent({ c, onDone }: { c: Case; onDone: () => void }) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">{tr(C.consentFine)}</p>
-      <div className="mt-5">
-        <BigButton onClick={() => { safe(() => actions.giveConsent(c.id)); onDone() }}>{tr(CITIZEN_MESSAGES.consentAccept)}</BigButton>
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/30">
+        <input type="checkbox" name="consent" data-testid="consent-checkbox" className="mt-0.5 size-5 accent-[var(--color-brand)]" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
+        <span className="text-[14px] font-medium text-ink">{tr(C.consentCheckbox)}</span>
+      </label>
+      <div className="mt-4">
+        <BigButton disabled={!agreed} onClick={() => { safe(() => actions.giveConsent(c.id)); onDone() }}>{tr(CITIZEN_MESSAGES.consentAccept)}</BigButton>
       </div>
     </div>
   )
@@ -147,8 +154,18 @@ function GuardianStep({ c, onDone }: { c: Case; onDone: () => void }) {
       <StepHeading
         badges={<><span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand">{tr(C.routeLabel)} {ROUTES[g.route].code}</span></>}
         title={fill(tr(C.guardianTitle), { guardian: g.name })}
-        body={fill(tr(C.guardianBody), { guardian: g.name, relation: tr(g.relation), name: first })}
+        body={fill(tr(g.route === 'A' ? C.guardianBody : C.guardianBodyAccount), { guardian: g.name, relation: tr(g.relation), name: first })}
       />
+      {g.route !== 'A' ? (
+        <div className="w-full text-left">
+          <p className="mb-3 rounded-[2px] border-l-4 border-success bg-success-soft p-3 text-[14px] text-ink">{fill(tr(C.guardianSignedIn), { guardian: g.name })}</p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/30">
+            <input type="checkbox" name="guardianConfirm" className="mt-0.5 size-5 accent-[var(--color-brand)]" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
+            <span className="text-[14px] font-medium text-ink">{fill(tr(C.guardianConfirm), { name: first, relation: tr(g.relation) })}</span>
+          </label>
+          <div className="mt-4"><BigButton disabled={!confirmed} onClick={onDone}>{tr(C.continue)}</BigButton></div>
+        </div>
+      ) : (
       <EidasHandoff person={g.name} country={g.document.issuingCountry} onDone={() => undefined}>
         <div className="mt-6 w-full text-left">
           <label className="flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/30">
@@ -159,28 +176,45 @@ function GuardianStep({ c, onDone }: { c: Case; onDone: () => void }) {
           <div className="mt-4"><BigButton disabled={!confirmed} onClick={onDone}>{tr(C.continue)}</BigButton></div>
         </div>
       </EidasHandoff>
+      )}
     </div>
   )
 }
 
 /* ------------------------------------------------------------- chip (B) */
-function ChipStep({ c, onDone }: { c: Case; onDone: () => void }) {
+function ChipStep({ c, onDone }: { c: Case; onDone: (chipFailed?: boolean) => void }) {
   const { tr } = useTr()
+  const willFail = c.simulatedFailure === 'chip_unreadable'
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
-  const p = useProgress(running, 3400, () => setDone(true))
+  const [tries, setTries] = useState(0)
+  const failedNow = willFail && tries > 0 && !running
+  const p = useProgress(running, 3400, () => {
+    setRunning(false)
+    setTries(t => t + 1)
+    if (!willFail) setDone(true)
+  })
+  const start = () => { setRunning(true) }
   return (
     <div>
       <StepHeading title={tr(C.chipTitle)} body={tr(C.chipBody)} />
-      <ChipReadAnimation progress={done ? 1 : p} done={done} docLabel={tr(DOCUMENTS[c.document.type].label)} />
+      <ChipReadAnimation progress={done ? 1 : running ? p : 0} done={done} docLabel={tr(DOCUMENTS[c.document.type].label)} />
       <p className="mt-3 text-center text-sm font-bold text-ink" aria-live="polite">
-        {done ? tr(C.chipDone) : running ? tr(C.chipReading) : ' '}
+        {done ? tr(C.chipDone) : running ? tr(C.chipReading) : ' '}
       </p>
+      {failedNow && (
+        <p role="alert" data-testid="chip-error" className="mt-2 flex gap-2 rounded-[2px] border-l-4 border-danger bg-danger-soft p-3 text-[14px] leading-snug text-ink">
+          <TriangleAlert size={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+          {tries >= 2 ? tr(C.chipFail2) : tr(C.chipFail1)}
+        </p>
+      )}
       <div className="mt-5">
-        {!done ? (
-          <BigButton disabled={running} onClick={() => setRunning(true)}>{running ? tr(C.chipReading) : tr(C.chipStart)}</BigButton>
+        {done ? (
+          <BigButton onClick={() => onDone()}>{tr(C.continue)}</BigButton>
+        ) : failedNow && tries >= 2 ? (
+          <BigButton onClick={() => onDone(true)}>{tr(C.continue)}</BigButton>
         ) : (
-          <BigButton onClick={onDone}>{tr(C.continue)}</BigButton>
+          <BigButton disabled={running} onClick={start}>{running ? tr(C.chipReading) : failedNow ? tr(C.chipRetry) : tr(C.chipStart)}</BigButton>
         )}
       </div>
     </div>
@@ -192,21 +226,35 @@ function FaceStep({ c, onDone }: { c: Case; onDone: () => void }) {
   const { tr } = useTr()
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
-  const p = useProgress(running, 4200, () => setDone(true))
   const assisted = c.answers?.assisted && c.assisted
+  // Assisted mode shows one retry for reflections (glasses / window), then passes.
+  const [glare, setGlare] = useState(false)
+  const [tries, setTries] = useState(0)
+  const p = useProgress(running, 4200, () => {
+    setRunning(false)
+    const n = tries + 1
+    setTries(n)
+    if (assisted && n === 1) setGlare(true)
+    else { setGlare(false); setDone(true) }
+  })
   return (
     <div>
       <StepHeading
         title={tr(C.faceTitle)}
         body={assisted ? fill(tr(C.faceBodyAssisted), { name: c.persona.name.split(' ')[0], helper: c.assisted!.helperName.split(' ')[0] }) : tr(C.faceBody)}
       />
-      <FaceScanAnimation progress={done ? 1 : p} done={done} />
+      <FaceScanAnimation progress={done ? 1 : running ? p : 0} done={done} />
       <p className="mt-3 text-center text-sm font-bold text-ink" aria-live="polite">
-        {done ? tr(C.faceDone) : running ? (p < 0.75 ? tr(C.faceTurn) : tr(C.faceHold)) : ' '}
+        {done ? tr(C.faceDone) : running ? (p < 0.75 ? tr(C.faceTurn) : tr(C.faceHold)) : ' '}
       </p>
+      {glare && !running && (
+        <p role="alert" data-testid="face-glare" className="mt-2 flex gap-2 rounded-[2px] border-l-4 border-warning bg-warning-soft p-3 leading-snug text-ink">
+          <TriangleAlert size={20} className="mt-0.5 shrink-0 text-warning" aria-hidden />{tr(C.faceGlare)}
+        </p>
+      )}
       <div className="mt-4">
         {!done ? (
-          <BigButton disabled={running} onClick={() => setRunning(true)}>{running ? tr(C.faceTurn) : tr(C.faceStart)}</BigButton>
+          <BigButton disabled={running} onClick={() => { setGlare(false); setRunning(true) }}>{running ? tr(C.faceTurn) : glare ? tr(C.faceRetry) : tr(C.faceStart)}</BigButton>
         ) : (
           <BigButton onClick={onDone}>{tr(C.continue)}</BigButton>
         )}
@@ -302,6 +350,113 @@ function BookStep({ c, onDone }: { c: Case; onDone: () => void }) {
   )
 }
 
+/* --------------------------------------------- assisted mode (case 3) */
+const firstName = (n: string) => n.split(' ')[0]
+
+function HelperStep({ c, onDone }: { c: Case; onDone: () => void }) {
+  const { tr } = useTr()
+  const [name, setName] = useState(c.assisted?.helperName ?? '')
+  const [rel, setRel] = useState(() => Math.max(0, HELPER_RELATIONS.findIndex(r => r.en === c.assisted?.relation.en)))
+  const [ownPhone, setOwnPhone] = useState(true)
+  const [err, setErr] = useState('')
+  const applicant = firstName(c.persona.name)
+  const submit = () => {
+    if (name.trim().split(/\s+/).length < 2) { setErr(tr(C.helperNameError)); return }
+    try {
+      actions.setAssistedHelper(c.id, { helperName: name, relation: HELPER_RELATIONS[rel], deviceOwner: ownPhone ? name : c.assisted?.deviceOwner ?? name })
+      onDone()
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+  }
+  return (
+    <div data-testid="helper-form">
+      <StepHeading title={tr(C.helperTitle)} body={fill(tr(C.helperBody), { name: applicant })} />
+      <label className="block text-[14px] font-bold text-ink">{tr(C.helperName)}
+        <input name="helperName" data-testid="helper-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="mt-1 block w-full rounded-[2px] border border-line bg-surface px-3 py-3 text-[16px] font-normal" />
+      </label>
+      <label className="mt-4 block text-[14px] font-bold text-ink">{fill(tr(C.helperRelation), { name: applicant })}
+        <select name="helperRelation" data-testid="helper-relation" value={rel} onChange={e => setRel(Number(e.target.value))} className="mt-1 block w-full rounded-[2px] border border-line bg-surface px-3 py-3 text-[16px] font-normal">
+          {HELPER_RELATIONS.map((r, i) => <option key={r.en} value={i}>{tr(r)}</option>)}
+        </select>
+      </label>
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand">
+        <input type="checkbox" name="helperOwnPhone" className="mt-0.5 size-5 accent-[var(--color-brand)]" checked={ownPhone} onChange={e => setOwnPhone(e.target.checked)} />
+        <span className="text-[14px] font-medium text-ink">{tr(C.helperOwnPhone)}</span>
+      </label>
+      {err && <p role="alert" className="mt-2 text-[14px] font-bold text-danger">{err}</p>}
+      <div className="mt-5"><BigButton onClick={submit}>{tr(C.continue)}</BigButton></div>
+    </div>
+  )
+}
+
+function HandoverStep({ c, onDone }: { c: Case; onDone: () => void }) {
+  const { tr } = useTr()
+  const [explain, setExplain] = useState(false)
+  const vars = { name: firstName(c.persona.name), helper: firstName(c.assisted?.helperName ?? '') }
+  return (
+    <div data-testid="assisted-handover">
+      <div className="mb-4 grid size-16 place-items-center rounded-full bg-brand-soft text-brand"><HandHeart size={32} aria-hidden /></div>
+      <h1 className="font-display text-[32px] font-bold leading-tight text-ink">{fill(tr(C.handoverTitle), vars)}</h1>
+      <p className="mt-3 text-[20px] leading-relaxed text-ink">{fill(tr(C.handoverBody), vars)}</p>
+      {explain && (
+        <ol className="mt-5 space-y-3">
+          {C.handoverSteps.map((st, n) => (
+            <li key={n} className="flex items-start gap-3 rounded-[2px] border border-line bg-surface p-4 text-[19px] leading-snug text-ink">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand text-[18px] font-bold text-brand-ink">{n + 1}</span>{tr(st)}
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-6 grid gap-3">
+        <BigButton className="min-h-20 text-[22px]" onClick={onDone}>{tr(C.handoverReady)}</BigButton>
+        <BigButton variant="secondary" className="min-h-20 text-[20px]" onClick={() => setExplain(true)}>{tr(C.handoverExplain)}</BigButton>
+      </div>
+    </div>
+  )
+}
+
+function ContactStep({ c, onDone }: { c: Case; onDone: () => void }) {
+  const { tr } = useTr()
+  const [phone, setPhone] = useState(c.assisted?.applicantPhone ?? '')
+  const [noPhone, setNoPhone] = useState(Boolean(c.assisted?.noOwnPhone))
+  const [err, setErr] = useState('')
+  const vars = { name: firstName(c.persona.name), helper: firstName(c.assisted?.helperName ?? '') }
+  const submit = () => {
+    try { actions.setApplicantContact(c.id, noPhone ? { noOwnPhone: true } : { phone }); onDone() }
+    catch { setErr(tr(C.contactError)) }
+  }
+  return (
+    <div data-testid="assisted-contact">
+      <h1 className="font-display text-[30px] font-bold leading-tight text-ink">{fill(tr(C.contactTitle), vars)}</h1>
+      <p className="mt-3 text-[19px] leading-relaxed text-ink">{fill(tr(C.contactBody), vars)}</p>
+      <label className="mt-5 block text-[18px] font-bold text-ink">{tr(C.contactPhone)}
+        <input name="applicantPhone" data-testid="applicant-phone" type="tel" inputMode="tel" autoComplete="off" disabled={noPhone} value={phone} onChange={e => { setPhone(e.target.value); setErr('') }} className="mt-2 block w-full rounded-[2px] border-2 border-line bg-surface px-4 py-4 text-[24px] font-normal tracking-wide disabled:opacity-50" />
+      </label>
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[2px] border-2 border-line bg-surface p-4 has-[:checked]:border-brand">
+        <input type="checkbox" name="noOwnPhone" className="mt-1 size-6 accent-[var(--color-brand)]" checked={noPhone} onChange={e => setNoPhone(e.target.checked)} />
+        <span className="text-[18px] font-medium leading-snug text-ink">{tr(C.contactNoPhone)}</span>
+      </label>
+      {err && <p role="alert" className="mt-3 text-[17px] font-bold text-danger">{err}</p>}
+      <div className="mt-6"><BigButton className="min-h-20 text-[22px]" onClick={submit}>{tr(C.continue)}</BigButton></div>
+    </div>
+  )
+}
+
+const maskPhone = (p?: string) => (p ? `··· ${p.slice(-3)}` : '')
+
+function HelperDone({ c }: { c: Case }) {
+  const { tr } = useTr()
+  const go = useGo()
+  const vars = { name: firstName(c.persona.name), helper: firstName(c.assisted?.helperName ?? ''), phone: maskPhone(c.assisted?.applicantPhone) }
+  return (
+    <div data-testid="helper-done" className="text-center">
+      <span className="mx-auto grid size-16 place-items-center rounded-full bg-success text-white"><Check size={30} strokeWidth={3} aria-hidden /></span>
+      <h1 className="mt-4 font-display text-[26px] font-bold leading-tight text-ink">{fill(tr(C.helperDoneTitle), vars)}</h1>
+      <p className="mx-auto mt-3 max-w-md text-[17px] leading-relaxed text-ink">{fill(tr(c.assisted?.noOwnPhone ? C.helperDoneBodyPost : C.helperDoneBodyPhone), vars)}</p>
+      <div className="mt-6"><BigButton onClick={() => { safe(() => actions.citizenSignOut()); go('/') }}>{tr(C.helperDoneSignOut)}</BigButton></div>
+    </div>
+  )
+}
+
 /* ---------------------------------------------------------- live checks */
 function LiveChecks({ c }: { c: Case }) {
   const { tr } = useTr()
@@ -316,11 +471,13 @@ function LiveChecks({ c }: { c: Case }) {
       .catch(e => console.warn('[citizen] submit', e))
       .finally(() => setDone(true))
   }, [c.id])
+  const assisted = Boolean(c.answers?.assisted)
   useEffect(() => {
-    if (!done) return
+    if (!done || assisted) return
     const id = setTimeout(() => go(`/citizen/case/${c.id}`), 3200)
     return () => clearTimeout(id)
-  }, [done, c.id, go])
+  }, [done, c.id, go, assisted])
+  if (done && assisted) return <HelperDone c={c} />
 
   const status = c.status === 'draft' ? 'received' : c.status
   const approved = c.status === 'approved'
@@ -328,7 +485,7 @@ function LiveChecks({ c }: { c: Case }) {
     <div>
       <StepHeading title={tr(C.liveChecks)} body={tr(C.checksRunning)} />
       <div className="mb-3 flex items-center gap-2" aria-live="polite">
-        <StatusPill status={status} />
+        <StatusPill status={status} advanced={c.advanced} />
       </div>
       <CheckListHeader title={tr(C.verificationStep)} />
       <div aria-live="polite">
@@ -348,6 +505,38 @@ function LiveChecks({ c }: { c: Case }) {
   )
 }
 
+/* ------------------------------------------- demo: simulate a failure */
+function SimulateFailure({ c }: { c: Case }) {
+  const { tr } = useTr()
+  const route = c.route ?? 'B'
+  const options = SIM_FAILURE_ORDER.filter(f => SIM_FAILURES[f].routes.includes(route))
+  if (!options.length || c.status !== 'draft') return null
+  const value = c.simulatedFailure ?? ''
+  return (
+    <details className="group mt-8 rounded-[2px] border border-dashed border-line bg-surface-2/60 p-3 text-[13px]" data-testid="simulate-failure" open={Boolean(value) || undefined}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-bold text-muted">
+        <FlaskConical size={15} aria-hidden />{tr(C.simTitle)}
+        {value && <span className="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-[11px] text-danger">{tr(SIM_FAILURES[value].label)}</span>}
+      </summary>
+      <p className="mt-2 text-muted">{tr(C.simBody)}</p>
+      <label className="mt-2 block">
+        <span className="sr-only">{tr(C.simTitle)}</span>
+        <select
+          name="simulatedFailure"
+          data-testid="simulate-failure-select"
+          className="w-full rounded-[2px] border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+          value={value}
+          onChange={e => safe(() => actions.setSimulatedFailure(c.id, (e.target.value || null) as SimFailure | null))}
+        >
+          <option value="">{tr(C.simNone)}</option>
+          {options.map(f => <option key={f} value={f}>{tr(SIM_FAILURES[f].label)}</option>)}
+        </select>
+      </label>
+      {value && <p className="mt-2 text-muted">{tr(SIM_FAILURES[value].hint)}</p>}
+    </details>
+  )
+}
+
 /* ------------------------------------------------------------------ page */
 export function Verify() {
   const { id } = useParams()
@@ -355,7 +544,7 @@ export function Verify() {
   const { tr } = useTr()
   const reduced = useReduced()
   const [startedAsDraft] = useState(() => c?.status === 'draft' && !!c?.route)
-  const [phases] = useState<Phase[]>(() => (c ? phasesFor(c) : []))
+  const [phases, setPhases] = useState<Phase[]>(() => (c ? phasesFor(c) : []))
   const [i, setI] = useState(0)
 
   if (!c) return <Navigate to="/citizen" replace />
@@ -363,16 +552,23 @@ export function Verify() {
 
   const phase = phases[i]
   const next = () => setI(n => Math.min(n + 1, phases.length - 1))
+  // An unreadable chip skips the face check: there is no chip photo to compare with.
+  const afterChip = (chipFailed?: boolean) => {
+    if (chipFailed) setPhases(ps => ps.filter(p => p !== 'face'))
+    next()
+  }
   const route = c.route!
 
+  const largeText = Boolean(c.answers?.assisted) && (phase === 'handover' || phase === 'chip' || phase === 'face' || phase === 'contact')
   return (
-    <div>
+    <div className={cn(largeText && 'assisted-large')} data-large-text={largeText ? '1' : undefined}>
       <div className="mb-5 flex items-center gap-3">
         <span className="rounded-full bg-brand px-2.5 py-1 text-xs font-bold text-brand-ink">{tr(C.routeLabel)} {ROUTES[route].code}</span>
         <div className="flex-1">
           <ProgressBar value={(i + 1) / phases.length} label={fill(tr(C.stepLabel), { n: i + 1, total: phases.length })} />
         </div>
       </div>
+      {isProposedRule(route, c.answers) && <div className="-mt-3 mb-4"><ProposedRuleTag /></div>}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={phase}
@@ -382,6 +578,9 @@ export function Verify() {
           transition={{ duration: reduced ? 0.1 : 0.22 }}
         >
           {phase === 'consent' && <Consent c={c} onDone={next} />}
+          {phase === 'helper' && <HelperStep c={c} onDone={next} />}
+          {phase === 'handover' && <HandoverStep c={c} onDone={next} />}
+          {phase === 'contact' && <ContactStep c={c} onDone={next} />}
           {phase === 'guardian' && <GuardianStep c={c} onDone={next} />}
           {phase === 'eidas' && (
             <div>
@@ -389,13 +588,14 @@ export function Verify() {
               <EidasHandoff person={c.persona.name} country={eidCountry(c)} onDone={next} />
             </div>
           )}
-          {phase === 'chip' && <ChipStep c={c} onDone={next} />}
+          {phase === 'chip' && <ChipStep c={c} onDone={afterChip} />}
           {phase === 'face' && <FaceStep c={c} onDone={next} />}
           {phase === 'dni' && <DniStep onDone={next} />}
           {phase === 'book' && <BookStep c={c} onDone={next} />}
           {phase === 'checks' && <LiveChecks c={c} />}
         </motion.div>
       </AnimatePresence>
+      {phase !== 'checks' && <SimulateFailure c={c} />}
     </div>
   )
 }

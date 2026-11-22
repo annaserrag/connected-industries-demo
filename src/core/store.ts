@@ -14,7 +14,7 @@ import type {
 } from '@/contract/types'
 import type { ClaveActions } from '@/contract/api'
 import {
-  buildSeedState, CHANNEL_NAME, OFFICERS, REJECTION_REASONS, STATE_VERSION, STORAGE_KEY, SYSTEM_ACTOR,
+  buildSeedState, CASE_LIBRARY, CHANNEL_NAME, OFFICERS, REJECTION_REASONS, SIM_FAILURES, STATE_VERSION, STORAGE_KEY, SYSTEM_ACTOR,
 } from '@/contract/seed'
 import { checksForCase, decide, deriveFlags, OFFICER_VIDEO_DONE, riskOf, runCheck } from './engine'
 import { seedHistory } from './history'
@@ -340,6 +340,53 @@ export const actions: ClaveActions = {
     await runEngine(caseId)
   },
 
+  setAssistedHelper(caseId, helper) {
+    const c = getCase(caseId)
+    if (c.status !== 'draft') throw new ClaveRuleError('The helper can only be set before the checks start.')
+    const name = helper.helperName.trim()
+    if (name.length < 2) throw new ClaveRuleError('Write the helper’s name.')
+    updateCase(caseId, cc => ({ assisted: { ...(cc.assisted ?? {}), helperName: name, relation: helper.relation, deviceOwner: helper.deviceOwner.trim() || name } }), [
+      audit(caseId, citizenActor(c), 'case_started', `Assisted mode: ${name} (${helper.relation.en}) helps on ${helper.deviceOwner.trim() || name}'s phone.`),
+    ])
+  },
+  setApplicantContact(caseId, contact) {
+    const c = getCase(caseId)
+    if (!c.assisted) throw new ClaveRuleError('Only assisted applications need a separate contact.')
+    const phone = contact.phone?.replace(/[^\d+]/g, '')
+    if (!contact.noOwnPhone && !(phone && /^\+?\d{9,15}$/.test(phone))) throw new ClaveRuleError('Write a mobile number with 9 to 15 digits.')
+    updateCase(caseId, cc => ({ assisted: { ...cc.assisted!, applicantPhone: contact.noOwnPhone ? undefined : phone, noOwnPhone: Boolean(contact.noOwnPhone) } }), [])
+  },
+  setMinorApplicant(caseId, minor) {
+    const c = getCase(caseId)
+    if (c.status !== 'draft') throw new ClaveRuleError('This can only be set before the checks start.')
+    if (c.guardian) return
+    const name = minor.name.trim().replace(/\s+/g, ' ')
+    if (name.split(' ').length < 2) throw new ClaveRuleError('Write the minor’s name and surname.')
+    if (!(minor.age >= 0 && minor.age < 18)) throw new ClaveRuleError('A minor is under 18.')
+    const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    const minorDocNumber = `${c.document.number.slice(0, -2)}M${c.document.number.slice(-1)}`
+    updateCase(caseId, cc => ({
+      guardian: {
+        name: cc.persona.name,
+        relation: { en: 'parent or legal guardian', es: 'madre, padre o tutor legal' },
+        document: cc.document,
+        route: cc.presetAnswers.nationalityGroup === 'eu' && cc.presetAnswers.hasEuEid ? 'A' : 'B',
+      },
+      persona: { ...cc.persona, name, age: Math.floor(minor.age), initials, hue: (cc.persona.hue + 140) % 360, profile: { en: `Minor registered by ${cc.persona.name}`, es: `Menor registrado por ${cc.persona.name}` } },
+      document: { ...cc.document, number: minorDocNumber },
+    }), [audit(caseId, citizenActor(c), 'case_started', `${c.persona.name} registers a minor in their care: ${name} (${Math.floor(minor.age)}).`)])
+  },
+  setSimulatedFailure(caseId, failure) {
+    const c = getCase(caseId)
+    if (c.status !== 'draft') throw new ClaveRuleError('The failure can only be chosen before the checks start.')
+    const route = c.route ?? 'B'
+    if (failure && !SIM_FAILURES[failure].routes.includes(route)) throw new ClaveRuleError(`That failure does not apply to route ${route}.`)
+    const original = CASE_LIBRARY.find(l => l.id === c.id)?.simulation ?? { attempts: [] }
+    updateCase(caseId, () => ({
+      simulatedFailure: failure ?? undefined,
+      simulation: failure ? SIM_FAILURES[failure].script(route) : original,
+    }), [])
+  },
   bookVideoCall(caseId, slotIso) {
     const c = getCase(caseId)
     if (Number.isNaN(Date.parse(slotIso))) throw new ClaveRuleError('Pick one of the available times.')

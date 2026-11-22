@@ -149,9 +149,9 @@ export function RouteCode({ code, className }: { code: string; className?: strin
 
 /** Primary full-width button for the phone layout. */
 export function BigButton({
-  children, onClick, disabled, variant = 'primary', type = 'button', className,
+  children, onClick, disabled, variant = 'primary', type = 'button', className, testId,
 }: {
-  children: ReactNode; onClick?: () => void; disabled?: boolean; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; type?: 'button' | 'submit'; className?: string
+  children: ReactNode; onClick?: () => void; disabled?: boolean; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; type?: 'button' | 'submit'; className?: string; testId?: string
 }) {
   const v = {
     primary: 'border-2 border-brand bg-brand text-brand-ink hover:border-brand-strong hover:bg-brand-strong',
@@ -164,6 +164,7 @@ export function BigButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       className={cn(
         'inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[2px] px-5 py-3 text-[16px] font-bold transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',

@@ -201,7 +201,7 @@ test.describe('5. Accessibility', () => {
     await tabTo(page, /^Priya Nair$/, log)
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/officer\/case\/bg-03/)
-    const refuse = await tabTo(page, /^Refuse/, log)
+    const refuse = await tabTo(page, /^Reject with reason/, log)
     expect(refuse.visible).toBe(true)
     await page.keyboard.press('Enter')
     const dlg = page.getByRole('dialog')
@@ -284,7 +284,7 @@ test.describe('5. Accessibility', () => {
     }
     // refuse dialog open
     await page.goto(`${BASE}/?debug=1#/officer/case/giulia`)
-    await page.getByRole('button', { name: /^Refuse/ }).click()
+    await page.getByRole('button', { name: /^Reject with reason/ }).click()
     await page.getByRole('dialog').getByRole('radio').nth(2).click()
     await page.waitForTimeout(500)
     report['refuse-dialog:en'] = { contrast: await page.evaluate(CONTRAST), unlabelled: await page.evaluate(LABELS) }

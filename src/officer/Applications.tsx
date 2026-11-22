@@ -138,7 +138,7 @@ export function ApplicationsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5"><StatusPill status={c.status} /></td>
+                      <td className="px-3 py-2.5"><StatusPill status={c.status} advanced={c.advanced} /></td>
                       <td className="px-3 py-2.5">{c.route ? <RouteBadge route={c.route} compact /> : <span className="text-muted">—</span>}</td>
                       <td className="px-3 py-2.5">
                         <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink">{tr(DOCUMENTS[d].label).split(' (')[0]}</span>

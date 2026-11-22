@@ -30,7 +30,7 @@ The app is a static site (relative paths, hash routing), so it runs as a Hugging
    ```
 
    The script builds the app, creates the Space (public, SDK "static") if it does not exist, and uploads the build. Run it again after every change to redeploy. The token is read from the environment only; it is never saved to disk or committed.
-3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.hf.space`), so both windows share the same browser storage: `…hf.space/#/citizen` and `…hf.space/#/officer`.
+3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.static.hf.space`), so both windows share the same browser storage: `…static.hf.space/#/citizen` and `…static.hf.space/#/officer`.
 
 ## Citizen accounts (team only)
 
@@ -40,7 +40,7 @@ The eight library personas have saved citizen accounts. **These logins are inten
 |---|---|---|---|---|
 | Giulia Ferraro | Italian master's student in Madrid (24) | Passport chip + face check, basic level in minutes; an officer approves the advanced level live (video 0:40–2:00) | `YB4829137` | `giulia-demo` |
 | Daniel Mwangi | Kenyan master's student with a TIE (23) | Non-EU student, TIE chip + face check from the phone instead of an office appointment | `Y8042719P` | `daniel-demo` |
-| Rafael Medina | The neighbour: 80, no smartphone, helped by his daughter | Assisted mode on Lucía's phone; he does the face check himself (video 3:40–4:20) | `X9019583W` | `rafael-demo` |
+| Ernesto Medina | The neighbour: 80, no smartphone, helped by his daughter | Assisted mode on Lucía's phone: helper form, hand-over message in large text, one face retry for reflections, his own mobile for the answer, and Lucía's last screen without the result (video 3:40–4:20) | `X9019583W` | `rafael-demo` |
 | Noah Becker | German minor (16) registering with his mother | Mother signs in with her German eID and confirms him; an officer confirms the link | `C01X58RT2` | `noah-demo` |
 | Yusuf Haddad | International protection applicant with a red card (31) | Policy proposal: no chip, straight to a video call with an officer | `Y9117004D` | `yusuf-demo` |
 | Ivo Petrov (identity claimed by an impostor) | Deepfake attempt: someone else's passport, synthetic face video | Liveness fails, the engine stops it and an officer refuses with a reason (video 2:50–3:40) | `391027844` | `ivo-demo` |
@@ -51,7 +51,7 @@ Sign-in ignores letter case and spaces. Anyone can also choose **Create an accou
 
 ## Staff accounts
 
-Staff sign in at `/#/officer` like on the real Cl@ve gateway, with one of two method cards: **Electronic certificate** (pick a certificate, then type its PIN) or **User and password**. **These PINs and passwords are never shown in the app**; they live only here. Everything is fictional: the DNI numbers below carry a deliberately wrong check letter, so they can never belong to a real person. Every attempt goes to the audit trail with the method used, never the PIN or password.
+Staff sign in at `/#/officer` like on the real Cl@ve gateway, with one of two method cards: **Electronic certificate** (pick a certificate, then type its PIN) or **User and password**. For recording, the sign-in page also shows a **Demo access** box with Laura Navarro's certificate PIN and her user and password (all fictional). Everything is fictional: the DNI numbers below carry a deliberately wrong check letter, so they can never belong to a real person. Every attempt goes to the audit trail with the method used, never the PIN or password.
 
 Certificates (the picker lists all five):
 
@@ -92,7 +92,10 @@ An NRP built on a DNI with the real check letter is refused, like any real-looki
 2. Window 1 (1440 × 900): `/#/officer`, sign the officer in. Window 2 (phone size, or a phone-sized window): `/#/citizen`.
 3. Sign in with the persona's applicant number and password from the table above (type them off-camera or crop the first seconds), then follow route assistant → verification → status.
 4. The staff window updates live: open the case from the queue and approve, request information, complete the video call or refuse with a reason, depending on the scenario.
-5. Press **Sign out** in the citizen header before the next persona. For the closing numbers open `/#/dashboard` (Service statistics; its weekly numbers are invented, as disclosed on About).
+5. Press **Sign out** in the citizen header before the next persona.
+6. **Hard cases with any account** (cases 2, 6, 7 and 8): on the verification screen, open **Demo: simulate a result** at the bottom and pick *Chip cannot be read* (two failed reads, then the case moves to a video call), *Chip signature invalid* or *Liveness check fails* (high risk, an officer refuses with a reason the citizen sees and can appeal) or *Data does not match* (refuse with "Residence not found", the citizen presses "I have corrected it" and the officer re-approves). Leave it on *No failure* for a normal run.
+7. **Minor** (case 4): on the last assistant question choose *I am registering a minor in my care* and fill in the minor's name and age. **Red card** (case 5): sign up with a non-EU country and *Red card*. Route B, the Fallback video call for foreigners, the red card and assisted mode all carry the tag *Proposed rule, not yet in force*.
+8. Staff menu: **Appeals** and **Advanced-level review** list those cases on their own. An approved citizen sees **Download receipt (PDF)** (marked as a prototype with no official value) and **Open Cl@ve Móvil** (explains that the prototype opens no app). For the closing numbers open `/#/dashboard` (Service statistics; its weekly numbers are invented, as disclosed on About).
 
 ## Structure
 

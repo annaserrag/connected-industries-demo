@@ -93,7 +93,7 @@ test.describe('4. Key rule', () => {
     await citizen.goto(`${BASE}/#/citizen/case/giulia`)
     await expect(citizen.getByTestId('advanced-card')).toBeVisible()
     await officer.getByRole('table').getByRole('link', { name: 'Giulia Ferraro', exact: true }).click()
-    await officer.getByRole('button', { name: /^Refuse/ }).click()
+    await officer.getByRole('button', { name: /^Reject with reason/ }).click()
     const dlg = officer.getByRole('dialog')
     await expect(dlg.getByText('The basic level stays granted')).toBeVisible()
     await dlg.getByRole('radio', { name: /Face does not match/ }).click()

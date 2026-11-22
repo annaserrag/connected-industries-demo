@@ -173,6 +173,7 @@ test.describe('Routes sweep', () => {
     await expect(citizen.getByTestId('recommended-route')).toContainText('EU digital ID (eIDAS)')
     await citizen.getByRole('button', { name: 'Continue with this route' }).click()
     await count(citizen, 'consent')
+    await citizen.getByTestId('consent-checkbox').check()
     await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
     await expect(citizen.getByRole('heading', { name: 'EU digital ID (eIDAS)' })).toBeVisible()
     await count(citizen, 'eidas')
@@ -187,6 +188,7 @@ test.describe('Routes sweep', () => {
     }
     await citizen.getByRole('button', { name: 'See my route' }).click()
     await citizen.getByRole('button', { name: 'Continue with this route' }).click()
+    await citizen.getByTestId('consent-checkbox').check()
     await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
     await expect(citizen.getByRole('button', { name: 'Start reading the chip' })).toBeVisible()
     await count(citizen, 'chip')

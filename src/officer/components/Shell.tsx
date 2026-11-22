@@ -8,7 +8,7 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import * as RDialog from '@radix-ui/react-dialog'
-import { FileStack, History, Inbox, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Rows3, UserRound, X } from 'lucide-react'
+import { FileStack, History, Inbox, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Rows3, Scale, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { Bilingual } from '@/contract/types'
 import { OFFICERS, STAFF_OFFICES } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
@@ -55,6 +55,8 @@ interface Item { to: string; icon: ComponentType<{ className?: string }>; label:
 
 const ITEMS: Item[] = [
   { to: PATHS.officer, icon: Inbox, label: C.navQueue, testId: 'nav-queue', match: p => p === PATHS.officer || p === `${PATHS.officer}/` || p.startsWith(`${PATHS.officer}/case/`) },
+  { to: PATHS.officerAppeals, icon: Scale, label: C.navAppeals, testId: 'nav-appeals' },
+  { to: PATHS.officerAdvanced, icon: ShieldCheck, label: C.navAdvanced, testId: 'nav-advanced' },
   { to: PATHS.officerDashboard, icon: LayoutDashboard, label: C.navStaffDashboard, testId: 'nav-dashboard' },
   { to: PATHS.officerDocuments, icon: FileStack, label: C.navDocuments, testId: 'nav-documents' },
   { to: PATHS.officerAll, icon: Rows3, label: C.navAll, testId: 'nav-applications' },

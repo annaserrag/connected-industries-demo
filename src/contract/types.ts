@@ -297,6 +297,8 @@ export interface AssistantAnswers {
   hasEuEid: boolean
   /** Registering on someone else's phone, with their help. */
   assisted: boolean
+  /** A parent or guardian registers a minor in their care. */
+  forMinor?: boolean
 }
 
 /**
@@ -313,6 +315,10 @@ export interface Assisted {
   relation: Bilingual
   /** Whose phone it is. */
   deviceOwner: string
+  /** The applicant's own mobile, so the result reaches them and not the helper. */
+  applicantPhone?: string
+  /** The applicant has no mobile of their own: the result goes by post. */
+  noOwnPhone?: boolean
 }
 
 export interface Guardian {
@@ -324,6 +330,9 @@ export interface Guardian {
 }
 
 export type CaseOrigin = 'library' | 'background' | 'signup'
+
+/** Failures the verification screen can simulate, so the hard cases can be shown with any account. */
+export type SimFailure = 'chip_unreadable' | 'chip_signature' | 'liveness' | 'data_mismatch'
 
 export interface Case {
   id: string
@@ -344,6 +353,8 @@ export interface Case {
   /** Which beat this case shows in the video/guide. */
   demoBeat: Bilingual
   simulation: SimulationScript
+  /** Failure chosen in the verification screen's "Simulate a failure" control (prototype only). */
+  simulatedFailure?: SimFailure
 
   /* ---------- live state (mutated only through core actions) ---------- */
   /** null until the citizen starts. */

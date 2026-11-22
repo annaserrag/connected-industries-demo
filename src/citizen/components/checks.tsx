@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, CircleMinus, Clock, LoaderCircle, TriangleExclamationPoint, X } from 'lucide-react'
 import type { CheckId, CheckOutcome, CheckResult } from '@/contract/types'
 import { CHECKS, ENGINE } from '@/contract/seed'
-import { cn } from '@/ui'
+import { cn, SimulatedValuesNote } from '@/ui'
 import { C, fill } from '../copy'
 import { useReduced, useTr } from '../hooks'
 
@@ -23,7 +23,7 @@ export function ScoreBar({ score, min, label }: { score: number; min: number; la
     <div className="mt-2">
       <div className="flex items-center justify-between text-[11px] font-medium text-muted">
         <span>{label}</span>
-        <span className={cn('tabular-nums', ok ? 'text-success' : 'text-danger')}>{score.toFixed(2)}</span>
+        <span className="flex items-baseline gap-1.5"><SimulatedValuesNote /><span className={cn('tabular-nums', ok ? 'text-success' : 'text-danger')}>{score.toFixed(2)}</span></span>
       </div>
       <div
         className="relative mt-1 h-2 w-full rounded-full bg-surface-2"

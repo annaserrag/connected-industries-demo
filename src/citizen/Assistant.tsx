@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  BookOpen, Bot, ChevronDown, ChevronLeft, Earth, FileText, Globe, HandHeart, IdCard, Landmark, ShieldCheck, Smartphone, Users,
+  Baby, BookOpen, Bot, ChevronDown, ChevronLeft, Earth, FileText, Globe, HandHeart, IdCard, Landmark, ShieldCheck, Smartphone, Users,
 } from 'lucide-react'
-import { Avatar, cn } from '@/ui'
+import { Avatar, ProposedRuleTag, cn } from '@/ui'
 import { actions } from '@/core/store'
 import type { AssistantAnswers, DocumentType } from '@/contract/types'
 import {
-  ASSISTANT_QUESTIONS, CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES, ROUTE_ORDER, recommendRoute,
+  ASSISTANT_QUESTIONS, CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES, ROUTE_ORDER, isProposedRule, recommendRoute,
 } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar, RouteCode } from './components/basics'
@@ -31,6 +31,9 @@ export function Assistant() {
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
   const [showOthers, setShowOthers] = useState(false)
+  const [minorName, setMinorName] = useState('')
+  const [minorAge, setMinorAge] = useState('')
+  const [minorErr, setMinorErr] = useState('')
 
   const steps: Q[] = useMemo(
     () => (answers ? ['nationality', 'document', ...(answers.nationalityGroup === 'eu' ? (['hasEuEid'] as Q[]) : []), 'assisted', 'result'] : []),
@@ -52,6 +55,13 @@ export function Assistant() {
   const route = ROUTES[rec.route]
 
   const confirm = () => {
+    if (answers.forMinor && !c.guardian) {
+      const age = Number(minorAge)
+      if (minorName.trim().split(/\s+/).length < 2) { setMinorErr(tr(C.minorNameError)); return }
+      if (!minorAge || !(age < 18)) { setMinorErr(tr(C.minorAgeError)); return }
+      setMinorErr('')
+      try { actions.setMinorApplicant(c.id, { name: minorName, age }) } catch (e) { setMinorErr(e instanceof Error ? e.message : String(e)); return }
+    }
     safe(() => actions.startCase(c.id, answers, rec.route))
     go(`/citizen/verify/${c.id}`)
   }
@@ -128,7 +138,6 @@ export function Assistant() {
                     key={d} name="document" value={d} checked={answers.document === d}
                     onChange={() => set({ document: d })}
                     title={tr(DOCUMENTS[d].label)}
-                    sub={DOCUMENTS[d].hasChip ? tr(C.hasChip) : tr(C.noChip)}
                     icon={docIcon(d)}
                   />
                 ))}
@@ -150,9 +159,9 @@ export function Assistant() {
             <fieldset>
               <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.assisted)}</legend>
               <div className="space-y-2.5">
-                <OptionCard name="assisted" value="no" checked={!answers.assisted} onChange={() => set({ assisted: false })} title={tr(C.no)} sub={tr(C.assistedNoSub)} icon={<Smartphone size={20} />} />
+                <OptionCard name="who" value="self" checked={!answers.assisted && !answers.forMinor} onChange={() => set({ assisted: false, forMinor: false })} title={tr(C.whoSelf)} sub={tr(C.whoSelfSub)} icon={<Smartphone size={20} />} />
                 <OptionCard
-                  name="assisted" value="yes" checked={answers.assisted} onChange={() => set({ assisted: true })} title={tr(C.yes)} sub={tr(C.assistedYesSub)} icon={<HandHeart size={20} />}
+                  name="who" value="assisted" checked={answers.assisted} onChange={() => set({ assisted: true, forMinor: false })} title={tr(C.whoAssisted)} sub={tr(C.assistedYesSub)} icon={<HandHeart size={20} />}
                   aside={answers.assisted && c.assisted ? (
                     <span className="mt-2 block rounded-[2px] bg-surface px-3 py-2 text-[12px] leading-snug text-muted border border-line">
                       <span className="font-bold text-ink">{tr(C.helperOnDevice)}:</span> {c.assisted.helperName} ({tr(c.assisted.relation)})<br />
@@ -160,11 +169,14 @@ export function Assistant() {
                     </span>
                   ) : undefined}
                 />
+                <OptionCard name="who" value="minor" checked={Boolean(answers.forMinor)} onChange={() => set({ assisted: false, forMinor: true })} title={tr(C.whoMinor)} sub={tr(C.whoMinorSub)} icon={<Baby size={20} />} />
               </div>
-              <p className="mt-4 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
-                <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-                {tr(CITIZEN_MESSAGES.assistedNote)}
-              </p>
+              {answers.assisted && (
+                <p className="mt-4 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
+                  <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+                  {tr(CITIZEN_MESSAGES.assistedNote)}
+                </p>
+              )}
             </fieldset>
           )}
 
@@ -182,6 +194,7 @@ export function Assistant() {
                   <span className="rounded-[2px] bg-brand px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-brand-ink">
                     {tr(C.routeLabel)} {route.code}
                   </span>
+                  {isProposedRule(rec.route, answers) && <ProposedRuleTag />}
                 </div>
                 <h2 className="mt-3 font-display text-[22px] font-bold leading-tight">{tr(route.name)}</h2>
                 <p className="mt-1 text-[15px] text-muted">{tr(route.forWhom)}</p>
@@ -190,6 +203,18 @@ export function Assistant() {
               <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-muted">{tr(C.whyThisRoute)}</h3>
               <p className="mt-1 text-[15px] leading-relaxed text-ink">{tr(rec.reason)}</p>
 
+              {answers.forMinor && !c.guardian && (
+                <fieldset className="mt-4 rounded-[2px] border-2 border-brand bg-surface p-4" data-testid="minor-form">
+                  <legend className="px-1 text-sm font-bold text-ink">{tr(C.minorFormTitle)}</legend>
+                  <label className="block text-[13px] font-bold text-ink">{tr(C.minorName)}
+                    <input name="minorName" data-testid="minor-name" value={minorName} onChange={e => setMinorName(e.target.value)} autoComplete="off" className="mt-1 block w-full rounded-[2px] border border-line bg-surface px-3 py-2.5 text-[15px] font-normal" />
+                  </label>
+                  <label className="mt-3 block text-[13px] font-bold text-ink">{tr(C.minorAge)}
+                    <input name="minorAge" data-testid="minor-age" inputMode="numeric" value={minorAge} onChange={e => setMinorAge(e.target.value.replace(/\D/g, '').slice(0, 2))} className="mt-1 block w-24 rounded-[2px] border border-line bg-surface px-3 py-2.5 text-[15px] font-normal" />
+                  </label>
+                  {minorErr && <p role="alert" className="mt-2 text-[13px] font-bold text-danger">{minorErr}</p>}
+                </fieldset>
+              )}
               {c.guardian && rec.route === 'B' && (
                 <p className="mt-3 flex gap-2 rounded-[2px] bg-surface p-3 text-[13px] leading-snug text-ink border border-line">
                   <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
@@ -248,6 +273,7 @@ export function Assistant() {
                         <span className="text-[13px] leading-snug">
                           <span className="font-bold text-ink">{tr(ROUTES[r].name)}</span>
                           <span className="block text-muted">{tr(ROUTES[r].forWhom)}</span>
+                          {(r === 'B' || r === 'FALLBACK') && <ProposedRuleTag className="mt-1" />}
                         </span>
                       </li>
                     ))}

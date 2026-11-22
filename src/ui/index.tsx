@@ -2,7 +2,7 @@
 export { cn, useLang, useTr, DUR, SPRING, SPRING_POP } from './utils'
 export {
   Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-  Badge, StatusPill, RiskBadge, RouteBadge, Avatar,
+  Badge, StatusPill, RiskBadge, RouteBadge, Avatar, ProposedRuleTag, SimulatedValuesNote,
   Spinner, Kbd, Skeleton, LiveDot, Divider, Callout, TextLink,
 } from './primitives'
 export type { ButtonProps, ButtonVariant, ButtonSize, Tone } from './primitives'

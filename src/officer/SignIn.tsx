@@ -10,7 +10,7 @@ import {
   ArrowLeft, ArrowRight, BadgeCheck, CircleAlert, CreditCard, Eye, EyeOff, FileKey2, IdCard, Info, KeyRound, Loader2, LockKeyhole, ShieldX, X,
 } from 'lucide-react'
 import type { StaffCertificate, StaffSignInMethod, StaffSignInResult } from '@/contract/types'
-import { KEY_RULE, STAFF_CERTIFICATES, STAFF_CREDENTIAL_LABELS } from '@/contract/seed'
+import { KEY_RULE, STAFF_CERTIFICATES, STAFF_CREDENTIAL_LABELS, STAFF_DEMO_SECRETS } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { actions, ClaveRuleError, useClave } from '@/core/store'
 import { findAccount, isCertificateExpired } from '@/core/staff'
@@ -253,6 +253,28 @@ function FieldError({ id, children }: { id: string; children: ReactNode }) {
       <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
+  )
+}
+
+/* ------------------------------------------------------ demo access box */
+
+/** Visible demo credentials so anyone recording or grading can sign in. Fictional accounts only. */
+function DemoAccess({ certId, compact }: { certId?: string; compact?: boolean }) {
+  const tr = useTr()
+  const cert = STAFF_CERTIFICATES.find(c => c.id === (certId ?? 'cert-laura'))
+  const pin = cert ? STAFF_DEMO_SECRETS.pins[cert.id] : undefined
+  return (
+    <aside data-testid="staff-demo-access" className={cn('mx-auto rounded-[2px] border-2 border-dashed border-brand/60 bg-brand-soft p-4 text-[14px] text-ink', compact ? 'mt-4 max-w-[520px]' : 'mt-8 max-w-[760px]')}>
+      <p className="flex items-center gap-2 font-bold"><KeyRound className="size-4 text-brand" aria-hidden />{tr({ en: 'Demo access (fictional accounts)', es: 'Acceso de demostración (cuentas ficticias)' })}</p>
+      {certId && cert && pin ? (
+        <p className="mt-1.5">{tr({ en: 'PIN for', es: 'PIN de' })} {cert.holderName}: <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono text-[15px] font-bold" data-testid="demo-pin">{pin}</code></p>
+      ) : (
+        <ul className="mt-1.5 grid gap-1 sm:grid-cols-2">
+          <li>{tr({ en: 'Electronic certificate: Laura Navarro · PIN', es: 'Certificado electrónico: Laura Navarro · PIN' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold" data-testid="demo-pin">{STAFF_DEMO_SECRETS.pins['cert-laura']}</code></li>
+          <li>{tr({ en: 'User and password:', es: 'Usuario y contraseña:' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">lnavarro</code> · <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{STAFF_DEMO_SECRETS.passwords.lnavarro}</code></li>
+        </ul>
+      )}
+    </aside>
   )
 }
 
@@ -600,6 +622,7 @@ export function SignIn() {
                   />
                 </div>
                 {error && <p role="alert" className="mt-6 rounded-[2px] border border-danger/40 bg-danger-soft px-3 py-2 text-[15px] text-danger">{error}</p>}
+                <DemoAccess />
               </div>
               <div className="bg-band">
                 <div className="mx-auto grid max-w-[1000px] gap-3 px-4 py-7 text-[15px] leading-relaxed text-ink sm:px-6">
@@ -625,12 +648,14 @@ export function SignIn() {
                 lockedFor={certLockedFor}
               />
               {error && <p role="alert" className="mx-auto mt-4 max-w-[520px] text-[15px] text-danger">{error}</p>}
+              <DemoAccess certId={pinCert.id} compact />
             </motion.div>
           )}
 
           {phase.kind === 'password' && (
             <motion.div key="password" {...rise} className="px-4 py-10 sm:px-6 sm:py-14">
               <PasswordStep onSubmit={submitPassword} onBack={() => toMethods('password')} checking={checking} wrong={pwWrong > 0} attempt={pwWrong} />
+              <DemoAccess compact />
             </motion.div>
           )}
 

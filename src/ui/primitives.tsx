@@ -3,10 +3,10 @@ import { Slot } from '@radix-ui/react-slot'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   AlertTriangle, ArrowUpRight, CheckCircle2, CircleDashed, CircleDot, Inbox, Landmark,
-  Loader2, ShieldAlert, ShieldCheck, Shield, XCircle, MessageSquareMore,
+  Loader2, ShieldAlert, ShieldCheck, Shield, XCircle, MessageSquareMore, Scale,
 } from 'lucide-react'
-import type { RiskLevel, RouteId, StatusId } from '@/contract/types'
-import { ROUTES, STATUSES } from '@/contract/seed'
+import type { AdvancedState, RiskLevel, RouteId, StatusId } from '@/contract/types'
+import { PROPOSED_RULE, ROUTES, SIMULATED_VALUES, statusLabel } from '@/contract/seed'
 import { cn, useTr, SPRING_POP } from './utils'
 
 /* ------------------------------------------------------------------ Button */
@@ -144,11 +144,11 @@ const statusMeta: Record<StatusId | 'draft', { tone: Tone; icon: ReactNode }> = 
 }
 
 /** Citizen status pill (the five reference-sheet statuses + draft), icon + label. Animates on change. */
-export const StatusPill = ({ status, className, size }: { status: StatusId | 'draft'; className?: string; size?: 'sm' | 'md' }) => {
+export const StatusPill = ({ status, advanced, className, size }: { status: StatusId | 'draft'; advanced?: AdvancedState; className?: string; size?: 'sm' | 'md' }) => {
   const tr = useTr()
   const reduce = useReducedMotion()
   const m = statusMeta[status]
-  const label = status === 'draft' ? tr('Not started', 'Sin empezar') : tr(STATUSES[status].label)
+  const label = status === 'draft' ? tr('Not started', 'Sin empezar') : tr(statusLabel(status, advanced))
   return (
     <motion.span
       key={status}
@@ -160,6 +160,25 @@ export const StatusPill = ({ status, className, size }: { status: StatusId | 'dr
       <Badge tone={m.tone} icon={m.icon} className={className} size={size}>{label}</Badge>
     </motion.span>
   )
+}
+
+/** "Proposed rule, not yet in force": on route B, Fallback for foreigners, red card and assisted mode. */
+export const ProposedRuleTag = ({ className }: { className?: string }) => {
+  const tr = useTr()
+  return (
+    <span
+      data-testid="proposed-rule"
+      className={cn('inline-flex items-center gap-1 rounded-[2px] border border-dashed border-warning/60 bg-warning-soft px-2 py-0.5 text-[11px] font-bold leading-tight text-warning', className)}
+    >
+      <Scale aria-hidden className="size-3.5 shrink-0" />{tr(PROPOSED_RULE)}
+    </span>
+  )
+}
+
+/** Small "simulated values" note shown next to liveness and face-match scores. */
+export const SimulatedValuesNote = ({ className }: { className?: string }) => {
+  const tr = useTr()
+  return <span data-testid="simulated-values" className={cn('text-[10px] font-semibold italic text-muted', className)}>{tr(SIMULATED_VALUES)}</span>
 }
 
 /** Risk level badge: low / medium / high with shield icon + word. */

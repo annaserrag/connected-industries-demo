@@ -73,7 +73,7 @@ test('8c About page lists what is simulated (EN + ES)', async ({ page }) => {
   const about = page.getByTestId('about-page')
   await expect(about).toBeVisible()
   await expect(about.getByRole('heading', { name: 'What is simulated' })).toBeVisible()
-  for (const part of [/verification engine/i, /eIDAS/, /chip/i, /face check/i, /padrón/i, /Staff certificates, PINs and staff accounts/, /wrong check letter/, /Service statistics/]) {
+  for (const part of [/verification engine/i, /eIDAS/, /chip/i, /face check/i, /residence/i, /Staff certificates, PINs and staff accounts/, /wrong check letter/, /Service statistics/]) {
     await expect(about, String(part)).toContainText(part)
   }
   await page.getByRole('button', { name: 'Español' }).first().click()

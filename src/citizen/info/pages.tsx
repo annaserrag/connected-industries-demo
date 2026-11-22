@@ -150,7 +150,7 @@ export function HelpPage() {
             <ol className="max-w-[72ch] space-y-3">
               {[
                 b('Create your account: name, date of birth, nationality and the document you have. You get your applicant number.', 'Crea tu cuenta: nombre, fecha de nacimiento, nacionalidad y el documento que tienes. Recibes tu número de solicitante.'),
-                b('Answer a few questions. We recommend the fastest route for you.', 'Responde unas preguntas. Te recomendamos la vía más rápida para ti.'),
+                b('Answer a few questions. We recommend the route that best fits you.', 'Responde unas preguntas. Te recomendamos la vía que mejor te encaja.'),
                 b('Verify your identity from your phone on that route.', 'Verifica tu identidad desde el móvil por esa vía.'),
                 b('Follow your application until you have Cl@ve. If we need something, we tell you here.', 'Sigue tu solicitud hasta tener Cl@ve. Si necesitamos algo, te lo decimos aquí.'),
               ].map((s, i) => (
@@ -208,8 +208,11 @@ const SIMULATED: Bilingual[] = [
   b('Signing in with another EU country’s digital ID (eIDAS): the national eID screen is a neutral mock-up.', 'El acceso con la identidad digital de otro país de la UE (eIDAS): la pantalla del eID nacional es una maqueta neutra.'),
   b('Reading the passport or TIE chip with the phone (NFC): it is an animation, nothing is read.', 'La lectura del chip del pasaporte o la TIE con el móvil (NFC): es una animación, no se lee nada.'),
   b('The face check (liveness and face match): no camera is used.', 'La comprobación facial (prueba de vida y coincidencia): no se usa la cámara.'),
-  b('The residence (padrón) check with the town hall and the DNI video call.', 'La consulta de residencia (padrón) con el ayuntamiento y la videollamada con DNI.'),
+  b('The residence check with other public bodies’ records and the DNI video call.', 'La consulta de tus datos de residencia en registros de otros organismos y la videollamada con DNI.'),
   b('Video calls with officers and their booking slots.', 'Las videollamadas con personal funcionario y sus horas de reserva.'),
+  b('The “Demo: simulate a result” control on the verification screen, which forces a failed chip read, an invalid chip signature, a failed liveness check or data that does not match, so the hard cases can be recorded.', 'El control «Demo: simular un resultado» de la pantalla de verificación, que fuerza un chip no legible, una firma del chip inválida, una prueba de vida fallida o datos que no coinciden, para poder grabar los casos difíciles.'),
+  b('The receipt PDF (it says it has no official value) and the “Open Cl@ve Móvil” button, which opens no app.', 'El justificante en PDF (indica que no tiene validez oficial) y el botón «Abrir Cl@ve Móvil», que no abre ninguna app.'),
+  b('Text messages and letters to the applicant in assisted mode: nothing is sent.', 'Los SMS y cartas a la persona solicitante en modo asistido: no se envía nada.'),
   b('Staff certificates, PINs and staff accounts used to sign in to the registration console.', 'Los certificados, PIN y cuentas del personal con los que se entra en la consola de registro.'),
   b('Every person, document and number. DNI/NIE-shaped numbers carry a deliberately wrong check letter, so they can never belong to a real person.', 'Todas las personas, documentos y números. Los números con forma de DNI/NIE llevan una letra de control errónea a propósito, así que nunca pueden ser de una persona real.'),
   b('The numbers on the Service statistics page (weekly indicators, charts, appeals): invented to show what we would measure after launch. The “Published figures” there and below are real.', 'Las cifras de la página de Estadísticas del servicio (indicadores semanales, gráficos, recursos): inventadas para mostrar lo que mediríamos tras el lanzamiento. Las «Cifras publicadas» de esa página y de esta son reales.'),

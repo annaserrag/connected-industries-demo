@@ -32,6 +32,9 @@ import type {
   SimulatedIndicator,
   StatusDef,
   StatusId,
+  AdvancedState,
+  SimFailure,
+  SimulationScript,
 } from './types'
 
 export const SERVICE_NAME = 'Get your Cl@ve'
@@ -111,7 +114,7 @@ export const STATUSES: Record<StatusId, StatusDef> = {
     label: { en: 'Checking', es: 'Comprobando' },
     message: {
       en: 'We are checking your document, your face and your residence record. Most checks finish in a few minutes. If a person needs to look at it, we will tell you here.',
-      es: 'Estamos comprobando tu documento, tu cara y tu empadronamiento. La mayoría termina en pocos minutos. Si tiene que revisarlo una persona, te lo diremos aquí.',
+      es: 'Estamos comprobando tu documento, tu cara y tus datos de residencia. La mayoría termina en pocos minutos. Si tiene que revisarlo una persona, te lo diremos aquí.',
     },
   },
   need_info: {
@@ -143,6 +146,100 @@ export const STATUSES: Record<StatusId, StatusDef> = {
   },
 }
 export const STATUS_ORDER: StatusId[] = ['received', 'checking', 'need_info', 'approved', 'not_approved']
+
+/** Full status name shown to citizens and staff; 'approved' says which level. */
+export function statusLabel(status: StatusId, advanced?: AdvancedState): Bilingual {
+  if (status !== 'approved') return STATUSES[status].label
+  if (advanced === 'granted') return { en: 'Approved: advanced level', es: 'Aprobada: nivel avanzado' }
+  if (advanced === 'pending_review') return { en: 'Approved: basic level, advanced level under review', es: 'Aprobada: nivel básico, nivel avanzado en revisión' }
+  return { en: 'Approved: basic level', es: 'Aprobada: nivel básico' }
+}
+
+/** Shown next to every liveness / face-match score. */
+export const SIMULATED_VALUES: Bilingual = { en: 'simulated values', es: 'valores simulados' }
+
+/** Tag on everything that depends on a rule change we propose (route B, Fallback for foreigners, red card, assisted mode). */
+export const PROPOSED_RULE: Bilingual = { en: 'Proposed rule, not yet in force', es: 'Norma propuesta, aún no vigente' }
+
+/** True when the route or mode only exists under a proposed rule change. */
+export function isProposedRule(route: RouteId | null | undefined, answers?: Pick<AssistantAnswers, 'assisted' | 'document' | 'nationalityGroup'> | null): boolean {
+  if (answers?.assisted) return true
+  if (answers?.document === 'RED_CARD' || answers?.document === 'NIE_PAPER') return true
+  if (route === 'B') return true
+  if (route === 'FALLBACK') return answers?.nationalityGroup !== 'spanish'
+  return false
+}
+
+/** Relations offered in the assisted-mode helper form. */
+export const HELPER_RELATIONS: Bilingual[] = [
+  { en: 'daughter', es: 'hija' },
+  { en: 'son', es: 'hijo' },
+  { en: 'neighbour', es: 'vecina o vecino' },
+  { en: 'other relative', es: 'otro familiar' },
+  { en: 'social worker or volunteer', es: 'trabajadora social o voluntariado' },
+]
+
+/* ------------------------------------------------ simulated failures */
+
+type Attempt = SimulationScript['attempts'][number]
+const PASS_LIVE: Attempt = {
+  liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
+  face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
+}
+
+/**
+ * The verification screen's "Simulate a failure" control. Each entry says on which routes it applies and
+ * the script the engine then runs (attempt 1, and attempt 2 after a correction).
+ */
+export const SIM_FAILURES: Record<SimFailure, { label: Bilingual; hint: Bilingual; routes: RouteId[]; script: (route: RouteId) => SimulationScript }> = {
+  chip_unreadable: {
+    label: { en: 'Chip cannot be read', es: 'Chip no legible' },
+    hint: { en: 'The phone fails to read the chip twice: the case moves to a video call with an officer.', es: 'El móvil no consigue leer el chip dos veces: el caso pasa a videollamada con una persona funcionaria.' },
+    routes: ['B'],
+    script: () => ({ attempts: [{
+      chip_read: { outcome: 'fail', detail: { en: 'Chip could not be read on two tries (damaged or shielded card)', es: 'No se pudo leer el chip en dos intentos (tarjeta dañada o apantallada)' } },
+      chip_signature: { outcome: 'skipped', detail: { en: 'Not possible without reading the chip', es: 'No es posible sin leer el chip' } },
+      document_validity: { outcome: 'skipped', detail: { en: 'Checked by the officer on the video call', es: 'La comprueba la persona funcionaria en la videollamada' } },
+      liveness: { outcome: 'skipped', detail: { en: 'Done on the video call instead', es: 'Se hace en la videollamada' } },
+      face_match: { outcome: 'skipped', detail: { en: 'No chip photo to compare with', es: 'No hay foto del chip con la que comparar' } },
+    }] }),
+  },
+  chip_signature: {
+    label: { en: 'Chip signature invalid', es: 'Firma del chip inválida' },
+    hint: { en: 'The chip reads, but its signature is not from a trusted issuing country: high risk, an officer decides.', es: 'El chip se lee, pero su firma no es de un país emisor de confianza: riesgo alto, decide una persona funcionaria.' },
+    routes: ['B'],
+    script: () => ({ attempts: [{
+      chip_signature: { outcome: 'fail', detail: { en: 'Signature not issued by a trusted country signing authority (CSCA)', es: 'Firma no emitida por una autoridad firmante de confianza del país (CSCA)' } },
+      document_validity: { outcome: 'warn', detail: { en: 'Expiry date in chip differs from printed page', es: 'La caducidad del chip difiere de la página impresa' } },
+      ...PASS_LIVE,
+    }] }),
+  },
+  liveness: {
+    label: { en: 'Liveness check fails', es: 'Prueba de vida fallida' },
+    hint: { en: 'The face matches the chip photo but the video is not a live person (injected video): an officer decides.', es: 'La cara coincide con la foto del chip, pero el vídeo no es de una persona real (vídeo inyectado): decide una persona funcionaria.' },
+    routes: ['B'],
+    script: () => ({ attempts: [{
+      liveness: { outcome: 'fail', score: 0.22, detail: { en: 'Injected video stream: no depth, screen-replay pattern, frozen micro-movement', es: 'Vídeo inyectado: sin profundidad, patrón de pantalla, micromovimiento congelado' } },
+      face_match: { outcome: 'pass', score: 0.97, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
+    }] }),
+  },
+  data_mismatch: {
+    label: { en: 'Data does not match', es: 'Datos que no coinciden' },
+    hint: { en: 'Your residence details are not found at the address given. After "I have corrected it", the second check passes.', es: 'Tus datos de residencia no aparecen en la dirección indicada. Tras «Ya lo he corregido», la segunda comprobación pasa.' },
+    routes: ['A', 'B'],
+    script: route => ({ attempts: [
+      {
+        ...(route === 'B' ? PASS_LIVE : {}),
+        residence: { outcome: 'fail', detail: { en: 'No residence record at the declared address', es: 'Sin datos de residencia en la dirección declarada' } },
+      },
+      {
+        ...(route === 'B' ? PASS_LIVE : {}),
+        residence: { outcome: 'pass', detail: { en: 'Residence confirmed after the update', es: 'Residencia confirmada tras la actualización' } },
+      },
+    ] }),
+  },
+}
+export const SIM_FAILURE_ORDER: SimFailure[] = ['chip_unreadable', 'chip_signature', 'liveness', 'data_mismatch']
 
 export const LEVEL_LABELS: Record<'basic' | 'advanced', Bilingual> = {
   basic: { en: 'Basic level', es: 'Nivel básico' },
@@ -200,8 +297,8 @@ export const CHECKS: Record<CheckId, CheckDef> = {
   },
   residence: {
     id: 'residence', simulated: sim,
-    label: { en: 'Residence record (with consent)', es: 'Empadronamiento (con tu consentimiento)' },
-    explains: { en: 'With your consent, we check you are registered as living in Spain.', es: 'Con tu consentimiento, comprobamos que estás empadronado en España.' },
+    label: { en: 'Residence details (with consent)', es: 'Datos de residencia (con tu consentimiento)' },
+    explains: { en: 'With your consent, we check your residence details in other public bodies’ records.', es: 'Con tu consentimiento, comprobamos tus datos de residencia en registros de otros organismos.' },
   },
   guardian_link: {
     id: 'guardian_link', simulated: sim,
@@ -255,7 +352,7 @@ export const DECISION_RULES: DecisionRule[] = [
     automaticOutcome: { en: 'Basic level granted; advanced level queued', es: 'Nivel básico concedido; nivel avanzado en cola' },
     toOfficerWhen: {
       en: 'Face match or liveness is low, chip signature fails, residence check fails',
-      es: 'Coincidencia facial o prueba de vida baja, falla la firma del chip o falla el empadronamiento',
+      es: 'Coincidencia facial o prueba de vida baja, falla la firma del chip o fallan los datos de residencia',
     },
   },
   {
@@ -341,14 +438,14 @@ export const REJECTION_REASONS: Record<import('./types').RejectionReasonId, Reje
   },
   residence_not_found: {
     id: 'residence_not_found',
-    officerLabel: { en: 'Residence not found', es: 'Empadronamiento no encontrado' },
+    officerLabel: { en: 'Residence not found', es: 'Residencia no encontrada' },
     citizenMessage: {
-      en: 'We could not find you registered as living at the address you gave (padrón).',
-      es: 'No te encontramos empadronado en la dirección que indicaste.',
+      en: 'We could not confirm your residence details at the address you gave.',
+      es: 'No hemos podido confirmar tus datos de residencia en la dirección que indicaste.',
     },
     howToFix: {
-      en: 'If you registered recently, update your padrón and press "I have corrected it" so we check again.',
-      es: 'Si te empadronaste hace poco, actualiza tu padrón y pulsa «Ya lo he corregido» para que volvamos a comprobarlo.',
+      en: 'If your address changed recently, update your residence details and press "I have corrected it" so we check again.',
+      es: 'Si cambiaste de dirección hace poco, actualiza tus datos de residencia y pulsa «Ya lo he corregido» para que volvamos a comprobarlo.',
     },
   },
   data_mismatch: {
@@ -382,8 +479,8 @@ export const REJECTION_REASONS: Record<import('./types').RejectionReasonId, Reje
 export const CITIZEN_MESSAGES = {
   consentTitle: { en: 'Before we check, we need your consent', es: 'Antes de comprobar, necesitamos tu consentimiento' },
   consentBody: {
-    en: 'To confirm who you are, we will read the chip in your document, take a short face video and check your residence record (padrón) with the town hall. We only use this to give you Cl@ve, and you can see every check we did in your status page.',
-    es: 'Para confirmar quién eres, leeremos el chip de tu documento, grabaremos un breve vídeo de tu cara y consultaremos tu empadronamiento con el ayuntamiento. Solo lo usamos para darte Cl@ve, y puedes ver cada comprobación en tu página de estado.',
+    en: 'To confirm who you are, we will do the checks listed below. You can see every check we did on your status page.',
+    es: 'Para confirmar quién eres, haremos las comprobaciones que ves abajo. Puedes ver cada comprobación en tu página de estado.',
   },
   consentAccept: { en: 'I agree, start the checks', es: 'Acepto, empezar las comprobaciones' },
   appealConfirmation: {
@@ -414,7 +511,7 @@ export const ASSISTANT_QUESTIONS = {
   },
   document: { en: 'Which document do you have with you?', es: '¿Qué documento tienes a mano?' },
   hasEuEid: { en: 'Can you log in with your own country’s digital ID?', es: '¿Puedes entrar con la identidad digital de tu país?' },
-  assisted: { en: 'Is someone helping you on their phone?', es: '¿Te ayuda alguien desde su móvil?' },
+  assisted: { en: 'How will you register?', es: '¿Cómo vas a hacer el registro?' },
 } as const
 
 /**
@@ -432,6 +529,16 @@ export function recommendRoute(a: AssistantAnswers): { route: RouteId; reason: B
       },
     }
   }
+  if (a.forMinor && (a.document === 'PASSPORT' || a.document === 'TIE')) {
+    return {
+      route: 'B',
+      policyProposal: false,
+      reason: {
+        en: 'You are registering a minor in your care. You confirm the link first; then the minor’s document is read and the minor does the face check. An officer always confirms the link before anything is granted.',
+        es: 'Registras a un menor a tu cargo. Primero confirmas el vínculo; después se lee el documento del menor y el menor hace la comprobación facial. Una persona funcionaria siempre confirma el vínculo antes de conceder nada.',
+      },
+    }
+  }
   if (a.nationalityGroup === 'spanish' && a.document === 'DNI') {
     return {
       route: 'C',
@@ -444,8 +551,8 @@ export function recommendRoute(a: AssistantAnswers): { route: RouteId; reason: B
       route: 'A',
       policyProposal: false,
       reason: {
-        en: 'Your country’s digital ID already works with Cl@ve, so it is the fastest way: no chip, no camera.',
-        es: 'La identidad digital de tu país ya funciona con Cl@ve, así que es lo más rápido: sin chip ni cámara.',
+        en: 'You can confirm who you are with your own country’s digital ID, through eIDAS, the European network that connects national digital IDs. It is the route that best fits you.',
+        es: 'Puedes confirmar quién eres con la identidad digital de tu país, a través de eIDAS, la red europea que conecta las identidades digitales nacionales. Es la vía que mejor te encaja.',
       },
     }
   }
@@ -685,7 +792,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
         chip_read: { outcome: 'pass', detail: { en: 'Chip read in 2.1 s', es: 'Chip leído en 2,1 s' } },
         liveness: { outcome: 'pass', score: 0.98, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
         face_match: { outcome: 'pass', score: 0.96, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid (padrón)', es: 'Empadronada en Madrid' } },
+        residence: { outcome: 'pass', detail: { en: 'Residence confirmed in Madrid', es: 'Residencia confirmada en Madrid' } },
       }],
     },
   },
@@ -707,7 +814,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       attempts: [{
         liveness: { outcome: 'pass', score: 0.97, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
         face_match: { outcome: 'pass', score: 0.94, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid (padrón)', es: 'Empadronado en Madrid' } },
+        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid ', es: 'Residencia confirmada en Madrid' } },
       }],
     },
   },
@@ -715,7 +822,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     id: 'rafael',
     origin: 'library',
     persona: {
-      name: 'Rafael Medina', age: 80, nationality: 'Argentine', initials: 'RM', hue: 32,
+      name: 'Ernesto Medina', age: 80, nationality: 'Argentine', initials: 'EM', hue: 32,
       profile: { en: 'The neighbour: 80, no smartphone, helped by his daughter', es: 'El vecino: 80 años, sin smartphone, le ayuda su hija' },
     },
     document: d('TIE', 'X9019583W', 'Spain', '2029-05-12'),
@@ -729,8 +836,8 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     simulation: {
       attempts: [{
         liveness: { outcome: 'pass', score: 0.91, detail: { en: 'Live person confirmed (slower movement, within range)', es: 'Persona real confirmada (movimiento más lento, dentro del rango)' } },
-        face_match: { outcome: 'pass', score: 0.92, detail: { en: 'Matches chip photo (Rafael, not the device owner)', es: 'Coincide con la foto del chip (Rafael, no la dueña del móvil)' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Getafe (padrón)', es: 'Empadronado en Getafe' } },
+        face_match: { outcome: 'pass', score: 0.92, detail: { en: 'Matches chip photo (Ernesto, not the device owner)', es: 'Coincide con la foto del chip (Ernesto, no la dueña del móvil)' } },
+        residence: { outcome: 'pass', detail: { en: 'Registered in Getafe ', es: 'Residencia confirmada en Getafe' } },
       }],
     },
   },
@@ -742,7 +849,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       profile: { en: 'A minor (16) registering with his mother', es: 'Un menor (16) que se registra con su madre' },
     },
     document: d('PASSPORT', 'C01X58RT2', 'Germany', '2030-02-02'),
-    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
+    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false, forMinor: true },
     guardian: {
       name: 'Anke Becker',
       relation: { en: 'mother', es: 'madre' },
@@ -758,7 +865,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
       attempts: [{
         liveness: { outcome: 'pass', score: 0.95, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
         face_match: { outcome: 'pass', score: 0.93, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid with his mother (padrón)', es: 'Empadronado en Madrid con su madre' } },
+        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid with his mother ', es: 'Residencia confirmada en Madrid con su madre' } },
         guardian_link: { outcome: 'pass', detail: { en: 'Mother signed in via German eID (eIDAS); same address in padrón', es: 'La madre entró con eID alemán (eIDAS); mismo domicilio en el padrón' } },
       }],
     },
@@ -781,7 +888,7 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     simulation: {
       attempts: [{
         chip_read: { outcome: 'skipped', detail: { en: 'Document has no chip', es: 'El documento no tiene chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid (padrón)', es: 'Empadronado en Madrid' } },
+        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid ', es: 'Residencia confirmada en Madrid' } },
         officer_video: { outcome: 'pending', detail: { en: 'Waiting for officer video call', es: 'Esperando videollamada con funcionaria' } },
       }],
     },
@@ -841,8 +948,8 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     document: d('TIE', 'Z9088104B', 'Spain', '2028-12-01'),
     presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: false },
     scenario: {
-      en: 'Her padrón was not updated after moving, so the officer refuses with "Residence not found". She updates it, presses "I have corrected it" and is approved.',
-      es: 'No actualizó el padrón al mudarse, así que la funcionaria deniega con «Empadronamiento no encontrado». Lo actualiza, pulsa «Ya lo he corregido» y queda aprobada.',
+      en: 'Her residence details were not updated after moving, so the officer refuses with "Residence not found". She updates it, presses "I have corrected it" and is approved.',
+      es: 'No actualizó sus datos de residencia al mudarse, así que la funcionaria deniega con «Residencia no encontrada». Lo actualiza, pulsa «Ya lo he corregido» y queda aprobada.',
     },
     demoBeat: { en: 'Video 2:50–3:40 · A rejection corrected', es: 'Vídeo 2:50–3:40 · Una denegación corregida' },
     simulation: {
@@ -850,12 +957,12 @@ export const CASE_LIBRARY: LibrarySeed[] = [
         {
           liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
           face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-          residence: { outcome: 'fail', detail: { en: 'No residence record at the declared address (padrón)', es: 'Sin empadronamiento en la dirección declarada' } },
+          residence: { outcome: 'fail', detail: { en: 'No residence record at the declared address', es: 'Sin datos de residencia en la dirección declarada' } },
         },
         {
           liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
           face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-          residence: { outcome: 'pass', detail: { en: 'Residence confirmed after padrón update', es: 'Empadronamiento confirmado tras la actualización' } },
+          residence: { outcome: 'pass', detail: { en: 'Residence confirmed after the update', es: 'Residencia confirmada tras la actualización' } },
         },
       ],
     },
@@ -889,7 +996,7 @@ const BACKGROUND: BackgroundSeed[] = [
   bg({ id: 'bg-01', name: 'Amélie Laurent', age: 27, nationality: 'French', initials: 'AL', hue: 240, profile: { en: 'French designer', es: 'Diseñadora francesa' }, doc: d('EU_EID', 'X4RT90213', 'France', '2031-01-10'), route: 'A', status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 14, checks: [['eidas_login', 'pass', undefined, 'French eID confirmed via eIDAS'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [], risk: 'low' }),
   bg({ id: 'bg-02', name: 'Mateo Rojas', age: 34, nationality: 'Colombian', initials: 'MR', hue: 50, profile: { en: 'Colombian nurse with a TIE', es: 'Enfermero colombiano con TIE' }, doc: d('TIE', 'Y8063377N', 'Spain', '2028-06-01'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 22, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.96, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Zaragoza']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
   bg({ id: 'bg-03', name: 'Priya Nair', age: 31, nationality: 'Indian', initials: 'PN', hue: 20, profile: { en: 'Indian data scientist with a passport', es: 'Científica de datos india con pasaporte' }, doc: d('PASSPORT', 'K7712093', 'India', '2033-08-19'), route: 'B', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 9, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.93, 'Live person'], ['face_match', 'warn', 0.86, 'Below threshold: new glasses and beard vs chip photo'], ['residence', 'pass', undefined, 'Registered in Barcelona']], flags: [{ code: 'low_face_match', severity: 'medium', reason: { en: 'Face match 0.86 is below the 0.90 threshold', es: 'Coincidencia facial 0,86 por debajo del umbral 0,90' } }], risk: 'medium' }),
-  bg({ id: 'bg-04', name: 'Oluwaseun Adeyemi', age: 26, nationality: 'Nigerian', initials: 'OA', hue: 120, profile: { en: 'Nigerian MBA student with a TIE', es: 'Estudiante nigeriano de MBA con TIE' }, doc: d('TIE', 'Y8071240D', 'Spain', '2027-07-15'), route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two padrón records found (old and new address)']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'Residence record ambiguous', es: 'Empadronamiento ambiguo' } }], risk: 'medium', infoRequest: 'Please confirm which of your two addresses is current (Calle Mayor or Calle Alcalá).' }),
+  bg({ id: 'bg-04', name: 'Oluwaseun Adeyemi', age: 26, nationality: 'Nigerian', initials: 'OA', hue: 120, profile: { en: 'Nigerian MBA student with a TIE', es: 'Estudiante nigeriano de MBA con TIE' }, doc: d('TIE', 'Y8071240D', 'Spain', '2027-07-15'), route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two residence records found (old and new address)']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'Residence record ambiguous', es: 'Datos de residencia ambiguos' } }], risk: 'medium', infoRequest: 'Please confirm which of your two addresses is current (Calle Mayor or Calle Alcalá).' }),
   bg({ id: 'bg-05', name: 'Carmen Ruiz Ortega', age: 45, nationality: 'Spanish', initials: 'CR', hue: 0, profile: { en: 'Spanish teacher with a DNI', es: 'Profesora española con DNI' }, doc: d('DNI', '48219360M', 'Spain', '2030-04-04'), route: 'C', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 140, checks: [['dni_video', 'pass', undefined, 'DNI video identification completed']], flags: [], risk: 'low' }),
   bg({ id: 'bg-06', name: 'Tomás Ferreira', age: 38, nationality: 'Portuguese', initials: 'TF', hue: 100, profile: { en: 'Portuguese chef', es: 'Cocinero portugués' }, doc: d('EU_EID', '152198027ZX4', 'Portugal', '2029-10-10'), route: 'A', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 31, checks: [['eidas_login', 'warn', undefined, 'Surname order differs from residence record'], ['residence', 'pass', undefined, 'Registered in Sevilla']], flags: [{ code: 'eid_data_mismatch', severity: 'medium', reason: { en: 'eID data does not match the records (surname order)', es: 'Los datos del eID no coinciden con los registros (orden de apellidos)' } }], risk: 'medium' }),
   bg({ id: 'bg-07', name: 'Aisha Rahman', age: 29, nationality: 'Bangladeshi', initials: 'AR', hue: 160, profile: { en: 'Bangladeshi researcher with a passport', es: 'Investigadora bangladesí con pasaporte' }, doc: d('PASSPORT', 'A11902588', 'Bangladesh', '2026-10-30'), route: 'B', status: 'not_approved', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 1440, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'fail', undefined, 'Passport expired on 30 Oct 2026'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [{ code: 'appeal_filed', severity: 'medium', reason: { en: 'Appeal filed against the refusal', es: 'Recurso presentado contra la denegación' } }], risk: 'medium', refusedWith: 'document_expired', appeal: 'My passport renewal is in progress; I attach the consulate receipt.' }),

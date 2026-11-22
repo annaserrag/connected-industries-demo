@@ -4,7 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import {
-  citizenAssistant, citizenChipAndFace, citizenConsent, citizenToStatus, officerOpenFromQueue, officerRefuse,
+  citizenAssistant, citizenAssistedSteps, citizenChipAndFace, citizenConsent, citizenToStatus, officerOpenFromQueue, officerRefuse,
   officerSignIn, shot, SHOTS, state, twoViews, BASE, DEMO_LOGINS,
 } from './helpers'
 import fs from 'node:fs'
@@ -75,15 +75,18 @@ test.describe('1. E2E per case', () => {
     await context.close()
   })
 
-  test('1c Rafael (neighbour, assisted on daughter phone)', async ({ browser }) => {
+  test('1c Ernesto (neighbour, assisted on daughter phone)', async ({ browser }) => {
     const { citizen, officer, problems, loads, context } = await twoViews(browser)
     await officerSignIn(officer)
     await citizenAssistant(citizen, 'rafael')
     await expect(citizen.getByText('Lucía Medina').first()).toBeVisible()
     await citizenConsent(citizen)
-    await citizenChipAndFace(citizen)
-    await citizenToStatus(citizen)
-    await officerOpenFromQueue(officer, 'Rafael Medina')
+    await citizenAssistedSteps(citizen)
+    // MSG-ASS-03: the helper's last screen never shows the result
+    await expect(citizen.getByTestId('helper-done')).toBeVisible({ timeout: 30_000 })
+    await expect(citizen.getByTestId('helper-done')).not.toContainText(/approved|basic level/i)
+    await citizen.goto(citizen.url().replace(/#.*$/, '#/citizen/case/rafael'))
+    await officerOpenFromQueue(officer, 'Ernesto Medina')
     await expect(officer.getByText(/Assisted mode on Lucía Medina/).first()).toBeVisible()
     await shot(officer, '1c-rafael-officer-case')
     await decide(officer, /Grant advanced level/)

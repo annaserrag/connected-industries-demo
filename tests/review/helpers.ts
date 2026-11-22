@@ -124,9 +124,9 @@ export async function citizenAssistant(citizen: Page, id: string, opts?: { assis
     const see = citizen.getByRole('button', { name: 'See my route' })
     if (await see.isVisible().catch(() => false)) break
     if (opts?.assisted !== undefined) {
-      const q = citizen.getByText('Is someone helping you on their phone?')
+      const q = citizen.getByText('How will you register?')
       if (await q.isVisible().catch(() => false)) {
-        await citizen.locator(`input[name="assisted"][value="${opts.assisted ? 'yes' : 'no'}"]`).check({ force: true })
+        await citizen.locator(`input[name="who"][value="${opts.assisted ? 'assisted' : 'self'}"]`).check({ force: true })
       }
     }
     await citizen.getByRole('button', { name: 'Next', exact: true }).click()
@@ -134,9 +134,9 @@ export async function citizenAssistant(citizen: Page, id: string, opts?: { assis
   }
   if (opts?.assisted !== undefined) {
     // the assisted question is the last before "See my route"
-    const q = citizen.getByText('Is someone helping you on their phone?')
+    const q = citizen.getByText('How will you register?')
     if (await q.isVisible().catch(() => false)) {
-      await citizen.locator(`input[name="assisted"][value="${opts.assisted ? 'yes' : 'no'}"]`).check({ force: true })
+      await citizen.locator(`input[name="who"][value="${opts.assisted ? 'assisted' : 'self'}"]`).check({ force: true })
     }
   }
   await citizen.getByRole('button', { name: 'See my route' }).click()
@@ -147,7 +147,23 @@ export async function citizenAssistant(citizen: Page, id: string, opts?: { assis
 
 export async function citizenConsent(citizen: Page) {
   await citizen.getByRole('button', { name: 'Continue with this route' }).click()
+  await citizen.getByTestId('consent-checkbox').check()
   await citizen.getByRole('button', { name: 'I agree, start the checks' }).click()
+}
+
+/** Assisted mode (case 3): helper form, hand-over, chip, face with one glare retry, own mobile. */
+export async function citizenAssistedSteps(citizen: Page, phone = '612345678') {
+  await expect(citizen.getByTestId('helper-form')).toBeVisible()
+  await citizen.getByRole('button', { name: 'Continue', exact: true }).click()
+  await citizen.getByRole('button', { name: 'I am ready' }).click()
+  await citizen.getByRole('button', { name: 'Start reading the chip' }).click()
+  await citizen.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })
+  await citizen.getByRole('button', { name: 'Start the face check' }).click()
+  await expect(citizen.getByTestId('face-glare')).toBeVisible({ timeout: 15_000 })
+  await citizen.getByRole('button', { name: 'Try again' }).click()
+  await citizen.getByRole('button', { name: 'Continue', exact: true }).click({ timeout: 15_000 })
+  await citizen.getByTestId('applicant-phone').fill(phone)
+  await citizen.getByRole('button', { name: 'Continue', exact: true }).click()
 }
 
 export async function citizenChipAndFace(citizen: Page) {
@@ -172,7 +188,7 @@ export async function officerOpenFromQueue(officer: Page, name: string) {
 }
 
 export async function officerRefuse(officer: Page, reasonLabel: string) {
-  await officer.getByRole('button', { name: /^Refuse/ }).click()
+  await officer.getByRole('button', { name: /^Reject with reason/ }).click()
   const dlg = officer.getByRole('dialog')
   await expect(dlg).toBeVisible()
   await dlg.getByRole('radio', { name: new RegExp(reasonLabel) }).click()
