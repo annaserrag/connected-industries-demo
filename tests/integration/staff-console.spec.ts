@@ -55,7 +55,7 @@ const auditText = (page: Page) => page.evaluate(() => JSON.stringify((window as 
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('sign-in page looks like the gateway: two method cards, no simulated wording', async ({ page }) => {
+test('sign-in page looks like the gateway: two method cards, visible demo access, no simulated wording', async ({ page }) => {
   const errors = track(page)
   await boot(page)
   await expect(page.getByRole('heading', { level: 1, name: 'Staff identification' })).toBeVisible()
@@ -66,7 +66,9 @@ test('sign-in page looks like the gateway: two method cards, no simulated wordin
   await page.getByRole('button', { name: 'Español' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Identificación del personal' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Acceder con certificado' })).toBeVisible()
-  await expect(page.locator('body')).not.toContainText(/Simulado|demostración/)
+  await expect(page.locator('body')).not.toContainText(/Simulado/)
+  // the demo access box shows the fictional PIN and user/password for recording
+  await expect(page.getByTestId('staff-demo-access')).toContainText('2580')
   await page.getByRole('button', { name: 'English' }).click()
   expect(errors).toEqual([])
 })
