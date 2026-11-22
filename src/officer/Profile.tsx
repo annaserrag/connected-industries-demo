@@ -51,7 +51,7 @@ export function ProfilePage() {
         <Avatar initials={officer.name.split(' ').map(p => p[0]).join('').slice(0, 2)} hue={226} size={56} />
         <div className="min-w-0">
           <h1 className="font-display text-[28px] font-bold text-ink">{tr(S.profileTitlePage)}</h1>
-          <p className="text-sm text-muted">{officer.name} · <span>{officer.office}</span>{profile && <> · {postLabel(profile.post, lang)}</>}</p>
+          <p className="text-sm text-muted">{officer.name} · <span>{tr(officer.office)}</span>{profile && <> · {postLabel(profile.post, lang)}</>}</p>
         </div>
         {!editing && source && (
           <Btn variant={profile ? 'secondary' : 'primary'} className="ml-auto" onClick={() => setEditing(true)}>

@@ -134,15 +134,6 @@ export const Badge = ({ tone = 'neutral', children, className, icon, size = 'sm'
   </span>
 )
 
-/**
- * Kept for API compatibility, renders nothing: the public platform shows no "Simulated" labels.
- * What is simulated is disclosed once, on the About page (/about).
- */
-export const SimulatedBadge = (_props: { label?: string; className?: string }) => null
-
-/** Kept for API compatibility, renders nothing. Policy proposals are listed on the About page. */
-export const PolicyBadge = (_props: { className?: string }) => null
-
 const statusMeta: Record<StatusId | 'draft', { tone: Tone; icon: ReactNode }> = {
   draft: { tone: 'neutral', icon: <CircleDashed aria-hidden /> },
   received: { tone: 'info', icon: <Inbox aria-hidden /> },

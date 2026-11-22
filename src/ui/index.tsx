@@ -2,7 +2,7 @@
 export { cn, useLang, useTr, DUR, SPRING, SPRING_POP } from './utils'
 export {
   Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-  Badge, SimulatedBadge, PolicyBadge, StatusPill, RiskBadge, RouteBadge, Avatar,
+  Badge, StatusPill, RiskBadge, RouteBadge, Avatar,
   Spinner, Kbd, Skeleton, LiveDot, Divider, Callout, TextLink,
 } from './primitives'
 export type { ButtonProps, ButtonVariant, ButtonSize, Tone } from './primitives'
@@ -23,4 +23,3 @@ export {
   PageTransition, Stagger, StaggerItem, ConfettiBurst, ChipReadAnimation, FaceScanAnimation, AbstractFace,
 } from './motion'
 export type { ChipReadState, FaceScanState } from './motion'
-export { DemoPanel } from './DemoPanel'

@@ -7,8 +7,8 @@ import { BadgeCheck, CreditCard, Globe, IdCard, Inbox, Nfc, ScanFace, Smartphone
 import {
   Avatar, Badge, Button, Callout, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, CheckRow,
   ChipReadAnimation, ConfettiBurst, CountUp, Dialog, DialogClose, EmptyState, ErrorState, FaceScanAnimation, Field,
-  Footer, Input, Kbd, LangToggle, LiveDot, LoadingState, Logo, PageHeader, PhoneFrame, PolicyBadge, RadioCards,
-  RiskBadge, RouteBadge, ScoreBar, Select, SimulatedBadge, Skeleton, Spinner, StatusPill, Stepper, Switch, Textarea,
+  Footer, Input, Kbd, LangToggle, LiveDot, LoadingState, Logo, PageHeader, PhoneFrame, RadioCards,
+  RiskBadge, RouteBadge, ScoreBar, Select, Skeleton, Spinner, StatusPill, Stepper, Switch, Textarea,
   Toaster, toast, CheckTick, Stagger, StaggerItem,
 } from '@/ui'
 import type { CheckOutcome } from '@/contract/types'
@@ -37,7 +37,7 @@ function CitizenMock() {
         options={[
           { value: 'A', label: 'EU digital ID (eIDAS)', description: 'Log in with your own national eID.', icon: <Globe /> },
           { value: 'B', label: 'Passport chip + face check', description: 'Your phone reads the chip and checks your face.', icon: <Nfc />, badge: <Badge tone="success" icon={<BadgeCheck />}>Recommended</Badge> },
-          { value: 'F', label: 'Video call with an officer', description: 'For red-card and NIE paper holders.', icon: <Video />, badge: <PolicyBadge /> },
+          { value: 'F', label: 'Video call with an officer', description: 'For red-card and NIE paper holders.', icon: <Video /> },
         ]}
       />
       <Button size="lg" block>Continue</Button>
@@ -82,7 +82,6 @@ function Kit() {
         <Section title="Badges & pills">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>Neutral</Badge><Badge tone="info">Info</Badge><Badge tone="success">Success</Badge><Badge tone="warning">Warning</Badge><Badge tone="danger">Danger</Badge>
-            <SimulatedBadge /><PolicyBadge />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {(['draft', 'received', 'checking', 'need_info', 'approved', 'not_approved'] as const).map(s => <StatusPill key={s} status={s} />)}
@@ -107,7 +106,7 @@ function Kit() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-1.5">
-                <CheckRow label="Chip read (NFC)" outcome={outcomes[0]} detail="Chip read in 2.1 s" trailing={<SimulatedBadge />} />
+                <CheckRow label="Chip read (NFC)" outcome={outcomes[0]} detail="Chip read in 2.1 s" />
                 <CheckRow label="Liveness" outcome={outcomes[1]} detail="Natural micro-movement and depth" score={0.98} threshold={0.85} />
                 <CheckRow label="Face match" outcome={outcomes[2]} detail="Below threshold: new glasses" score={0.86} threshold={0.9} />
                 <CheckRow label="Chip signature" outcome={outcomes[3]} detail="Not issued by a trusted authority" />
@@ -128,7 +127,7 @@ function Kit() {
             <Card className="p-5"><Stepper current={2} steps={[{ label: 'Received' }, { label: 'Checking' }, { label: 'Need info', state: 'warning' }, { label: 'Approved' }]} /></Card>
             <Card className="space-y-3 p-5">
               <ScoreBar label="Liveness" value={0.42} threshold={0.85} />
-              <div className="flex items-center gap-3"><CheckTick size={32} /><span className="font-display text-3xl font-semibold"><CountUp value={21558192} /></span><SimulatedBadge /></div>
+              <div className="flex items-center gap-3"><CheckTick size={32} /><span className="font-display text-3xl font-semibold"><CountUp value={21558192} /></span></div>
             </Card>
           </Section>
         </div>
@@ -183,7 +182,6 @@ function Kit() {
                 <StaggerItem><p className="text-center text-muted">Basic level granted. The advanced level is being reviewed by a person.</p></StaggerItem>
                 <StaggerItem><Card className="space-y-2 p-4"><div className="flex items-center justify-between"><span className="font-semibold">Basic level</span><StatusPill status="approved" /></div><div className="flex items-center justify-between"><span className="font-semibold">Advanced level</span><Badge tone="info" icon={<IdCard />}>In review</Badge></div></Card></StaggerItem>
                 <StaggerItem><Button block size="lg" onClick={() => setConfetti(c => c + 1)} icon={<CreditCard className="size-5" />}>Celebrate</Button></StaggerItem>
-                <StaggerItem><div className="flex justify-center"><SimulatedBadge /></div></StaggerItem>
               </Stagger>
             </PhoneFrame>
             <Card className="w-[300px] p-5"><FaceScanAnimation state="idle" hue={150} showSimulated /><div className="mt-4 flex justify-center"><Button icon={<ScanFace className="size-5" />}>Start face check</Button></div></Card>

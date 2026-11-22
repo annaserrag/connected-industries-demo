@@ -112,7 +112,7 @@ export interface RadioCardOption {
   label: ReactNode
   description?: ReactNode
   icon?: ReactNode
-  /** Small badge on the right (e.g. <PolicyBadge/>). */
+  /** Small badge on the right (e.g. a tag). */
   badge?: ReactNode
   disabled?: boolean
 }

@@ -19,8 +19,8 @@ const b = (en: string, es: string): Bilingual => ({ en, es })
 
 export const GOV_TAGLINE: Bilingual = b('Electronic identity registration', 'Registro de identidad electrónica')
 export const GOV_COPYRIGHT: Bilingual = b(
-  '© 2026 Get your Cl@ve · Academic prototype — IE University',
-  '© 2026 Get your Cl@ve · Prototipo académico — IE University',
+  '© 2026 Get your Cl@ve · Academic prototype of IE University',
+  '© 2026 Get your Cl@ve · Prototipo académico de IE University',
 )
 
 export interface GovNavItem { to: string; label: Bilingual; description?: Bilingual }

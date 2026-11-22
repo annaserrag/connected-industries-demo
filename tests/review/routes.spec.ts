@@ -7,8 +7,8 @@ import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import { BASE, SHOTS, attachConsole, citizenSignIn, isFictionalDniNie, shot, staffCertificateSignIn, watch, type Problems } from './helpers'
 
-const FOOT_EN = '© 2026 Get your Cl@ve · Academic prototype — IE University'
-const FOOT_ES = '© 2026 Get your Cl@ve · Prototipo académico — IE University'
+const FOOT_EN = '© 2026 Get your Cl@ve · Academic prototype of IE University'
+const FOOT_ES = '© 2026 Get your Cl@ve · Prototipo académico de IE University'
 /** Words that mark a screen as a demo. What is simulated is listed once, on /about. */
 const MARKERS = /\bSimulated\b|\bSimulad[oa]s?\b|Demo data|Datos de demo|\(demo\)|\bDEMO-|Demo mode|Modo demo/
 

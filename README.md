@@ -2,7 +2,7 @@
 
 Student prototype (IE University, Connected Industries, Smart Cities & E-Government, Group 10). Not an official Government of Spain service.
 
-The platform looks and behaves like a real Spanish e-government service (style inspired by clave.gob.es and the Cl@ve sign-in gateway, with no official logos). There is **no demo mode** and no "Simulated" labels on the screens: everything that is simulated (AI engine, eIDAS, chip read, face check, residence check, staff certificates, the statistics page numbers), the two policy proposals and the open assumptions are listed once, on **About this platform** (`/#/about`). Every page has the footer line "© 2026 Get your Cl@ve · Academic prototype — IE University".
+The platform looks and behaves like a real Spanish e-government service (style inspired by clave.gob.es and the Cl@ve sign-in gateway, with no official logos). There is **no demo mode** and no "Simulated" labels on the screens: everything that is simulated (AI engine, eIDAS, chip read, face check, residence check, staff certificates, the statistics page numbers), the two policy proposals and the open assumptions are listed once, on **About this platform** (`/#/about`). Every page has the footer line "© 2026 Get your Cl@ve · Academic prototype of IE University".
 
 ## Run it
 
@@ -17,6 +17,20 @@ Then open http://localhost:4173. Fonts (Nunito Sans, Merriweather) are bundled w
 **Citizen and staff side by side:** open http://localhost:4173/#/citizen and http://localhost:4173/#/officer in two windows of the *same browser* (live sync uses BroadcastChannel + localStorage). To start over, use **Privacy → Delete the data in this browser** (`/#/privacy`): it removes accounts created on the form, signs everyone out and puts the eight personas back at the start.
 
 Pages: `/` home · `/citizen` sign in / create account (gateway-style method cards) · `/officer` staff console · `/dashboard` service statistics (linked from the menu only) · `/help` · `/about` · `/accessibility` · `/legal` · `/privacy`.
+
+## Public URL (Hugging Face Space)
+
+The app is a static site (relative paths, hash routing), so it runs as a Hugging Face **static Space** with no server.
+
+1. Create a token with **write** access at huggingface.co/settings/tokens.
+2. From the repo folder:
+
+   ```
+   HF_TOKEN=hf_xxx HF_SPACE=<your-user>/get-your-clave npm run deploy:hf
+   ```
+
+   The script builds the app, creates the Space (public, SDK "static") if it does not exist, and uploads the build. Run it again after every change to redeploy. The token is read from the environment only; it is never saved to disk or committed.
+3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.hf.space`), so both windows share the same browser storage: `…hf.space/#/citizen` and `…hf.space/#/officer`.
 
 ## Citizen accounts (team only)
 

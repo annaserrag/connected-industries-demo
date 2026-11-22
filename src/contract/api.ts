@@ -140,7 +140,6 @@ export const PATHS = {
   officerProfile: '/officer/profile',           // the officer's job details
   officerAll: '/officer/applications',          // every application, searchable
   dashboard: '/dashboard',                       // screen 9   — dashboard area exports <DashboardPage/>
-  demo: '/demo',                                 // demo mode  — design area exports <DemoPanel/>
 } as const
 
 /**
@@ -148,7 +147,7 @@ export const PATHS = {
  *   '@/citizen'   → LandingPage, CitizenApp
  *   '@/officer'   → OfficerApp
  *   '@/dashboard' → DashboardPage
- *   '@/ui'        → DemoPanel + the UI kit below
+ *   '@/ui'        → the UI kit below
  * Query params: `?embed=1` hides the app chrome (used by the demo panel iframes).
  */
 
@@ -159,8 +158,6 @@ export const PATHS = {
  *  Button        ({ variant?: 'primary'|'secondary'|'ghost'|'danger', size?: 'sm'|'md'|'lg', asChild?, ...button props })
  *  Card          ({ className?, children })      CardHeader, CardTitle, CardContent
  *  Badge         ({ tone?: 'neutral'|'info'|'success'|'warning'|'danger', children })
- *  SimulatedBadge({ label?: string })            — the "Simulated" pill, use on every simulated thing
- *  PolicyBadge   ()                              — the "Policy proposal" pill
  *  StatusPill    ({ status: StatusId|'draft' })
  *  RiskBadge     ({ risk: RiskLevel })
  *  RouteBadge    ({ route: RouteId })

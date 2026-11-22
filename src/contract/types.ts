@@ -162,7 +162,7 @@ export interface Actor {
 export interface Officer {
   id: string
   name: string
-  office: string
+  office: Bilingual
 }
 
 /* ------------------------------------------------------------ staff access

@@ -35,12 +35,6 @@ import type {
 } from './types'
 
 export const SERVICE_NAME = 'Get your Cl@ve'
-export const FOOTER_DISCLAIMER: Bilingual = {
-  en: 'Student prototype — not an official Government of Spain service.',
-  es: 'Prototipo de estudiantes — no es un servicio oficial del Gobierno de España.',
-}
-export const SIMULATED_LABEL: Bilingual = { en: 'Simulated', es: 'Simulado' }
-export const POLICY_PROPOSAL_LABEL: Bilingual = { en: 'Policy proposal', es: 'Propuesta normativa' }
 export const STATE_VERSION = 4
 
 /* ------------------------------------------------------------- key rule */
@@ -280,13 +274,13 @@ export const DECISION_RULES: DecisionRule[] = [
     },
   },
   {
-    situation: { en: 'Minor registering with a parent (prototype rule)', es: 'Menor que se registra con su madre o padre (regla del prototipo)' },
+    situation: { en: 'Minor registering with a parent', es: 'Menor que se registra con su madre o padre' },
     route: 'B',
     automaticOutcome: { en: 'None', es: 'Ninguno' },
     toOfficerWhen: { en: 'Always: an officer confirms the guardian link', es: 'Siempre: una persona funcionaria confirma el vínculo' },
   },
   {
-    situation: { en: 'Red-card holder (policy proposal)', es: 'Titular de tarjeta roja (propuesta normativa)' },
+    situation: { en: 'Red-card holder', es: 'Titular de tarjeta roja' },
     route: 'FALLBACK',
     automaticOutcome: { en: 'None', es: 'Ninguno' },
     toOfficerWhen: { en: 'Always: video call with an officer', es: 'Siempre: videollamada con una persona funcionaria' },
@@ -514,7 +508,7 @@ export const REFERENCE_FIGURES: ReferenceFigure[] = [
 ]
 
 /* ------------------------------------------------- simulated dashboard data
- * Every number below is SIMULATED and must be labelled "Simulated" wherever shown.
+ * Illustrative post-launch figures for the statistics page; disclosed on the About page.
  */
 export const SIMULATED_INDICATORS: SimulatedIndicator[] = [
   { id: 'time_to_advanced', simulated: true, label: { en: 'Time to advanced level: foreigners vs Spaniards', es: 'Tiempo hasta el nivel avanzado: extranjeros frente a españoles' } },
@@ -543,9 +537,9 @@ export const SIMULATED_DASHBOARD = {
 /* ---------------------------------------------------------------- officers */
 
 export const OFFICERS: Officer[] = [
-  { id: 'OF-DEMO-07', name: 'Laura Navarro', office: 'Registration office · Madrid' },
-  { id: 'OF-DEMO-12', name: 'Javier Prieto', office: 'Registration office · Valencia' },
-  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: 'Registration office · Sevilla' },
+  { id: 'OF-DEMO-07', name: 'Laura Navarro', office: { en: 'Registration office · Madrid', es: 'Oficina de registro · Madrid' } },
+  { id: 'OF-DEMO-12', name: 'Javier Prieto', office: { en: 'Registration office · Valencia', es: 'Oficina de registro · Valencia' } },
+  { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: { en: 'Registration office · Sevilla', es: 'Oficina de registro · Sevilla' } },
 ]
 
 /* ------------------------------------------------------------ staff access (simulated) */
@@ -780,10 +774,10 @@ export const CASE_LIBRARY: LibrarySeed[] = [
     presetAnswers: { nationalityGroup: 'non_eu', document: 'RED_CARD', hasEuEid: false, assisted: false },
     policyProposal: true,
     scenario: {
-      en: 'Excluded today. Under our policy proposal, his red card has no chip, so he goes straight to a video call with an officer.',
-      es: 'Hoy está excluido. Con nuestra propuesta normativa, su tarjeta roja no tiene chip, así que va directo a videollamada con una funcionaria.',
+      en: 'His red card has no chip, so he goes straight to a video call with an officer.',
+      es: 'Su tarjeta roja no tiene chip, así que va directo a videollamada con una funcionaria.',
     },
-    demoBeat: { en: 'Policy proposal · red-card holders', es: 'Propuesta normativa · titulares de tarjeta roja' },
+    demoBeat: { en: 'Red-card holders', es: 'Titulares de tarjeta roja' },
     simulation: {
       attempts: [{
         chip_read: { outcome: 'skipped', detail: { en: 'Document has no chip', es: 'El documento no tiene chip' } },

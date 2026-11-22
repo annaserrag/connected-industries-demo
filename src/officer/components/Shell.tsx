@@ -137,7 +137,7 @@ function useIdentity() {
   return {
     officer,
     initials: officer ? officer.name.split(' ').map(p => p[0]).join('').slice(0, 2) : '',
-    officeText: office ? `${tr(office.name)} · ${office.code}` : officer?.office ?? '',
+    officeText: office ? `${tr(office.name)} · ${office.code}` : (officer ? tr(officer.office) : ''),
     postText: profile ? postLabel(profile.post, lang) : '',
   }
 }

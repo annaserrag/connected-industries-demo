@@ -150,7 +150,7 @@ export const CheckRow = ({ label, outcome, detail, score, threshold, icon, trail
   label: ReactNode; outcome: CheckOutcome; detail?: ReactNode; score?: number; threshold?: number
   /** Optional leading icon shown before the label (e.g. a lucide icon for the check type). */
   icon?: ReactNode
-  /** Right side slot (e.g. <SimulatedBadge/>). */
+  /** Right side slot (e.g. a status tag). */
   trailing?: ReactNode
   className?: string; compact?: boolean
 }) => {

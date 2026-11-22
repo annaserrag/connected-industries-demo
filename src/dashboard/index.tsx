@@ -26,7 +26,7 @@ function Footnote() {
   )
 }
 
-/** Public "Service statistics" page in the platform's style. No "Simulated" labels: the About page discloses the data. */
+/** Public "Service statistics" page in the platform's style. */
 export function DashboardPage() {
   const tr = useTr()
   const lang = useLang()

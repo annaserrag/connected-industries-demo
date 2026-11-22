@@ -8,11 +8,6 @@ export const COPY = {
     en: 'How the new registration is doing for foreigners and Spaniards: time to the advanced level, office visits, corrected rejections and appeals.',
     es: 'Cómo funciona el nuevo registro para personas extranjeras y españolas: tiempo hasta el nivel avanzado, visitas a oficina, denegaciones corregidas y recursos.',
   },
-  bannerTitle: { en: 'Simulated data', es: 'Datos simulados' },
-  bannerBody: {
-    en: 'Every number in the charts and tiles below is invented for a student prototype. They show what we would measure after launch, not real results.',
-    es: 'Todas las cifras de los gráficos e indicadores son inventadas para un prototipo de estudiantes. Muestran lo que mediríamos tras el lanzamiento, no resultados reales.',
-  },
   bannerAside: {
     en: 'Real published figures appear only in the “Context” section, with year and source.',
     es: 'Las cifras reales publicadas aparecen solo en la sección «Contexto», con año y fuente.',

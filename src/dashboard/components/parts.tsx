@@ -5,7 +5,7 @@ import { cn } from '@/ui'
 import { COPY } from '../copy'
 import { useTr } from './hooks'
 
-/** Formerly the "Simulated" pill; the public statistics page no longer labels cards (the About page discloses it). */
+/** Small tag slot on a statistics card (renders nothing today). */
 export function Sim() {
   return null
 }
@@ -77,7 +77,7 @@ export function DataTable({ spec, id, visible }: { spec: TableSpec; id: string; 
   )
 }
 
-/** Card wrapper for a simulated chart: title, takeaway, Simulated badge, chart (role=img) and a data-table toggle. */
+/** Card wrapper for a simulated chart: title, takeaway, chart (role=img) and a data-table toggle. */
 export function ChartCard({
   title,
   takeaway,
