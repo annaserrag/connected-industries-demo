@@ -14,7 +14,7 @@ export function applications(s: AppState): Case[] {
   return Object.values(s.cases).filter(c => c.status !== 'draft')
 }
 
-/** Queue size per priority tier (with the age bump). */
+/** Queue size per priority tier. */
 export function countsByTier(s: AppState, now: Date = new Date()): Record<PriorityTier, number> {
   const out = Object.fromEntries(TIER_ORDER.map(t => [t, 0])) as Record<PriorityTier, number>
   for (const c of officerQueue(s, now)) out[priorityOf(c, now)]++

@@ -157,7 +157,7 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                           {bumped && (
                             <Tip content={fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}>
                               <span data-testid="age-bump" tabIndex={0} className="mt-1 ml-auto flex w-fit items-center gap-0.5 rounded-full bg-warning-soft px-1.5 py-0.5 text-[11px] font-bold text-warning outline-none focus-visible:ring-2 focus-visible:ring-brand">
-                                <ArrowUp className="size-3" aria-hidden />{tr(S.bumpedShort)}
+                                <ArrowUp className="size-3" aria-hidden />{fill(tr(S.bumpedShort), { h: PRIORITY_AGE_BUMP_HOURS })}
                                 <span className="sr-only">: {fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}</span>
                               </span>
                             </Tip>

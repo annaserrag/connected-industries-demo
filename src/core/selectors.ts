@@ -7,8 +7,8 @@ import { PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS } from '@/contract/seed'
  *   P1 any high-risk flag · P2 open appeal · P3 citizen answered an info request (status 'checking') ·
  *   P5 Fallback route with the officer video call pending · P6 basic granted + advanced pending_review and
  *   nothing else flagged · P4 everything else that needs a decision.
- * Age bump: waiting longer than PRIORITY_AGE_BUMP_HOURS moves a case up one tier (never above P1). A bumped
- * case joins the back of its new tier (after the cases native to it), so fresh fraud still comes first.
+ * A case always stays in the tier that matches its reason (an appeal is never shown as "possible fraud").
+ * Waiting longer than PRIORITY_AGE_BUMP_HOURS moves it to the front of its own tier and marks it as overdue.
  */
 export const TIER_ORDER: PriorityTier[] = PRIORITY_TIERS.map(t => t.id)
 const tierIndex = (t: PriorityTier) => TIER_ORDER.indexOf(t)
@@ -21,7 +21,7 @@ export function waitingSince(c: Case): string {
   return times.reduce((a, b) => (b > a ? b : a))
 }
 
-/** The tier before the age bump. */
+/** The priority tier that matches the reason the case needs an officer. */
 export function baseTierOf(c: Case): PriorityTier {
   if (c.risk === 'high' || c.flags.some(f => f.severity === 'high')) return 'p1_high_risk'
   if (c.appeal?.state === 'open') return 'p2_appeal'
@@ -36,22 +36,21 @@ export function waitingHours(c: Case, now: Date = new Date()): number {
   return Math.max(0, (now.getTime() - new Date(waitingSince(c)).getTime()) / 3_600_000)
 }
 
-/** True when the age bump moved this case up a tier. */
+/** True when the case has waited longer than PRIORITY_AGE_BUMP_HOURS: it goes first within its own tier. */
 export function isAgeBumped(c: Case, now: Date = new Date()): boolean {
-  return baseTierOf(c) !== 'p1_high_risk' && waitingHours(c, now) > PRIORITY_AGE_BUMP_HOURS
+  return waitingHours(c, now) > PRIORITY_AGE_BUMP_HOURS
 }
 
-/** The tier a queued case sits in, with the age bump applied. */
-export function priorityOf(c: Case, now: Date = new Date()): PriorityTier {
-  const base = baseTierOf(c)
-  return isAgeBumped(c, now) ? TIER_ORDER[Math.max(0, tierIndex(base) - 1)] : base
+/** The tier a queued case sits in. Waiting time never moves a case into another tier. */
+export function priorityOf(c: Case, _now: Date = new Date()): PriorityTier {
+  return baseTierOf(c)
 }
 
-/** Cases waiting for an officer: by tier (with age bump), cases native to the tier before bumped ones, then oldest first. */
+/** Cases waiting for an officer: by tier, overdue cases first within the tier, then oldest first. */
 export function officerQueue(s: AppState, now: Date = new Date()): Case[] {
   const key = new Map<string, [number, number, string]>()
   for (const c of Object.values(s.cases)) {
-    if (c.awaitingOfficer) key.set(c.id, [tierIndex(priorityOf(c, now)), tierIndex(baseTierOf(c)), waitingSince(c)])
+    if (c.awaitingOfficer) key.set(c.id, [tierIndex(baseTierOf(c)), isAgeBumped(c, now) ? 0 : 1, waitingSince(c)])
   }
   return Object.values(s.cases)
     .filter(c => c.awaitingOfficer)

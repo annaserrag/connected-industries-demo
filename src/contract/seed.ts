@@ -652,7 +652,7 @@ export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bi
   { id: 'p5_video_call', label: { en: 'P5 · Video call', es: 'P5 · Videollamada' }, why: { en: 'Fallback route: the citizen is waiting for a video call.', es: 'Vía alternativa: la persona espera una videollamada.' } },
   { id: 'p6_advanced_review', label: { en: 'P6 · Advanced level', es: 'P6 · Nivel avanzado' }, why: { en: 'Basic level already granted; advanced level always gets a human review.', es: 'Nivel básico ya concedido; el avanzado siempre lo revisa una persona.' } },
 ]
-/** A case waiting longer than this moves up one priority tier. */
+/** A case waiting longer than this goes first within its own priority tier. */
 export const PRIORITY_AGE_BUMP_HOURS = 24
 export const SYSTEM_ACTOR = { kind: 'system' as const, id: 'ENGINE', name: 'Verification engine (simulated)' }
 

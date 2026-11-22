@@ -445,11 +445,11 @@ export const S = {
   /* queue priority */
   priority: b('Priority', 'Prioridad'),
   legend: b(
-    'Order: P1 high risk → P6 advanced level, then oldest first. A case waiting over {h} h moves up one tier.',
-    'Orden: P1 riesgo alto → P6 nivel avanzado, y después el más antiguo primero. Un caso que espera más de {h} h sube un nivel.',
+    'Order: P1 high risk → P6 advanced level, then oldest first. A case waiting over {h} h goes first within its tier.',
+    'Orden: P1 riesgo alto → P6 nivel avanzado, y después el más antiguo primero. Un caso que espera más de {h} h va primero dentro de su nivel.',
   ),
-  bumped: b('Moved up from {tier}: waiting over {h} h', 'Sube desde {tier}: espera más de {h} h'),
-  bumpedShort: b('+1 tier', '+1 nivel'),
+  bumped: b('Waiting over {h} h: shown first in {tier}', 'Espera más de {h} h: aparece primero en {tier}'),
+  bumpedShort: b('Over {h} h', 'Más de {h} h'),
   whyTier: b('Why this tier', 'Por qué este nivel'),
   casesN: b('cases', 'casos'),
   caseOne: b('case', 'caso'),

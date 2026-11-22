@@ -113,7 +113,7 @@ export interface ClaveActions {
 
 /** Derived selectors exported from '@/core/selectors'. */
 export interface ClaveSelectors {
-  /** Cases waiting for an officer, sorted by priority tier (PRIORITY_TIERS, with the age bump), then oldest first. */
+  /** Cases waiting for an officer, sorted by priority tier (PRIORITY_TIERS); within a tier, cases waiting over 24 h first, then oldest first. */
   officerQueue(state: AppState): Case[]
   /** The tier a queued case sits in (with the PRIORITY_AGE_BUMP_HOURS bump applied). */
   priorityOf(c: Case, now?: Date): PriorityTier

@@ -323,7 +323,7 @@ test('the console menu never disappears: full sidebar, icon rail, phone drawer',
   await ctx.close()
 })
 
-test('queue follows the priority tiers, with the age bump', async ({ page }) => {
+test('queue follows the priority tiers; overdue cases go first within their own tier', async ({ page }) => {
   const errors = track(page)
   await boot(page)
   const r = await page.evaluate(async () => {
@@ -350,15 +350,15 @@ test('queue follows the priority tiers, with the age bump', async ({ page }) => 
   expect(r.tiers.daniel).toBe('p6_advanced_review')
   expect(r.tiers['bg-09']).toBe('p5_video_call')
   expect(r.tiers['bg-03']).toBe('p4_medium_risk')
-  // Aisha's appeal has waited over 24 h: moved up from P2 to P1, behind the fresh high-risk case
-  expect(r.tiers['bg-07']).toBe('p1_high_risk')
+  // Aisha's appeal has waited over 24 h: it stays an appeal (never "possible fraud") and goes first among appeals
+  expect(r.tiers['bg-07']).toBe('p2_appeal')
   expect(r.q.indexOf('deepfake')).toBeLessThan(r.q.indexOf('bg-07'))
   expect(r.q.indexOf('bg-07')).toBeLessThan(r.q.indexOf('giulia'))
   expect(r.q.indexOf('giulia')).toBeLessThan(r.q.indexOf('bg-03'))
   expect(r.q.indexOf('bg-03')).toBeLessThan(r.q.indexOf('bg-09'))
   expect(r.q.indexOf('bg-09')).toBeLessThan(r.q.indexOf('daniel'))
-  // age bump: one tier up after 24 h, never above P1
-  expect(r.later).toEqual({ daniel: 'p5_video_call', bg03: 'p3_citizen_replied', deepfake: 'p1_high_risk' })
+  // waiting time never changes the tier
+  expect(r.later).toEqual({ daniel: 'p6_advanced_review', bg03: 'p4_medium_risk', deepfake: 'p1_high_risk' })
 
   // UI: tier groups in order, legend, bump indicator
   await page.goto(`${D}#/officer`)
