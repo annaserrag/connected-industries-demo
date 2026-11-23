@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useReducedMotion } from 'framer-motion'
 import type { Bilingual, Case, Lang } from '@/contract/types'
-import { useClave, actions } from '@/core/store'
+import { useClave } from '@/core/store'
 import { relativeTime } from '@/core/selectors'
 
 /** Lang-reactive translator (re-renders when the language changes). */
@@ -79,26 +79,83 @@ export function fmtTime(d: Date, lang: Lang) {
   return d.toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-/* ---- tiny per-tab memory for the booked video-call slot (convenience only) ---- */
-const SLOT_KEY = (id: string) => `getyourclave.citizen.slot.${id}`
-export function saveSlot(id: string, iso: string) {
-  try { sessionStorage.setItem(SLOT_KEY(id), iso) } catch { /* ignore */ }
-  try { actions.bookVideoCall(id, iso) } catch (e) { console.warn('[citizen] bookVideoCall', e) }
+/* ---- per-browser conveniences (localStorage / sessionStorage, always wrapped) ---- */
+
+const LARGE_KEY = 'getyourclave.citizen.largeText'
+const largeListeners = new Set<() => void>()
+function readLarge(): boolean {
+  try { return localStorage.getItem(LARGE_KEY) === '1' } catch { return false }
 }
-export function readSlot(id: string): string | null {
-  const fromStore = useClave.getState().cases[id]?.videoCallSlot
-  if (fromStore) return fromStore
-  try { return sessionStorage.getItem(SLOT_KEY(id)) } catch { return null }
-}
-export function clearSlot(id: string) {
-  try { sessionStorage.removeItem(SLOT_KEY(id)) } catch { /* ignore */ }
+let largeText = typeof window !== 'undefined' ? readLarge() : false
+/** MSG-HELP-01 "Letra grande": remembered per browser. */
+export function useLargeText(): [boolean, (on: boolean) => void] {
+  const on = useSyncExternalStore(
+    cb => { largeListeners.add(cb); return () => { largeListeners.delete(cb) } },
+    () => largeText,
+    () => false,
+  )
+  const set = useCallback((v: boolean) => {
+    largeText = v
+    try { localStorage.setItem(LARGE_KEY, v ? '1' : '0') } catch { /* private mode */ }
+    largeListeners.forEach(l => l())
+  }, [])
+  return [on, set]
 }
 
-/** Three fake video-call slots later today. */
-export function todaySlots(now = new Date()): Date[] {
-  const base = new Date(now)
-  base.setSeconds(0, 0)
-  const m = base.getMinutes()
-  base.setMinutes(m - (m % 15) + 15)
-  return [45, 150, 255].map(add => new Date(base.getTime() + add * 60_000))
+/** The helper of an assisted session finished on this tab: show MSG-ASS-03 only, never the result. */
+const HELPER_DONE = (id: string) => `getyourclave.citizen.helperDone.${id}`
+export function markHelperDone(id: string) {
+  try { sessionStorage.setItem(HELPER_DONE(id), '1') } catch { /* ignore */ }
+}
+export function isHelperDone(id: string): boolean {
+  try { return sessionStorage.getItem(HELPER_DONE(id)) === '1' } catch { return false }
+}
+export function clearHelperDone() {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i)
+      if (k?.startsWith('getyourclave.citizen.helperDone.')) sessionStorage.removeItem(k)
+    }
+  } catch { /* ignore */ }
+}
+
+/** Browser speech ("Leer en voz alta"). Returns null when the browser has no speech synthesis. */
+export function useSpeech() {
+  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined'
+  const [speaking, setSpeaking] = useState(false)
+  useEffect(() => () => { if (supported) try { window.speechSynthesis.cancel() } catch { /* ignore */ } }, [supported])
+  const speak = useCallback((text: string, lang: Lang) => {
+    if (!supported) return
+    try {
+      window.speechSynthesis.cancel()
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = lang === 'es' ? 'es-ES' : 'en-GB'
+      u.onend = () => setSpeaking(false)
+      u.onerror = () => setSpeaking(false)
+      setSpeaking(true)
+      window.speechSynthesis.speak(u)
+    } catch { setSpeaking(false) }
+  }, [supported])
+  const stop = useCallback(() => {
+    try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+    setSpeaking(false)
+  }, [])
+  return supported ? { speaking, speak, stop } : null
+}
+
+export const UPLOAD_MAX = 1.5 * 1024 * 1024
+/** Reads an image file into a data URL. Rejects non-images and files over 1.5 MB with 'type' / 'size'. */
+export function readImage(file: File): Promise<{ name: string; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { reject(new Error('type')); return }
+    if (file.size > UPLOAD_MAX) { reject(new Error('size')); return }
+    const r = new FileReader()
+    r.onload = () => resolve({ name: file.name, dataUrl: String(r.result) })
+    r.onerror = () => reject(new Error('read'))
+    r.readAsDataURL(file)
+  })
+}
+
+export function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
 }

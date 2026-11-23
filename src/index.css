@@ -67,7 +67,13 @@
 html[data-embed], html[data-embed] * { scrollbar-width: none; }
 html[data-embed] ::-webkit-scrollbar { display: none; }
 
-/* Assisted mode (case 3): large text while the applicant does their part. Unlayered, so it wins over utilities. */
-.assisted-large h1 { font-size: 30px; line-height: 1.2; }
-.assisted-large p { font-size: 19px; line-height: 1.5; }
-.assisted-large button { min-height: 4.5rem; font-size: 21px; }
+
+/* Large text (MSG-HELP-01 switch, and assisted mode "Ayudo a otra persona"): every running text ≥ 20 px. */
+.citizen-large main :where(p, li, label, span, a, button, input, select, textarea, legend, dd, dt, summary, figcaption, blockquote),
+.assisted-large :where(p, li, label, span, a, button, input, select, textarea, legend, dd, dt, summary, figcaption, blockquote) {
+  font-size: max(1em, 20px) !important;
+  line-height: 1.45;
+}
+.citizen-large main h1, .assisted-large h1 { font-size: max(30px, 1em) !important; line-height: 1.2; }
+.citizen-large main h2, .assisted-large h2, .citizen-large main h3, .assisted-large h3 { font-size: max(23px, 1em) !important; line-height: 1.25; }
+.assisted-large button { min-height: 3.75rem; }

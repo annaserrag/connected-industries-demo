@@ -8,6 +8,7 @@ import { ArrowRight, BadgeCheck, ChevronRight, LogIn, Smartphone } from 'lucide-
 import type { Bilingual } from '@/contract/types'
 import { GovHeader, Illustration, InfoCard } from '@/ui'
 import { KEY_RULE, REFERENCE_FIGURES } from '@/contract/seed'
+import { MSG } from '@/contract/messages'
 import { C } from './copy'
 import { useTr } from './hooks'
 
@@ -16,18 +17,14 @@ const FIGURE_IDS = ['users', 'eidas', 'online']
 const b = (en: string, es: string): Bilingual => ({ en, es })
 /** Landing-only copy (the rest of the citizen copy lives in ./copy). */
 const L = {
-  title: b('Get your Cl@ve from your phone', 'Obtén tu Cl@ve desde tu móvil'),
   subtitle: b(
     'Register in Cl@ve with any document you live in Spain with, no appointment needed. The same steps and the same time for everyone, Spanish or not.',
     'Regístrate en Cl@ve con cualquier documento con el que vivas en España, sin cita previa. Los mismos pasos y el mismo tiempo para todo el mundo, seas o no de España.',
   ),
-  apply: b('Apply', 'Solicitar'),
   alreadyApplied: b('Already applied?', '¿Ya lo has solicitado?'),
   signIn: b('Sign in', 'Accede'),
   modes: b('Choose how you access', 'Elige cómo accedes'),
-  citizenTitle: b('Citizen', 'Ciudadanía'),
   citizenBody: b('Apply for Cl@ve or follow your application.', 'Solicita Cl@ve o sigue tu solicitud.'),
-  staffTitle: b('Staff of a registration office', 'Personal de una oficina de registro'),
   staffBody: b(
     'Review applications with your electronic certificate or staff account. Only for authorised staff.',
     'Revisa solicitudes con tu certificado electrónico o tu cuenta de personal. Solo para personal autorizado.',
@@ -82,15 +79,16 @@ export function LandingPage() {
         <section className="bg-band" aria-labelledby="landing-title">
           <div className="mx-auto grid max-w-[1200px] items-center gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.2fr_1fr]">
             <div>
-              <h1 id="landing-title" className="font-display text-[30px] leading-[1.2] font-bold text-ink sm:text-[40px]">{tr(L.title)}</h1>
-              <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed text-muted sm:text-[18px]">{tr(L.subtitle)}</p>
+              <h1 id="landing-title" className="font-display text-[30px] leading-[1.2] font-bold text-ink sm:text-[40px]" data-testid="msg-RA-01">{tr(MSG['RA-01'].title)}</h1>
+              <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed text-ink sm:text-[18px]">{tr(MSG['RA-01'])}</p>
+              <p className="mt-3 max-w-[60ch] text-[16px] leading-relaxed text-muted">{tr(L.subtitle)}</p>
               <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
                 <Link
                   to="/citizen?mode=signup"
                   data-testid="landing-apply"
                   className="inline-flex h-13 items-center gap-2.5 rounded-[2px] border-2 border-brand bg-brand px-7 text-[17px] font-bold text-brand-ink transition-colors hover:border-brand-strong hover:bg-brand-strong"
                 >
-                  <Smartphone size={20} aria-hidden />{tr(L.apply)}<ArrowRight size={18} aria-hidden />
+                  <Smartphone size={20} aria-hidden />{tr(MSG['RA-01'].button)}<ArrowRight size={18} aria-hidden />
                 </Link>
                 <p className="text-[16px] text-ink">
                   {tr(L.alreadyApplied)}{' '}
@@ -103,8 +101,8 @@ export function LandingPage() {
 
             {/* role cards */}
             <div role="group" aria-label={tr(L.modes)} className="grid gap-3" data-testid="landing-tabs">
-              <RoleCard to="/citizen" testId="landing-citizen" title={tr(L.citizenTitle)} body={tr(L.citizenBody)} icon={<Smartphone size={22} aria-hidden />} illustration="citizen" />
-              <RoleCard to="/officer" testId="landing-officer" title={tr(L.staffTitle)} body={tr(L.staffBody)} icon={<BadgeCheck size={22} aria-hidden />} illustration="office" />
+              <RoleCard to="/citizen" testId="landing-citizen" title={tr(C.iAmCitizen)} body={tr(L.citizenBody)} icon={<Smartphone size={22} aria-hidden />} illustration="citizen" />
+              <RoleCard to="/officer" testId="landing-officer" title={tr(C.iAmOfficer)} body={tr(L.staffBody)} icon={<BadgeCheck size={22} aria-hidden />} illustration="office" />
             </div>
           </div>
         </section>

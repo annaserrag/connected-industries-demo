@@ -3,16 +3,17 @@
  * centred title, then a grid of method cards (applicant number + password, create an account).
  * No test identities are listed anywhere: the team's accounts live only in the README.
  */
-import { useId, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation } from 'react-router-dom'
 import {
-  AlertCircle, ArrowUpRight, BookOpen, ChevronDown, Eye, EyeOff, FileText, IdCard, LogIn, ShieldCheck, UserPlus,
+  AlertCircle, ArrowUpRight, BookOpen, Bot, ChevronDown, Eye, EyeOff, FileText, IdCard, LogIn, ShieldCheck, UserPlus,
 } from 'lucide-react'
 import { MethodCard, cn } from '@/ui'
 import { actions, useClave } from '@/core/store'
-import { ageOn, documentsForCountry, isValidName, NAME_MAX_LENGTH, parseIsoDate, SIGNUP_MAX_AGE } from '@/core/accounts'
-import { DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_MIN_AGE, fictionalDniNie } from '@/contract/seed'
+import { ageOn, documentNumberShapeOk, documentsForCountry, isValidNamePart, parseIsoDate, SIGNUP_MAX_AGE } from '@/core/accounts'
+import { DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_MIN_AGE, fictionalDniNie, hasDniNieShape, isFictionalDniNie, normaliseDocNumber } from '@/contract/seed'
+import { MSG } from '@/contract/messages'
 import type { Bilingual, DocumentType, SignUpResult } from '@/contract/types'
 import { C, fill } from './copy'
 import { BigButton, OptionCard } from './components/basics'
@@ -199,8 +200,8 @@ function SignInForm({ onSwitch }: { onSwitch: () => void }) {
 
 /* ------------------------------------------------------- create account */
 
-type SignUpField = 'name' | 'dob' | 'country' | 'doc' | 'pwd' | 'pwd2'
-const FIELD_ORDER: SignUpField[] = ['name', 'dob', 'country', 'doc', 'pwd', 'pwd2']
+type SignUpField = 'given' | 'surnames' | 'dob' | 'country' | 'doc' | 'number' | 'expiry' | 'pwd' | 'pwd2'
+const FIELD_ORDER: SignUpField[] = ['given', 'surnames', 'dob', 'country', 'doc', 'number', 'expiry', 'pwd', 'pwd2']
 
 const todayIso = () => {
   const d = new Date()
@@ -214,11 +215,14 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
   const { tr } = useTr()
   const go = useGo()
   const reduced = useReduced()
-  const [name, setName] = useState('')
+  const [given, setGiven] = useState('')
+  const [surnames, setSurnames] = useState('')
   const [dob, setDob] = useState('')
   const [country, setCountry] = useState('')
   const [doc, setDoc] = useState<DocumentType | ''>('')
   const [docCleared, setDocCleared] = useState(false)
+  const [number, setNumber] = useState('')
+  const [expiry, setExpiry] = useState('')
   const [pwd, setPwd] = useState('')
   const [pwd2, setPwd2] = useState('')
   const [touched, setTouched] = useState<Partial<Record<SignUpField, boolean>>>({})
@@ -232,7 +236,8 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
 
   const errors = useMemo(() => {
     const e: Partial<Record<SignUpField, string>> = {}
-    if (!isValidName(name)) e.name = tr(C.errName)
+    if (!isValidNamePart(given)) e.given = tr(C.errGivenNames)
+    if (!isValidNamePart(surnames)) e.surnames = tr(C.errSurnames)
     if (!dob) e.dob = tr(C.errDobRequired)
     else {
       const age = ageOn(dob)
@@ -242,10 +247,15 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
     if (countryIndex < 0) e.country = tr(C.errCountry)
     if (!doc) e.doc = docCleared ? tr(C.errDocForCountry) : tr(C.errDocType)
     else if (!allowedDocs.includes(doc)) e.doc = tr(C.errDocForCountry)
+    const n = normaliseDocNumber(number)
+    if (!n) e.number = tr(C.errDocNumber)
+    else if (hasDniNieShape(n) && !isFictionalDniNie(n)) e.number = tr(C.errRealNumber)
+    else if (doc && !documentNumberShapeOk(doc, n)) e.number = tr(C.errDocShape)
+    if (!expiry || !parseIsoDate(expiry)) e.expiry = tr(C.errExpiry)
     if (pwd.length < PASSWORD_MIN_LENGTH) e.pwd = fill(tr(C.errWeakPassword), { n: PASSWORD_MIN_LENGTH })
     if (!pwd2 || pwd2 !== pwd) e.pwd2 = tr(C.errMismatch)
     return e
-  }, [name, dob, countryIndex, doc, docCleared, allowedDocs, pwd, pwd2, tr])
+  }, [given, surnames, dob, countryIndex, doc, docCleared, allowedDocs, number, expiry, pwd, pwd2, tr])
 
   const show = (f: SignUpField) => ((submitted || touched[f]) ? errors[f] : undefined)
   const blur = (f: SignUpField) => () => setTouched(t => ({ ...t, [f]: true }))
@@ -274,7 +284,10 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
     }
     let res: SignUpResult | null = null
     try {
-      res = actions.citizenSignUp({ fullName: name, dateOfBirth: dob, countryIndex, documentType: doc as DocumentType, password: pwd })
+      res = actions.citizenSignUp({
+        givenNames: given, surnames, dateOfBirth: dob, countryIndex, documentType: doc as DocumentType,
+        documentNumber: number, expiryDate: expiry, password: pwd,
+      })
     } catch (err) {
       console.warn('[citizen] sign-up', err)
     }
@@ -282,7 +295,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
     if (!res.ok) {
       const map: Record<typeof res.reason, Bilingual> = {
         invalid_name: C.errName, underage: C.errUnderage, weak_password: C.errWeakPassword, invalid_document_for_country: C.errDocForCountry,
-        invalid_document_number: C.errGeneric, real_document_number: C.errGeneric, duplicate_document: C.errGeneric, invalid_expiry: C.errGeneric,
+        invalid_document_number: C.errDocShape, real_document_number: C.errRealNumber, duplicate_document: C.errDuplicate, invalid_expiry: C.errExpiry,
       }
       setFormError(fill(tr(map[res.reason]), { n: res.reason === 'underage' ? SIGNUP_MIN_AGE : PASSWORD_MIN_LENGTH }))
       return
@@ -295,34 +308,29 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5" data-testid="signup-form">
+      <p className="flex gap-2 text-[15px] leading-snug text-muted" data-testid="msg-AI-01"><Bot size={17} className="mt-0.5 shrink-0" aria-hidden />{tr(MSG['AI-01'])}</p>
+      <details className="rounded-[2px] border border-line bg-band p-3.5" data-testid="msg-AI-02">
+        <summary className="cursor-pointer text-[15px] font-bold text-brand">{tr(C.aiPrepare)}</summary>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink">{tr(MSG['AI-02'])}</p>
+        <p className="mt-2 text-[14px] leading-snug text-muted">{tr(MSG['AI-03'])}</p>
+      </details>
       <FormAlert id="signup-error">{submitted && FIELD_ORDER.some(f => errors[f]) ? tr(C.fixFields) : formError}</FormAlert>
       <TextField
-        inputRef={el => { refs.current.name = el }}
-        label={tr(C.fullName)}
-        hint={tr(C.fullNameHint)}
-        error={show('name')}
-        name="name"
-        autoComplete="name"
-        autoCapitalize="words"
-        maxLength={NAME_MAX_LENGTH}
-        value={name}
-        onChange={e => setName(e.target.value)}
-        onBlur={blur('name')}
-        data-testid="signup-name"
+        inputRef={el => { refs.current.given = el }}
+        label={tr(C.givenNames)} hint={tr(C.givenNamesHint)} error={show('given')}
+        name="given-name" autoComplete="given-name" autoCapitalize="words" maxLength={60}
+        value={given} onChange={e => setGiven(e.target.value)} onBlur={blur('given')} data-testid="signup-given"
+      />
+      <TextField
+        inputRef={el => { refs.current.surnames = el }}
+        label={tr(C.surnames)} hint={tr(C.surnamesHint)} error={show('surnames')}
+        name="family-name" autoComplete="family-name" autoCapitalize="words" maxLength={60}
+        value={surnames} onChange={e => setSurnames(e.target.value)} onBlur={blur('surnames')} data-testid="signup-surnames"
       />
       <TextField
         inputRef={el => { refs.current.dob = el }}
-        label={tr(C.dateOfBirth)}
-        error={show('dob')}
-        type="date"
-        name="bday"
-        autoComplete="bday"
-        min="1900-01-01"
-        max={todayIso()}
-        value={dob}
-        onChange={e => setDob(e.target.value)}
-        onBlur={blur('dob')}
-        data-testid="signup-dob"
+        label={tr(C.dateOfBirth)} error={show('dob')} type="date" name="bday" autoComplete="bday" min="1900-01-01" max={todayIso()}
+        value={dob} onChange={e => setDob(e.target.value)} onBlur={blur('dob')} data-testid="signup-dob"
       />
 
       <div className="space-y-1.5">
@@ -377,6 +385,18 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
         <FieldError id={docErrId}>{docErr}</FieldError>
       </fieldset>
 
+      <TextField
+        inputRef={el => { refs.current.number = el }}
+        label={tr(C.documentNumber)} hint={tr(C.documentNumberHint)} error={show('number')}
+        name="document-number" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={20}
+        value={number} onChange={e => setNumber(e.target.value)} onBlur={blur('number')} data-testid="signup-number"
+      />
+      <TextField
+        inputRef={el => { refs.current.expiry = el }}
+        label={tr(C.expiryDate)} error={show('expiry')} type="date" name="document-expiry" min="1990-01-01"
+        value={expiry} onChange={e => setExpiry(e.target.value)} onBlur={blur('expiry')} data-testid="signup-expiry"
+      />
+
       <PasswordField
         inputRef={el => { refs.current.pwd = el }}
         label={tr(C.newPassword)}
@@ -426,7 +446,8 @@ export function SignIn({ notice }: { notice?: 'signedOut' | 'other' }) {
   const reduced = useReduced()
   const { search } = useLocation()
   const [mode, setMode] = useState<Mode>(() => (new URLSearchParams(search).get('mode') === 'signup' ? 'signup' : 'signin'))
-  const firstField = (m: Mode) => document.querySelector<HTMLInputElement>(m === 'signin' ? '[data-testid="signin-doc"]' : '[data-testid="signup-name"]')
+  useEffect(() => { if (new URLSearchParams(search).get('mode') === 'signup') setMode('signup') }, [search])
+  const firstField = (m: Mode) => document.querySelector<HTMLInputElement>(m === 'signin' ? '[data-testid="signin-doc"]' : '[data-testid="signup-given"]')
   const open = (m: Mode) => {
     setMode(m)
     requestAnimationFrame(() => {

@@ -1,25 +1,49 @@
+/**
+ * Route assistant (MSG-RA-02 … RA-06), one question per screen, then the recommended route (RA-07A/B/C/F/X).
+ * The answers are only stored with actions.setAnswers when the citizen confirms the result.
+ */
 import { useMemo, useState } from 'react'
-import { useParams, Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  Baby, BookOpen, Bot, ChevronDown, ChevronLeft, Earth, FileText, Globe, HandHeart, IdCard, Landmark, ShieldCheck, Smartphone, Users,
-} from 'lucide-react'
+import { ArrowRight, Baby, BookOpen, Bot, ChevronLeft, CircleHelp, FileText, HandHeart, IdCard, Smartphone, User } from 'lucide-react'
 import { Avatar, ProposedRuleTag, cn } from '@/ui'
 import { actions } from '@/core/store'
-import type { AssistantAnswers, DocumentType } from '@/contract/types'
-import {
-  ASSISTANT_QUESTIONS, CHECKS, CITIZEN_MESSAGES, DOCUMENTS, ROUTES, ROUTE_ORDER, isProposedRule, recommendRoute,
-} from '@/contract/seed'
+import type { AssistantAnswers, DocumentType, Who, YesNoUnsure } from '@/contract/types'
+import { DOCUMENT_OPTIONS, WHO_OPTIONS, YES_NO_UNSURE, type MsgId } from '@/contract/messages'
+import { SIGNUP_COUNTRIES, countryByName, recommendRoute } from '@/contract/seed'
 import { C, fill } from './copy'
-import { BigButton, OptionCard, ProgressBar, RouteCode } from './components/basics'
-import { flowPath, safe } from './Shell'
-import { useCase, useGo, useReduced, useTr } from './hooks'
+import { BigButton, OptionCard, ProgressBar } from './components/basics'
+import { Alert, SelectInput, msg } from './components/flow'
+import { flowPath } from './Shell'
+import { errText, useCase, useGo, useReduced, useTr } from './hooks'
 
-type Q = 'nationality' | 'document' | 'hasEuEid' | 'assisted' | 'result'
+type Q = 'nationality' | 'document' | 'euEid' | 'who' | 'nfc' | 'result'
+type DocAnswer = DocumentType | 'UNSURE'
 
-const DOC_ORDER: DocumentType[] = ['PASSPORT', 'TIE', 'EU_EID', 'DNI', 'NIE_PAPER', 'RED_CARD']
-const docIcon = (d: DocumentType) =>
-  d === 'PASSPORT' ? <BookOpen size={20} /> : d === 'NIE_PAPER' || d === 'RED_CARD' ? <FileText size={20} /> : <IdCard size={20} />
+const DOC_ORDER: DocAnswer[] = ['DNI', 'EU_EID', 'PASSPORT', 'TIE', 'NIE_PAPER', 'RED_CARD', 'UNSURE']
+const docIcon = (d: DocAnswer) =>
+  d === 'UNSURE' ? <CircleHelp size={20} /> : d === 'PASSPORT' ? <BookOpen size={20} /> : d === 'NIE_PAPER' || d === 'RED_CARD' ? <FileText size={20} /> : <IdCard size={20} />
+const whoIcon = (w: Who) => (w === 'self' ? <User size={20} /> : w === 'helping' ? <HandHeart size={20} /> : <Baby size={20} />)
+
+interface Draft { countryIndex: number; document: DocAnswer | null; euEid: YesNoUnsure | null; who: Who | null; nfc: YesNoUnsure | null }
+
+function toAnswers(d: Draft): AssistantAnswers {
+  const country = SIGNUP_COUNTRIES[d.countryIndex]
+  const group = country?.group ?? 'non_eu'
+  const unsure = d.document === 'UNSURE'
+  const who = d.who ?? 'self'
+  const euEid = group === 'eu' ? d.euEid : null
+  return {
+    nationalityGroup: group, nationality: country?.name.en, document: d.document && d.document !== 'UNSURE' ? d.document : 'PASSPORT', documentUnsure: unsure || undefined,
+    euEid, who, nfc: d.nfc, hasEuEid: euEid === 'yes', assisted: who === 'helping', forMinor: who === 'child',
+  }
+}
+
+/** RA-06 is asked only when the answers so far could lead to route B. */
+function nfcNeeded(d: Draft): boolean {
+  if (!d.document) return false
+  return recommendRoute(toAnswers({ ...d, nfc: null })).route === 'B'
+}
 
 export function Assistant() {
   const { id } = useParams()
@@ -27,43 +51,61 @@ export function Assistant() {
   const { tr } = useTr()
   const go = useGo()
   const reduced = useReduced()
-  const [answers, setAnswers] = useState<AssistantAnswers | null>(() => (c ? c.answers ?? c.presetAnswers : null))
+  const [draft, setDraft] = useState<Draft>(() => {
+    const a = c?.answers
+    const idx = SIGNUP_COUNTRIES.findIndex(x => x.name.en === (a?.nationality ?? c?.typed.nationality))
+    return {
+      countryIndex: idx >= 0 ? idx : SIGNUP_COUNTRIES.indexOf(countryByName(c?.typed.nationality ?? '') ?? SIGNUP_COUNTRIES[0]),
+      document: a ? (a.documentUnsure ? 'UNSURE' : a.document) : null,
+      euEid: a?.euEid ?? null,
+      who: a ? c!.session.who : null,
+      nfc: a?.nfc ?? null,
+    }
+  })
   const [i, setI] = useState(0)
   const [dir, setDir] = useState(1)
-  const [showOthers, setShowOthers] = useState(false)
-  const [minorName, setMinorName] = useState('')
-  const [minorAge, setMinorAge] = useState('')
-  const [minorErr, setMinorErr] = useState('')
+  const [error, setError] = useState('')
 
-  const steps: Q[] = useMemo(
-    () => (answers ? ['nationality', 'document', ...(answers.nationalityGroup === 'eu' ? (['hasEuEid'] as Q[]) : []), 'assisted', 'result'] : []),
-    [answers],
-  )
+  const steps: Q[] = useMemo(() => {
+    const group = SIGNUP_COUNTRIES[draft.countryIndex]?.group
+    return ['nationality', 'document', ...(group === 'eu' ? (['euEid'] as Q[]) : []), 'who', ...(nfcNeeded(draft) ? (['nfc'] as Q[]) : []), 'result']
+  }, [draft])
 
-  if (!c || !answers) return <Navigate to="/citizen" replace />
-  if (c.status !== 'draft') return <Navigate to={flowPath(c)} replace />
+  if (!c) return <Navigate to="/citizen" replace />
+  if (c.session.consents.at || c.status !== 'draft') return <Navigate to={flowPath(c)} replace />
 
   const q = steps[Math.min(i, steps.length - 1)]
-  const questionCount = steps.length - 1
-  const set = (patch: Partial<AssistantAnswers>) => setAnswers(a => ({ ...(a as AssistantAnswers), ...patch }))
-  const next = () => { setDir(1); setI(n => Math.min(n + 1, steps.length - 1)) }
+  const total = steps.length - 1
+  const set = (p: Partial<Draft>) => { setDraft(d => ({ ...d, ...p })); setError('') }
+  const answered = q === 'nationality' ? draft.countryIndex >= 0 : q === 'document' ? Boolean(draft.document) : q === 'euEid' ? Boolean(draft.euEid) : q === 'who' ? Boolean(draft.who) : q === 'nfc' ? Boolean(draft.nfc) : true
+  const next = () => {
+    if (!answered) { setError(tr(C.chooseOne)); return }
+    setDir(1); setI(n => Math.min(n + 1, steps.length - 1))
+  }
   const back = () => {
+    setError('')
     if (i === 0) { go('/citizen'); return }
     setDir(-1); setI(n => n - 1)
   }
+  const answers = toAnswers(draft)
   const rec = recommendRoute(answers)
-  const route = ROUTES[rec.route]
+  const resultId = `RA-07${rec.route}` as MsgId
+  const large = draft.who === 'helping'
 
   const confirm = () => {
-    if (answers.forMinor && !c.guardian) {
-      const age = Number(minorAge)
-      if (minorName.trim().split(/\s+/).length < 2) { setMinorErr(tr(C.minorNameError)); return }
-      if (!minorAge || !(age < 18)) { setMinorErr(tr(C.minorAgeError)); return }
-      setMinorErr('')
-      try { actions.setMinorApplicant(c.id, { name: minorName, age }) } catch (e) { setMinorErr(e instanceof Error ? e.message : String(e)); return }
-    }
-    safe(() => actions.startCase(c.id, answers, rec.route))
-    go(`/citizen/verify/${c.id}`)
+    try {
+      const country = SIGNUP_COUNTRIES[draft.countryIndex]
+      actions.setAnswers(c.id, {
+        nationality: country.name.en, nationalityGroup: country.group, document: draft.document!,
+        euEid: country.group === 'eu' ? draft.euEid : null, who: draft.who ?? 'self', nfc: steps.includes('nfc') ? draft.nfc : null,
+      })
+      if (rec.route === 'F') {
+        actions.joinVideoCall(c.id)
+        go(`/citizen/case/${c.id}`)
+        return
+      }
+      go(`/citizen/verify/${c.id}`)
+    } catch (e) { setError(errText(e)) }
   }
 
   const variants = {
@@ -71,235 +113,124 @@ export function Assistant() {
     center: { opacity: 1, x: 0 },
     exit: (d: number) => (reduced ? { opacity: 0 } : { opacity: 0, x: d * -40 }),
   }
+  const legend = 'mb-2 block font-display text-[24px] font-bold leading-tight text-ink'
+  const help = (h?: { en: string; es: string }) => h && <p className="mb-4 text-[16px] leading-relaxed text-muted">{tr(h)}</p>
 
   return (
-    <div>
-      {/* top bar: back + progress */}
+    <div className={cn(large && 'assisted-large')} data-large-text={large ? '1' : undefined} data-testid="route-assistant">
       <div className="mb-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={back}
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink hover:bg-surface-2"
-          aria-label={tr(C.back)}
-        >
+        <button type="button" onClick={back} className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink hover:bg-surface-2" aria-label={tr(C.back)}>
           <ChevronLeft size={20} aria-hidden />
         </button>
         <div className="flex-1">
-          {q !== 'result' ? (
-            <ProgressBar value={(i + 1) / (questionCount + 1)} label={fill(tr(C.questionOf), { n: i + 1, total: questionCount })} />
-          ) : (
-            <ProgressBar value={1} label={tr(C.recommendedFor)} />
-          )}
+          <ProgressBar value={q === 'result' ? 1 : (i + 1) / (total + 1)} label={q === 'result' ? tr(C.yourRoute) : fill(tr(C.questionOf), { n: i + 1, total })} />
         </div>
       </div>
 
       {i === 0 && (
-        <div className="mb-5 flex items-center gap-3 rounded-[2px] bg-surface p-3 border border-line">
+        <div className="mb-5 flex items-center gap-3 rounded-[2px] border border-line bg-surface p-3">
           <Avatar initials={c.persona.initials} hue={c.persona.hue} size={40} />
-          <p className="text-[13px] leading-snug text-muted">
-            <span className="font-bold text-ink">{tr(C.hello)}, {c.persona.name.split(' ')[0]}.</span> {tr(C.assistantIntro)}
-          </p>
+          <p className="text-[15px] leading-snug text-ink"><span className="font-bold">{tr(C.hello)}, {c.typed.data.givenNames.split(' ')[0]}.</span> {tr(msg('RA-01'))}</p>
         </div>
       )}
 
       <AnimatePresence mode="wait" custom={dir} initial={false}>
-        <motion.section
-          key={q}
-          custom={dir}
-          variants={variants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: reduced ? 0.12 : 0.22, ease: 'easeOut' }}
-          aria-live="polite"
-        >
+        <motion.section key={q} custom={dir} variants={variants} initial="enter" animate="center" exit="exit" transition={{ duration: reduced ? 0.12 : 0.22, ease: 'easeOut' }}>
           {q === 'nationality' && (
-            <fieldset>
-              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.nationality)}</legend>
-              <div className="space-y-2.5">
-                {(['spanish', 'eu', 'non_eu'] as const).map(v => (
-                  <OptionCard
-                    key={v} name="nationality" value={v} checked={answers.nationalityGroup === v}
-                    onChange={() => set({ nationalityGroup: v, hasEuEid: v === 'eu' ? answers.hasEuEid : false })}
-                    title={tr(ASSISTANT_QUESTIONS.nationalityOptions[v])}
-                    icon={v === 'spanish' ? <Landmark size={20} /> : v === 'eu' ? <Globe size={20} /> : <Earth size={20} />}
-                  />
-                ))}
-              </div>
-            </fieldset>
+            <div data-testid="ra-02">
+              <h1 className={legend}>{tr(msg('RA-02'))}</h1>
+              {help(msg('RA-02').help)}
+              <SelectInput
+                label={tr(C.nationality)} value={String(draft.countryIndex)} onChange={v => set({ countryIndex: Number(v), euEid: null })} testId="ra-nationality" name="nationality"
+                options={SIGNUP_COUNTRIES.map((x, n) => ({ value: String(n), label: tr(x.name) }))}
+              />
+            </div>
           )}
 
           {q === 'document' && (
-            <fieldset>
-              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.document)}</legend>
+            <fieldset data-testid="ra-03">
+              <legend className={legend}>{tr(msg('RA-03'))}</legend>
+              {help(msg('RA-03').help)}
               <div className="space-y-2.5">
                 {DOC_ORDER.map(d => (
-                  <OptionCard
-                    key={d} name="document" value={d} checked={answers.document === d}
-                    onChange={() => set({ document: d })}
-                    title={tr(DOCUMENTS[d].label)}
-                    icon={docIcon(d)}
-                  />
+                  <OptionCard key={d} name="document" value={d} checked={draft.document === d} onChange={() => set({ document: d, nfc: null })} title={tr(DOCUMENT_OPTIONS[d])} icon={docIcon(d)} />
                 ))}
               </div>
             </fieldset>
           )}
 
-          {q === 'hasEuEid' && (
-            <fieldset>
-              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.hasEuEid)}</legend>
+          {q === 'euEid' && (
+            <fieldset data-testid="ra-04">
+              <legend className={legend}>{tr(msg('RA-04'))}</legend>
+              {help(msg('RA-04').help)}
               <div className="space-y-2.5">
-                <OptionCard name="hasEuEid" value="yes" checked={answers.hasEuEid} onChange={() => set({ hasEuEid: true })} title={tr(C.yes)} sub={tr(C.eidYesSub)} icon={<ShieldCheck size={20} />} />
-                <OptionCard name="hasEuEid" value="no" checked={!answers.hasEuEid} onChange={() => set({ hasEuEid: false })} title={tr(C.no)} sub={tr(C.eidNoSub)} icon={<IdCard size={20} />} />
+                {(['yes', 'no', 'unsure'] as YesNoUnsure[]).map(v => (
+                  <OptionCard key={v} name="euEid" value={v} checked={draft.euEid === v} onChange={() => set({ euEid: v })} title={tr(YES_NO_UNSURE[v])} />
+                ))}
               </div>
             </fieldset>
           )}
 
-          {q === 'assisted' && (
-            <fieldset>
-              <legend className="mb-4 font-display text-2xl font-bold leading-tight text-ink">{tr(ASSISTANT_QUESTIONS.assisted)}</legend>
+          {q === 'who' && (
+            <fieldset data-testid="ra-05">
+              <legend className={legend}>{tr(msg('RA-05'))}</legend>
               <div className="space-y-2.5">
-                <OptionCard name="who" value="self" checked={!answers.assisted && !answers.forMinor} onChange={() => set({ assisted: false, forMinor: false })} title={tr(C.whoSelf)} sub={tr(C.whoSelfSub)} icon={<Smartphone size={20} />} />
-                <OptionCard
-                  name="who" value="assisted" checked={answers.assisted} onChange={() => set({ assisted: true, forMinor: false })} title={tr(C.whoAssisted)} sub={tr(C.assistedYesSub)} icon={<HandHeart size={20} />}
-                  aside={answers.assisted && c.assisted ? (
-                    <span className="mt-2 block rounded-[2px] bg-surface px-3 py-2 text-[12px] leading-snug text-muted border border-line">
-                      <span className="font-bold text-ink">{tr(C.helperOnDevice)}:</span> {c.assisted.helperName} ({tr(c.assisted.relation)})<br />
-                      <span className="font-bold text-ink">{tr(C.deviceOwner)}:</span> {c.assisted.deviceOwner}
-                    </span>
-                  ) : undefined}
-                />
-                <OptionCard name="who" value="minor" checked={Boolean(answers.forMinor)} onChange={() => set({ assisted: false, forMinor: true })} title={tr(C.whoMinor)} sub={tr(C.whoMinorSub)} icon={<Baby size={20} />} />
+                {(['self', 'helping', 'child'] as Who[]).map(w => (
+                  <OptionCard key={w} name="who" value={w} checked={draft.who === w} onChange={() => set({ who: w })} title={tr(WHO_OPTIONS[w])} icon={whoIcon(w)} />
+                ))}
               </div>
-              {answers.assisted && (
-                <p className="mt-4 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
-                  <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-                  {tr(CITIZEN_MESSAGES.assistedNote)}
-                </p>
-              )}
+              {large && <p className="mt-3 text-[15px] text-muted" role="status">{tr(C.largeTextOn)}</p>}
+            </fieldset>
+          )}
+
+          {q === 'nfc' && (
+            <fieldset data-testid="ra-06">
+              <legend className={legend}>{tr(msg('RA-06'))}</legend>
+              {help(msg('RA-06').help)}
+              <div className="space-y-2.5">
+                {(['yes', 'no', 'unsure'] as YesNoUnsure[]).map(v => (
+                  <OptionCard key={v} name="nfc" value={v} checked={draft.nfc === v} onChange={() => set({ nfc: v })} title={tr(YES_NO_UNSURE[v])} icon={<Smartphone size={20} />} />
+                ))}
+              </div>
             </fieldset>
           )}
 
           {q === 'result' && (
-            <div>
-              <h1 className="font-display text-2xl font-bold leading-tight text-ink">{tr(C.recommendedFor)}</h1>
+            <div data-testid="recommended-route" data-route={rec.route}>
+              <p className="text-[14px] font-bold uppercase tracking-wider text-muted">{tr(C.yourRoute)}</p>
               <motion.div
-                initial={reduced ? false : { scale: 0.97, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                className="mt-4 rounded-card border-2 border-brand bg-brand-soft p-5 text-ink"
-                data-testid="recommended-route"
+                initial={reduced ? false : { scale: 0.97, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="mt-2 rounded-card border-2 border-brand bg-brand-soft p-5 text-ink"
+                data-testid={`msg-${resultId}`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="rounded-[2px] bg-brand px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-brand-ink">
-                    {tr(C.routeLabel)} {route.code}
-                  </span>
-                  {isProposedRule(rec.route, answers) && <ProposedRuleTag />}
-                </div>
-                <h2 className="mt-3 font-display text-[22px] font-bold leading-tight">{tr(route.name)}</h2>
-                <p className="mt-1 text-[15px] text-muted">{tr(route.forWhom)}</p>
+                {rec.policyProposal && <ProposedRuleTag className="mb-2" />}
+                <h1 className="font-display text-[24px] font-bold leading-tight">{tr(msg(resultId).title!)}</h1>
+                <p className="mt-2 text-[16px] leading-relaxed">{tr(msg(resultId))}</p>
+                {msg(resultId).why && <p className="mt-3 text-[15px] leading-relaxed text-muted">{tr(msg(resultId).why!)}</p>}
               </motion.div>
-
-              <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-muted">{tr(C.whyThisRoute)}</h3>
-              <p className="mt-1 text-[15px] leading-relaxed text-ink">{tr(rec.reason)}</p>
-
-              {answers.forMinor && !c.guardian && (
-                <fieldset className="mt-4 rounded-[2px] border-2 border-brand bg-surface p-4" data-testid="minor-form">
-                  <legend className="px-1 text-sm font-bold text-ink">{tr(C.minorFormTitle)}</legend>
-                  <label className="block text-[13px] font-bold text-ink">{tr(C.minorName)}
-                    <input name="minorName" data-testid="minor-name" value={minorName} onChange={e => setMinorName(e.target.value)} autoComplete="off" className="mt-1 block w-full rounded-[2px] border border-line bg-surface px-3 py-2.5 text-[15px] font-normal" />
-                  </label>
-                  <label className="mt-3 block text-[13px] font-bold text-ink">{tr(C.minorAge)}
-                    <input name="minorAge" data-testid="minor-age" inputMode="numeric" value={minorAge} onChange={e => setMinorAge(e.target.value.replace(/\D/g, '').slice(0, 2))} className="mt-1 block w-24 rounded-[2px] border border-line bg-surface px-3 py-2.5 text-[15px] font-normal" />
-                  </label>
-                  {minorErr && <p role="alert" className="mt-2 text-[13px] font-bold text-danger">{minorErr}</p>}
-                </fieldset>
-              )}
-              {c.guardian && rec.route === 'B' && (
-                <p className="mt-3 flex gap-2 rounded-[2px] bg-surface p-3 text-[13px] leading-snug text-ink border border-line">
-                  <Users size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-                  {fill(tr(C.guardianNote), { guardian: c.guardian.name, relation: tr(c.guardian.relation) })}
-                </p>
-              )}
-              {answers.assisted && (
-                <p className="mt-3 flex gap-2 rounded-[2px] bg-brand-soft p-3 text-[13px] leading-snug text-ink">
-                  <HandHeart size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-                  <span>
-                    {tr(CITIZEN_MESSAGES.assistedNote)}
-                    {c.assisted && (
-                      <span className="mt-1 block text-muted">
-                        {tr(C.helperOnDevice)}: <strong className="text-ink">{c.assisted.helperName}</strong> ({tr(c.assisted.relation)}) · {tr(C.deviceOwner)}: <strong className="text-ink">{c.assisted.deviceOwner}</strong>
-                      </span>
-                    )}
-                  </span>
-                </p>
-              )}
-
-              <div className="mt-5 flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted">{tr(C.whatHappensNext)}</h3>
-              </div>
-              <ol className="mt-2 space-y-1.5">
-                {[...(c.guardian && rec.route === 'B' ? (['guardian_link'] as const) : []), ...route.checks].map((ck, n) => (
-                  <li key={ck} className="flex items-start gap-3 rounded-[2px] bg-surface px-3 py-2 border border-line">
-                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-[11px] font-bold text-brand">{n + 1}</span>
-                    <span className="text-[13px] leading-snug">
-                      <span className="font-bold text-ink">{tr(CHECKS[ck].label)}</span>
-                      <span className="block text-muted">{tr(CHECKS[ck].explains)}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-
-              <button
-                type="button"
-                onClick={() => setShowOthers(s => !s)}
-                aria-expanded={showOthers}
-                aria-controls="other-routes"
-                className="mt-4 flex w-full items-center justify-between rounded-[2px] px-1 py-2 text-sm font-bold text-brand"
-              >
-                {showOthers ? tr(C.hideOtherRoutes) : tr(C.otherRoutes)}
-                <ChevronDown size={18} className={cn('transition-transform', showOthers && 'rotate-180')} aria-hidden />
-              </button>
-              <AnimatePresence initial={false}>
-                {showOthers && (
-                  <motion.ul
-                    id="other-routes"
-                    initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    {ROUTE_ORDER.filter(r => r !== rec.route).map(r => (
-                      <li key={r} className="flex gap-3 rounded-[2px] bg-surface p-3 border border-line">
-                        <RouteCode code={ROUTES[r].code} className="shrink-0 self-start" />
-                        <span className="text-[13px] leading-snug">
-                          <span className="font-bold text-ink">{tr(ROUTES[r].name)}</span>
-                          <span className="block text-muted">{tr(ROUTES[r].forWhom)}</span>
-                          {(r === 'B' || r === 'F') && <ProposedRuleTag className="mt-1" />}
-                        </span>
-                      </li>
-                    ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
             </div>
           )}
         </motion.section>
       </AnimatePresence>
 
+      <div className="mt-4"><Alert>{error}</Alert></div>
+
       <div className="mt-6 space-y-2">
         {q !== 'result' ? (
-          <BigButton onClick={next}>{i === steps.length - 2 ? tr(C.seeRecommendation) : tr(C.next)}</BigButton>
+          <BigButton onClick={next} testId="ra-next">{tr(C.next)} <ArrowRight size={18} aria-hidden /></BigButton>
         ) : (
           <>
-            <BigButton onClick={confirm}>{tr(C.confirmRoute)}</BigButton>
+            <BigButton onClick={confirm} testId="ra-confirm">{tr(msg(resultId).button!)}</BigButton>
             <BigButton variant="ghost" onClick={() => { setDir(-1); setI(0) }}>{tr(C.changeAnswers)}</BigButton>
           </>
         )}
       </div>
 
-      <p className="mt-5 flex gap-2 text-[12px] leading-snug text-muted">
-        <Bot size={15} className="mt-0.5 shrink-0" aria-hidden />
-        {tr(CITIZEN_MESSAGES.ownAiAssistant)}
-      </p>
+      {i === 0 && (
+        <p className="mt-5 flex gap-2 text-[14px] leading-snug text-muted" data-testid="msg-AI-01">
+          <Bot size={16} className="mt-0.5 shrink-0" aria-hidden />{tr(msg('AI-01'))}
+        </p>
+      )}
     </div>
   )
 }
