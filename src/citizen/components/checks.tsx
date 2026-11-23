@@ -6,6 +6,7 @@ import { CHECKS, ENGINE } from '@/contract/seed'
 import { cn, SimulatedValuesNote } from '@/ui'
 import { C, fill } from '../copy'
 import { useReduced, useTr } from '../hooks'
+import { score2 } from '@/core/store'
 
 const tone: Record<CheckOutcome, { ring: string; icon: ReactNode }> = {
   pass: { ring: 'bg-success text-white', icon: <Check size={14} strokeWidth={3} /> },
@@ -23,12 +24,12 @@ export function ScoreBar({ score, min, label }: { score: number; min: number; la
     <div className="mt-2">
       <div className="flex items-center justify-between text-[11px] font-medium text-muted">
         <span>{label}</span>
-        <span className="flex items-baseline gap-1.5"><SimulatedValuesNote /><span className={cn('tabular-nums', ok ? 'text-success' : 'text-danger')}>{score.toFixed(2)}</span></span>
+        <span className="flex items-baseline gap-1.5"><SimulatedValuesNote /><span className={cn('tabular-nums', ok ? 'text-success' : 'text-danger')}>{score2(score)}</span></span>
       </div>
       <div
         className="relative mt-1 h-2 w-full rounded-full bg-surface-2"
         role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={1} aria-valuenow={score}
-        aria-valuetext={`${score.toFixed(2)} / min ${min.toFixed(2)}`}
+        aria-valuetext={`${score2(score)} / min ${score2(min)}`}
       >
         <motion.div
           className={cn('h-full rounded-full', ok ? 'bg-success' : 'bg-danger')}
@@ -107,7 +108,7 @@ export function CheckList({
                 {r && showDetail && r.outcome !== 'fail' && <p className="mt-0.5 text-xs leading-snug text-muted">{tr(r.detail)}</p>}
                 {!r && !compact && <p className="mt-0.5 text-xs leading-snug text-muted">{tr(def.explains)}</p>}
                 {r && isScored && r.score !== undefined && (
-                  <ScoreBar score={r.score} min={min} label={`${tr(C.score)} · ${fill(tr(C.threshold), { min: min.toFixed(2) })}`} />
+                  <ScoreBar score={r.score} min={min} label={`${tr(C.score)} · ${fill(tr(C.threshold), { min: score2(min) })}`} />
                 )}
               </div>
             </motion.li>

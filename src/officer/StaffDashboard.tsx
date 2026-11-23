@@ -6,7 +6,7 @@ import {
   Ban, Bot, CalendarDays, ChevronRight, Cpu, Gavel, Hourglass, RotateCcw, Scale, ShieldCheck, Timer, UserCheck, UserRound,
 } from 'lucide-react'
 import type { ActorKind, PriorityTier } from '@/contract/types'
-import { DOCUMENTS, PRIORITY_TIERS, REJECTION_REASONS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { DOCUMENTS, PRIORITY_TIERS, REJECTION_REASONS, ROUTES, routeCode, ROUTE_ORDER } from '@/contract/seed'
 import { REJ_ORDER } from '@/contract/messages'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
@@ -274,7 +274,7 @@ export function StaffDashboardPage() {
             testid="route-bar"
             rows={ROUTE_ORDER.map(r => ({
               key: r,
-              label: <><span className="shrink-0 rounded-md bg-ink px-1.5 py-0.5 text-[11px] font-bold text-white">{ROUTES[r].code}</span><span className="min-w-0 truncate" title={tr(ROUTES[r].name)}>{tr(ROUTES[r].name)}</span></>,
+              label: <><span className="shrink-0 rounded-md bg-ink px-1.5 py-0.5 text-[11px] font-bold text-white">{tr(routeCode(r))}</span><span className="min-w-0 truncate" title={tr(ROUTES[r].name)}>{tr(ROUTES[r].name)}</span></>,
               value: routes[r],
               bar: r === 'F' ? 'bg-sim' : 'bg-ink/80',
             }))}

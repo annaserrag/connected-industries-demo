@@ -11,6 +11,7 @@ import { normaliseDocNumber } from '@/contract/ids'
 import { SimulatedValuesNote, cn } from '@/ui'
 import { C, fill } from '../copy'
 import { readImage, useSpeech, useTr } from '../hooks'
+import { score2 } from '@/core/store'
 
 /* ------------------------------------------------------------ messages */
 
@@ -21,6 +22,9 @@ export function msg(id: MsgId): Msg {
 type Vars = Record<string, string | number | undefined>
 
 /** Title + text of one MSG id, verbatim. */
+/** A message title used as a heading: no trailing full stop (the plan's titles end with one). */
+export const asHeading = (s: string) => s.replace(/\.\s*$/, '')
+
 export function MsgBlock({
   id, vars = {}, tone = 'plain', as = 'h2', testId, children, className, text,
 }: {
@@ -41,7 +45,7 @@ export function MsgBlock({
   return (
     <section className={cn(box, className)} data-testid={testId ?? `msg-${id}`} data-msg={id}>
       {m.title && (
-        <H className={cn('font-display font-bold leading-tight text-ink', H === 'h1' ? 'text-[26px]' : 'text-[19px]')}>{fillMsg(tr(m.title), vars)}</H>
+        <H className={cn('font-display font-bold leading-tight text-ink', H === 'h1' ? 'text-[26px]' : 'text-[19px]')}>{asHeading(fillMsg(tr(m.title), vars))}</H>
       )}
       <p className={cn('text-[16px] leading-relaxed text-ink', m.title && 'mt-1.5')}>{fillMsg(tr(text ?? m), vars)}</p>
       {children}
@@ -157,8 +161,8 @@ export function Scores({ liveness, faceMatch }: { liveness?: number; faceMatch?:
   if (liveness === undefined && faceMatch === undefined) return null
   return (
     <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px] text-muted" data-testid="face-scores">
-      {liveness !== undefined && <span>{tr(C.livenessScore)}: <strong className="tabular-nums text-ink">{liveness.toFixed(2)}</strong></span>}
-      {faceMatch !== undefined && <span>{tr(C.faceMatchScore)}: <strong className="tabular-nums text-ink">{faceMatch.toFixed(2)}</strong></span>}
+      {liveness !== undefined && <span>{tr(C.livenessScore)}: <strong className="tabular-nums text-ink">{score2(liveness)}</strong></span>}
+      {faceMatch !== undefined && <span>{tr(C.faceMatchScore)}: <strong className="tabular-nums text-ink">{score2(faceMatch)}</strong></span>}
       <SimulatedValuesNote className="text-[12px]" />
     </p>
   )

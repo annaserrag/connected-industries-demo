@@ -111,7 +111,7 @@ export function GovHeader({ actions, tagline = GOV_TAGLINE, menu = GOV_MENU, wid
             <LogoGlyph size={34} className="max-[359px]:hidden" />
             <span className="flex min-w-0 flex-col leading-none">
               <GovWordmark className="text-[17px] sm:text-[19px]" />
-              {tagline && (
+              {tagline && !actions && (
                 <span className="mt-1 block max-w-[150px] text-[9.5px] leading-[1.2] font-bold tracking-[0.01em] text-muted uppercase sm:hidden">{tr(tagline)}</span>
               )}
             </span>
@@ -234,7 +234,9 @@ export function GovFooter({ className, width = 'max-w-[1200px]' }: GovFooterProp
             ))}
           </ul>
         </nav>
-        <p className="mt-4 border-t border-line pt-4 text-[13px] text-muted" data-testid="gov-copyright">{tr(GOV_COPYRIGHT)}</p>
+        <p className="mt-4 border-t border-line pt-4 text-[13px] text-muted" data-testid="gov-copyright">
+          © 2026 Get your Cl@ve · <Link to="/about" className="gov-link" data-testid="footer-prototype-link">{tr('Academic prototype of IE University', 'Prototipo académico de IE University')}</Link>
+        </p>
       </div>
     </footer>
   )

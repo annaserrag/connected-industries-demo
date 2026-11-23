@@ -20,6 +20,11 @@ export interface ChipRecord {
   /** Name and date of birth stored in the chip. */
   data: PersonData
   expiry: string
+  /**
+   * Whether the photo stored in the chip is of the document's holder. Default true. false = the chip answers with
+   * another person's record (e.g. a chip that does not belong to the printed card): a live face then matches it low.
+   */
+  photoMatchesHolder?: boolean
 }
 
 export interface DocumentRecord {
@@ -84,10 +89,11 @@ export const DOCUMENT_REGISTRY: Record<string, DocumentRecord> = {
     type: 'PASSPORT', number: DEMO_NUMBERS.anaCosta, nationality: 'Portugal',
     chip: { readable: true, signatureValid: true, data: { givenNames: 'Ana', surnames: 'Costa', dateOfBirth: '1985-01-27' }, expiry: '2032-09-14' },
   },
-  // GYC-07 Rafael Duarte: chip readable, signature INVALID, chip data differs from the printed data.
+  // GYC-07 Rafael Duarte: chip readable, signature INVALID, chip data differs from the printed data, and the chip
+  // photo is of another person's record (so the live face matches it low).
   [DEMO_NUMBERS.rafael]: {
     type: 'TIE', number: DEMO_NUMBERS.rafael, nationality: 'Brazil',
-    chip: { readable: true, signatureValid: false, data: { givenNames: 'Rafael', surnames: 'Duarte Souza', dateOfBirth: '1988-03-14' }, expiry: '2030-11-30' },
+    chip: { readable: true, signatureValid: false, data: { givenNames: 'Rafael', surnames: 'Duarte Souza', dateOfBirth: '1988-03-14' }, expiry: '2030-11-30', photoMatchesHolder: false },
   },
   // GYC-08 Valentina Rojas Gómez: TIE, normal chip (her residence record is the odd one).
   [DEMO_NUMBERS.valentina]: {

@@ -1,12 +1,12 @@
 /* Screen 6: the officer case queue. */
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowUp, Ban, CircleCheck, Clock, Cpu, FilterX, Hourglass, Inbox, Info, Layers, ListOrdered, Scale, ShieldAlert, ShieldCheck, ShieldQuestion, Sparkles, Undo2 } from 'lucide-react'
 import type { AppState, Case, PriorityTier, RiskLevel, RouteId } from '@/contract/types'
-import { CHECKS, DOCUMENTS, PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { CHECKS, DOCUMENTS, PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS, ROUTES, routeCode, ROUTE_ORDER } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
-import { useClave } from '@/core/store'
+import { score2, useClave } from '@/core/store'
 import { advancedQueue, appealsQueue, baseTierOf, isAgeBumped, officerQueue, priorityOf, relativeTime, videoCallQueue, waitingSince } from '@/core/selectors'
 import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { PROPOSED_RULE_TAG } from '@/contract/messages'
@@ -70,12 +70,12 @@ function topFlag(c: Case) {
 }
 
 /* Rows are memoised: a store change re-renders (and re-measures for layout animation) only the rows whose case changed. */
-const TierHeaderRow = memo(function TierHeaderRow({ tier, count }: { tier: PriorityTier; count: number }) {
+const TierHeaderRow = memo(function TierHeaderRow({ tier, count, cols }: { tier: PriorityTier; count: number; cols: number }) {
   const tr = useTr()
   const def = tierDef(tier)
   return (
     <motion.tr layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} data-testid={`tier-row-${tier}`} className="border-b border-line/70 bg-canvas/70">
-                          <th colSpan={7} scope="colgroup" className="py-2 pr-5 pl-5 text-left font-normal">
+                          <th colSpan={cols} scope="colgroup" className="py-2 pr-5 pl-5 text-left font-normal">
                             <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                               <TierTag tier={tier} />
                               <span className="text-[12px] font-semibold text-muted tabular-nums">{count} {tr(count === 1 ? S.caseOne : S.casesN)}</span>
@@ -90,6 +90,48 @@ const TierHeaderRow = memo(function TierHeaderRow({ tier, count }: { tier: Prior
                         </motion.tr>
   )
 })
+
+/** Check icons of a queue row; wraps instead of overflowing. */
+function CheckIcons({ c }: { c: Case }) {
+  const tr = useTr()
+  return (
+    <ul className="flex flex-wrap items-center gap-0.5" aria-label={tr(C.checks)}>
+      {c.checks.map(k => {
+        const o = effectiveOutcome(k)
+        const text = `${tr(CHECKS[k.id].label)}: ${tr(OUTCOME_LABEL[o])}${k.score !== undefined ? ` (${score2(k.score)})` : ''}`
+        return (
+          <li key={k.id}>
+            <Tip content={<><b>{tr(CHECKS[k.id].label)}</b> · {tr(OUTCOME_LABEL[o])}{k.score !== undefined && ` · ${score2(k.score)}`}<br /><span className="opacity-75">{tr(k.detail)}</span></>}>
+              <span className="block rounded p-0.5" aria-label={text} role="img"><CheckIcon outcome={o} /></span>
+            </Tip>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** Waiting time (and the 24 h bump tag) of a queue row. */
+function Waiting({ c, bumped }: { c: Case; bumped: boolean }) {
+  const tr = useTr()
+  const lang = useLang()
+  return (
+    <span className="inline-flex flex-col items-end">
+      <span className="inline-flex items-center gap-1 text-[13px] whitespace-nowrap text-muted tabular-nums">
+        <Clock className="size-3.5" aria-hidden />
+        {relativeTime(waitingSince(c), lang)}
+      </span>
+      {bumped && (
+        <Tip content={fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}>
+          <span data-testid="age-bump" tabIndex={0} className="mt-1 flex w-fit items-center gap-0.5 rounded-full bg-warning-soft px-1.5 py-0.5 text-[11px] font-bold text-warning outline-none focus-visible:ring-2 focus-visible:ring-brand">
+            <ArrowUp className="size-3" aria-hidden />{fill(tr(S.bumpedShort), { h: PRIORITY_AGE_BUMP_HOURS })}
+            <span className="sr-only">: {fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}</span>
+          </span>
+        </Tip>
+      )}
+    </span>
+  )
+}
 
 const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flashed, onSelect, registerRow }: {
   c: Case; i: number; tier: PriorityTier; bumped: boolean; isSel: boolean; /** re-render tick for the waiting time */ minute: number; isNew: boolean; flashed: boolean
@@ -133,13 +175,19 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                               </Link>
                               <p className="truncate text-xs text-muted">{c.caseRef && <span className="font-mono font-semibold text-ink/70">{c.caseRef} · </span>}{c.persona.nationality} · {shortDoc(c, lang)} · {c.persona.age}<span className="sr-only"> · {tr(S.priority)}: {tr(tierDef(tier).label)}</span></p>
                               <CaseTags c={c} />
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 min-[1100px]:hidden" data-testid="queue-compact-meta">
+                                {c.route && <RouteBadge route={c.route} compact />}
+                                <StatusPill status={c.status} advanced={c.advanced} className="h-auto py-0.5 leading-tight whitespace-normal" />
+                                <CheckIcons c={c} />
+                                <Waiting c={c} bumped={bumped} />
+                              </div>
                             </div>
                             {isNew && <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">{tr(C.newCase)}</span>}
                           </div>
                         </td>
-                        <td className="px-3 py-3">{c.route && <Tip content={tr(ROUTES[c.route].name)}><span className="inline-flex"><RouteBadge route={c.route} compact /></span></Tip>}</td>
+                        <td className="hidden px-3 py-3 min-[1100px]:table-cell">{c.route && <Tip content={tr(ROUTES[c.route].name)}><span className="inline-flex"><RouteBadge route={c.route} compact /></span></Tip>}</td>
                         <td className="px-3 py-3"><RiskTag risk={c.risk} /></td>
-                        <td className="px-3 py-3">
+                        <td className="hidden px-3 py-3 min-[1100px]:table-cell">
                           <div className="flex flex-col items-start gap-1">
                             <StatusPill status={c.status} advanced={c.advanced} className="h-auto max-w-full py-0.5 text-left leading-tight whitespace-normal" />
                             {reviewKind(c) === 'advanced' && <span className="text-[11px] font-medium text-brand">{tr(C.advancedReviews)}</span>}
@@ -153,34 +201,9 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                             </p>
                           ) : <span className="text-xs text-muted">{tr(C.noFlags)}</span>}
                         </td>
-                        <td className="px-3 py-3">
-                          <ul className="flex items-center gap-1" aria-label={tr(C.checks)}>
-                            {c.checks.map(k => {
-                              const o = effectiveOutcome(k)
-                              const text = `${tr(CHECKS[k.id].label)}: ${tr(OUTCOME_LABEL[o])}${k.score !== undefined ? ` (${k.score.toFixed(2)})` : ''}`
-                              return (
-                                <li key={k.id}>
-                                  <Tip content={<><b>{tr(CHECKS[k.id].label)}</b> · {tr(OUTCOME_LABEL[o])}{k.score !== undefined && ` · ${k.score.toFixed(2)}`}<br /><span className="opacity-75">{tr(k.detail)}</span></>}>
-                                    <span className="block rounded p-0.5" aria-label={text} role="img"><CheckIcon outcome={o} /></span>
-                                  </Tip>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </td>
-                        <td className="py-3 pr-5 pl-3 text-right whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 text-[13px] text-muted tabular-nums">
-                            <Clock className="size-3.5" aria-hidden />
-                            {relativeTime(waitingSince(c), lang)}
-                          </span>
-                          {bumped && (
-                            <Tip content={fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}>
-                              <span data-testid="age-bump" tabIndex={0} className="mt-1 ml-auto flex w-fit items-center gap-0.5 rounded-full bg-warning-soft px-1.5 py-0.5 text-[11px] font-bold text-warning outline-none focus-visible:ring-2 focus-visible:ring-brand">
-                                <ArrowUp className="size-3" aria-hidden />{fill(tr(S.bumpedShort), { h: PRIORITY_AGE_BUMP_HOURS })}
-                                <span className="sr-only">: {fill(tr(S.bumped), { tier: tr(tierDef(baseTierOf(c)).label), h: PRIORITY_AGE_BUMP_HOURS })}</span>
-                              </span>
-                            </Tip>
-                          )}
+                        <td className="hidden px-3 py-3 min-[1100px]:table-cell"><CheckIcons c={c} /></td>
+                        <td className="hidden py-3 pr-5 pl-3 text-right whitespace-nowrap min-[1100px]:table-cell">
+                          <Waiting c={c} bumped={bumped} />
                           {isSel && <span className="mt-1 hidden justify-end group-hover:flex"><Kbd>↵</Kbd></span>}
                         </td>
                       </motion.tr>
@@ -190,8 +213,19 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
   a.c.id === b.c.id && a.c.updatedAt === b.c.updatedAt && a.i === b.i && a.tier === b.tier && a.bumped === b.bumped &&
   a.minute === b.minute && a.isSel === b.isSel && a.isNew === b.isNew && a.flashed === b.flashed && a.onSelect === b.onSelect && a.registerRow === b.registerRow)
 
+/** True at ≥ 1100 px, where the queue shows all seven columns (a spanning row must not add phantom columns below). */
+const WIDE_QUERY = '(min-width: 1100px)'
+function useWideQueue(): boolean {
+  return useSyncExternalStore(
+    cb => { const m = window.matchMedia(WIDE_QUERY); m.addEventListener('change', cb); return () => m.removeEventListener('change', cb) },
+    () => window.matchMedia(WIDE_QUERY).matches,
+    () => true,
+  )
+}
+
 export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
   const tr = useTr()
+  const wide = useWideQueue()
   const lang = useLang()
   useTick()
   const navigate = useNavigate()
@@ -382,7 +416,7 @@ export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
           <span>{tr(C.route)}</span>
           <select value={route} onChange={e => { setRoute(e.target.value as RouteId | 'all'); setSel(0) }} className="h-9 max-w-[240px] rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <option value="all">{tr(C.allRoutes)}</option>
-            {ROUTE_ORDER.map(r => <option key={r} value={r}>{ROUTES[r].code} · {tr(ROUTES[r].name)}</option>)}
+            {ROUTE_ORDER.map(r => <option key={r} value={r}>{tr(routeCode(r))} · {tr(ROUTES[r].name)}</option>)}
           </select>
         </label>
         {filtersOn && (
@@ -404,28 +438,20 @@ export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
           </div>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-sm">
-              <colgroup>
-                <col className="w-[23%]" />
-                <col className="w-[8%]" />
-                <col className="w-[10%]" />
-                <col className="w-[14%]" />
-                <col />
-                <col className="w-[14%]" />
-                <col className="w-[9%]" />
-              </colgroup>
+            {/* Wide (≥ 1100 px): seven fixed columns. Narrower: route, status, checks and waiting time move into the applicant cell. */}
+            <table className="w-full table-fixed border-collapse text-left text-sm">
               <caption className="sr-only">{tr(C.queueTitle)}</caption>
               <thead>
                 <tr className="border-b border-line bg-canvas/70 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
-                  <th scope="col" className="py-2.5 pr-3 pl-5">{tr(C.applicant)}</th>
-                  <th scope="col" className="px-3 py-2.5">{tr(C.route)}</th>
-                  <th scope="col" className="px-3 py-2.5">{tr(C.risk)}</th>
-                  <th scope="col" className="px-3 py-2.5">{tr(C.status)}</th>
+                  <th scope="col" className="w-[46%] py-2.5 pr-3 pl-5 min-[1100px]:w-[22%]">{tr(C.applicant)}</th>
+                  <th scope="col" className="hidden w-[76px] px-3 py-2.5 min-[1100px]:table-cell">{tr(C.route)}</th>
+                  <th scope="col" className="w-[128px] px-3 py-2.5">{tr(C.risk)}</th>
+                  <th scope="col" className="hidden w-[156px] px-3 py-2.5 min-[1100px]:table-cell">{tr(C.status)}</th>
                   <th scope="col" className="px-3 py-2.5">
                     <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3" aria-hidden />{tr(C.whyFlagged)}</span>
                   </th>
-                  <th scope="col" className="px-3 py-2.5">{tr(C.checks)}</th>
-                  <th scope="col" className="py-2.5 pr-5 pl-3 text-right">{tr(C.waiting)}</th>
+                  <th scope="col" className="hidden w-[168px] px-3 py-2.5 min-[1100px]:table-cell">{tr(C.checks)}</th>
+                  <th scope="col" className="hidden w-[112px] py-2.5 pr-5 pl-3 text-right min-[1100px]:table-cell">{tr(C.waiting)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -434,7 +460,7 @@ export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
                     const tier = tierOf.get(c.id)!
                     const out = []
                     if (i === 0 || tierOf.get(filtered[i - 1].id) !== tier) {
-                      out.push(<TierHeaderRow key={`tier-${tier}`} tier={tier} count={tierCount(tier)} />)
+                      out.push(<TierHeaderRow key={`tier-${tier}`} tier={tier} count={tierCount(tier)} cols={wide ? 7 : 3} />)
                     }
                     out.push(
                       <QueueRow
@@ -469,7 +495,7 @@ export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
         {recent.length === 0 ? (
           <p className="mt-3 rounded-[4px] border border-dashed border-line p-6 text-center text-sm text-muted">{tr(C.nothingDecided)}</p>
         ) : (
-          <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 min-[1100px]:grid-cols-2">
             <AnimatePresence initial={false}>
               {recent.map(c => {
                 const d = c.decisions[c.decisions.length - 1]

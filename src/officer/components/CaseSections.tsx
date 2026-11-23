@@ -14,6 +14,7 @@ import { SimulatedValuesNote, cn } from '@/ui'
 import { C, DECISION_LABEL, K, OUTCOME_LABEL } from '../copy'
 import { daysUntil, effectiveOutcome, fill, formatDate, formatDateTime, officerName, RISK_RANK, SCORED, useLang, useTr } from '../lib'
 import { CheckIcon, Dialog, Panel, RiskTag } from './ui'
+import { score2 } from '@/core/store'
 
 const PERSON_FIELDS: Array<keyof PersonData> = ['givenNames', 'surnames', 'dateOfBirth']
 const FIELD_LABEL: Record<keyof PersonData, Bilingual> = { givenNames: K.givenNames, surnames: K.surnames, dateOfBirth: K.dateOfBirth }
@@ -112,8 +113,8 @@ function CheckRow({ r }: { r: CheckResult }) {
       <td className="py-2.5 pr-5 pl-3 text-right whitespace-nowrap">
         {r.score !== undefined ? (
           <span className="inline-flex flex-col items-end">
-            <span className={cn('font-bold tabular-nums', th !== undefined && r.score < th ? 'text-danger' : 'text-success')}>{r.score.toFixed(2)}</span>
-            {th !== undefined && <span className="text-[10.5px] text-muted tabular-nums">{tr(C.threshold)} {th.toFixed(2)}</span>}
+            <span className={cn('font-bold tabular-nums', th !== undefined && r.score < th ? 'text-danger' : 'text-success')}>{score2(r.score)}</span>
+            {th !== undefined && <span className="text-[10.5px] text-muted tabular-nums">{tr(C.threshold)} {score2(th)}</span>}
             <SimulatedValuesNote />
           </span>
         ) : <span className="text-muted">—</span>}
@@ -156,7 +157,7 @@ export function AttemptsPanel({ c, e }: { c: Case; e: Evaluation | null }) {
             <span className="font-semibold tabular-nums">{i + 1}.</span>
             <CheckIcon outcome={f.result === 'pass' ? 'pass' : f.result === 'retry' ? 'warn' : 'fail'} className="size-3.5" />
             <span>{tr(K.cameraInput)}: <b>{tr(CAMERA_LABEL[cam])}</b></span>
-            <span className="text-muted">· {f.liveness !== undefined ? `${tr(K.liveness)} ${f.liveness.toFixed(2)}, ${tr(K.faceMatch)} ${f.faceMatch?.toFixed(2)}` : tr(K.noScore)}</span>
+            <span className="text-muted">· {f.liveness !== undefined ? `${tr(K.liveness)} ${score2(f.liveness)}, ${tr(K.faceMatch)} ${(f.faceMatch !== undefined ? score2(f.faceMatch) : "—")}` : tr(K.noScore)}</span>
           </li>
         )
       })}

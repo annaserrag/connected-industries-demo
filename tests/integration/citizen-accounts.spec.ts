@@ -36,6 +36,9 @@ async function signInForm(page: Page, doc: string, password: string) {
 
 async function signOut(page: Page) {
   await page.getByTestId('citizen-signout').click()
+  // Mid-flow the sign-out asks for a small confirmation first.
+  const confirm = page.getByTestId('signout-confirm')
+  await confirm.waitFor({ state: 'visible', timeout: 800 }).then(() => confirm.click(), () => {})
   await expect(page).toHaveURL(/#\/citizen$/)
   await expect(page.getByTestId('signin-form')).toBeVisible()
 }

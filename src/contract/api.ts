@@ -80,9 +80,9 @@ export interface AttemptResultOut {
   /** Simulated scores (face check only). Always shown with "valores simulados". */
   liveness?: number
   faceMatch?: number
-  /** 'VER-02' (passed) · 'VER-05' (face retry) · 'VER-06' (DNI video retry) · 'FALL-01' (Fallback offered) */
-  msg: 'VER-02' | 'VER-05' | 'VER-06' | 'FALL-01'
-  outcome: 'continue' | 'fallback'
+  /** 'VER-02' (passed) · 'VER-05' (face retry) · 'VER-06' (DNI video retry) · 'FALL-01' (Fallback offered) · 'VER-07' (chip integrity: a person reviews) */
+  msg: 'VER-02' | 'VER-05' | 'VER-06' | 'FALL-01' | 'VER-07'
+  outcome: 'continue' | 'fallback' | 'to_officer'
 }
 
 export interface SubmitResult { kind: 'auto_basic' | 'to_officer' | 'fallback' | 'continue'; ruleId: string | null }

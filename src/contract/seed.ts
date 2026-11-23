@@ -50,7 +50,7 @@ import { demoHash, fictionalDniNie, isFictionalDniNie, normaliseDocNumber } from
 export { demoHash, normaliseDocNumber, hasDniNieShape, hasValidDniNieLetter, isFictionalDniNie, fictionalDniNie, normaliseName } from './ids'
 
 export const SERVICE_NAME = 'Get your Cl@ve'
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 
 /* ------------------------------------------------------------- key rule */
 
@@ -107,6 +107,11 @@ export const STATUSES: Record<StatusId, StatusDef> = {
 }
 export const STATUS_ORDER: StatusId[] = ['received', 'checking', 'need_info', 'approved', 'not_approved']
 
+/** Short route code for lists: A, B, C, X, and the Fallback in words (never the English word in Spanish). */
+export function routeCode(r: RouteId): Bilingual {
+  return r === 'F' ? { en: 'Fallback', es: 'Alternativa' } : { en: ROUTES[r].code, es: ROUTES[r].code }
+}
+
 /** MSG id of the status text for a case (4 / 4B / 4C for approvals). */
 export function statusMsgId(status: StatusId, advanced?: AdvancedState): 'STA-1' | 'STA-2' | 'STA-3' | 'STA-4' | 'STA-4B' | 'STA-4C' | 'STA-5' {
   switch (status) {
@@ -116,6 +121,20 @@ export function statusMsgId(status: StatusId, advanced?: AdvancedState): 'STA-1'
     case 'not_approved': return 'STA-5'
     case 'approved': return advanced === 'granted' ? 'STA-4C' : advanced === 'pending_review' ? 'STA-4B' : 'STA-4'
   }
+}
+
+/**
+ * The status the CITIZEN sees. Same as the case status, except while a video call with an officer is the thing to
+ * do (Fallback offered, waiting room or live call): that is status 3 "We need something from you" (MSG-STA-3 +
+ * MSG-FALL-01, plan GYC-02), even though, for the officer, the case is already waiting in the queue. After "Come
+ * back later" (GYC-06) or once the call has ended, the citizen is back at status 2 while a person reviews.
+ */
+export function citizenStatus(c: Pick<Case, 'status' | 'session'>): StatusId | 'draft' {
+  if (c.status === 'approved' || c.status === 'not_approved' || c.status === 'draft' && !c.session?.fallback) return c.status
+  const fb = c.session?.fallback
+  const call = c.session?.videoCall?.state
+  if (fb && !fb.comeBackLater && call !== 'ended') return 'need_info'
+  return c.status
 }
 
 /** Full status name shown to citizens and staff; 'approved' says which level. */

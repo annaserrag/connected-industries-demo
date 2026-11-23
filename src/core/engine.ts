@@ -63,21 +63,49 @@ export type AttemptResult = 'pass' | 'retry' | 'fail'
 export interface FaceReading {
   camera: CameraInput
   result: AttemptResult
+  /** The live-person check completed and passed. */
+  live: boolean
   liveness?: number
+  /** undefined = no score (no chip photo to compare with, or the live-person check did not complete). */
   faceMatch?: number
 }
+
+/** What the live face is compared with: the chip photo of the holder, a chip photo of another record, or nothing (chip unread). */
+export type ChipPhoto = 'match' | 'mismatch' | 'none'
 
 function h32(s: string): number {
   return parseInt(demoHash(s), 16)
 }
 
-/** Face-check attempt n (0-based) with this camera input, against the chip photo of `docNumber`. */
-export function readFace(camera: CameraInput, docNumber: string, n: number): FaceReading {
+/**
+ * Face-check attempt n (0-based) with this camera input, against the chip photo of `docNumber`.
+ * person → live; the match is high with the holder's chip photo, low with another record's photo, absent without a chip photo.
+ * synthetic → liveness fails (0.2x), match 0.6x. reflections → no score, retry.
+ */
+export function readFace(camera: CameraInput, docNumber: string, n: number, photo: ChipPhoto = 'match'): FaceReading {
   const h = h32(`${docNumber}:${n}`)
   const two = (x: number) => Math.round(x * 100) / 100
-  if (camera === 'person') return { camera, result: 'pass', liveness: two(0.93 + (h % 5) / 100), faceMatch: two(0.93 + ((h >>> 4) % 5) / 100) }
-  if (camera === 'synthetic') return { camera, result: 'fail', liveness: two(0.2 + (h % 10) / 100), faceMatch: two(0.6 + ((h >>> 4) % 10) / 100) }
-  return { camera, result: 'retry' }
+  if (camera === 'person') {
+    const liveness = two(0.93 + (h % 5) / 100)
+    if (photo === 'none') return { camera, result: 'pass', live: true, liveness }
+    if (photo === 'mismatch') return { camera, result: 'fail', live: true, liveness, faceMatch: two(0.3 + ((h >>> 4) % 10) / 100) }
+    return { camera, result: 'pass', live: true, liveness, faceMatch: two(0.93 + ((h >>> 4) % 5) / 100) }
+  }
+  if (camera === 'synthetic') {
+    return { camera, result: 'fail', live: false, liveness: two(0.2 + (h % 10) / 100), faceMatch: photo === 'none' ? undefined : two(0.6 + ((h >>> 4) % 10) / 100) }
+  }
+  return { camera, result: 'retry', live: false }
+}
+
+/** What the face of this case is compared with, from the chip of the subject document (world fact). */
+export function chipPhotoOf(c: Case): ChipPhoto {
+  const doc = subjectDocument(c)
+  if (!doc) return 'match'
+  const reads = c.session.chipReads
+  const rec = lookupDocument(doc)
+  if (reads.length && reads[reads.length - 1] === 'ok' && rec.chip) return rec.chip.photoMatchesHolder === false ? 'mismatch' : 'match'
+  if (reads.length && reads[reads.length - 1] === 'failed') return 'none'
+  return 'match'
 }
 
 /** DNI video attempt (route C): person → pass, reflections → retry (MSG-VER-06), synthetic → fail. */
@@ -102,7 +130,8 @@ export interface Evaluation {
 }
 
 const today = (now: Date) => now.toISOString().slice(0, 10)
-const upper = (s: string) => normaliseName(s)
+/** Display form of a name or date in the discrepancy table: as written (accents kept), upper case. Comparison uses normaliseName. */
+const upper = (s: string) => s.trim().replace(/\s+/g, ' ').toLocaleUpperCase('es')
 
 function check(id: CheckId, outcome: CheckResult['outcome'], detail: Bilingual, extra: Partial<CheckResult> = {}): CheckResult {
   return { id, outcome, detail, ...extra }
@@ -130,7 +159,8 @@ export function evaluate(c: Case, now: Date = new Date()): Evaluation {
 
   /* face (route B / X / minor) */
   const faceDoc = doc?.number ?? c.typed.number
-  const readings = s.faceAttempts.map((cam, i) => readFace(cam, faceDoc, i))
+  const photo = chipPhotoOf(c)
+  const readings = s.faceAttempts.map((cam, i) => readFace(cam, faceDoc, i, photo))
   const lastFace = readings.length ? readings[readings.length - 1] : null
   const face = { readings, last: lastFace, notPassing: readings.filter(r => r.result !== 'pass').length, anySynthetic: s.faceAttempts.includes('synthetic') }
 
@@ -205,14 +235,15 @@ export function evaluate(c: Case, now: Date = new Date()): Evaluation {
         break
       case 'liveness':
         if (!face.last) checks.push(check(id, chip && !chip.ok && chip.failures >= 2 ? 'skipped' : 'pending', b('No face attempt yet', 'Sin intento de comprobación facial')))
-        else if (face.last.result === 'pass') checks.push(check(id, 'pass', b('Live person in front of the camera', 'Persona real ante la cámara'), { score: face.last.liveness }))
         else if (face.last.result === 'retry') checks.push(check(id, 'warn', b('Live-person check incomplete (low light or reflections)', 'Comprobación de persona real incompleta (poca luz o reflejos)')))
+        else if (face.last.live) checks.push(check(id, 'pass', b(`Live person in front of the camera${photo === 'none' ? ' (selfie; no chip photo to compare with)' : ''}`, `Persona real ante la cámara${photo === 'none' ? ' (selfi; sin foto del chip para comparar)' : ''}`), { score: face.last.liveness }))
         else checks.push(check(id, 'fail', b('Live-person check failed: no depth, replay pattern', 'Comprobación de persona real fallida: sin profundidad, patrón de reproducción'), { score: face.last.liveness }))
         break
       case 'face_match':
-        if (!face.last) checks.push(check(id, chip && !chip.ok && chip.failures >= 2 ? 'skipped' : 'pending', b('No face attempt yet', 'Sin intento de comprobación facial')))
-        else if (face.last.result === 'pass') checks.push(check(id, 'pass', b('Matches the chip photo', 'Coincide con la foto del chip'), { score: face.last.faceMatch }))
-        else if (face.last.result === 'retry') checks.push(check(id, 'skipped', b('No score: the live-person check did not complete', 'Sin puntuación: la comprobación de persona real no terminó')))
+        if (photo === 'none' && chip && !chip.ok) checks.push(check(id, 'skipped', b('Not possible without the chip: there is no chip photo to compare with', 'No es posible sin el chip: no hay foto del chip con la que comparar')))
+        else if (!face.last) checks.push(check(id, 'pending', b('No face attempt yet', 'Sin intento de comprobación facial')))
+        else if (face.last.result === 'retry' || face.last.faceMatch === undefined) checks.push(check(id, 'skipped', b('No score: the live-person check did not complete', 'Sin puntuación: la comprobación de persona real no terminó')))
+        else if (face.last.faceMatch >= ENGINE.faceMatchMin) checks.push(check(id, 'pass', b('Matches the chip photo', 'Coincide con la foto del chip'), { score: face.last.faceMatch }))
         else checks.push(check(id, 'fail', b('Low match with the chip photo', 'Coincidencia baja con la foto del chip'), { score: face.last.faceMatch }))
         break
       case 'dni_video':
@@ -353,9 +384,14 @@ export function decide(c: Case, now: Date = new Date(), stage: Stage = 'submit')
   /* 2. Chip read failed twice (route B / X / minor). */
   if (e.chip && !e.chip.ok && e.chip.failures >= ENGINE.maxAttemptsBeforeFallback && e.chip.last === 'failed') {
     const reason = b('Chip could not be read twice; document integrity not verified', 'El chip no se pudo leer dos veces; integridad del documento no verificada')
+    const ff: Flag[] = [flag('chip_unreadable', 'medium', reason)]
+    // The selfie liveness check still runs on this route (there is no chip photo for a face match).
+    if (e.face.last && e.face.last.result !== 'retry' && !e.face.last.live) {
+      ff.push(flag('low_liveness', e.face.anySynthetic ? 'high' : 'medium', b('The live-person check on the selfie failed.', 'La comprobación de persona real en el selfi falló.')))
+    }
     return base('fallback', 'CHIP-TWICE', {
-      fallback: 'chip', flags: [flag('chip_unreadable', 'medium', reason)], aiReason: reason,
-      citizenMsgs: ['STA-3', 'VER-04', 'FALL-01'], evidence: ['chip_read'],
+      fallback: 'chip', flags: ff, aiReason: reason,
+      citizenMsgs: ['STA-3', 'VER-04', 'FALL-01'], evidence: e.face.last ? ['chip_read', 'liveness'] : ['chip_read'],
       auditText: `Chip read failed ${e.chip.failures} times (${e.chip.doc.nationality} ${e.chip.doc.type}): video call with an officer offered, risk medium (rule CHIP-TWICE)`,
     })
   }
@@ -389,8 +425,13 @@ export function decide(c: Case, now: Date = new Date(), stage: Stage = 'submit')
     })
   }
 
-  /* 5. Chip signature invalid or printed ≠ chip → officer, High, MSG-VER-07. */
-  if (e.chip?.ok && e.chip.record.chip && (!e.chip.record.chip.signatureValid || e.printedDiff.length)) {
+  /*
+   * 5. Chip signature invalid or printed ≠ chip → officer, High, MSG-VER-07. The chip DID answer, so there is a chip
+   * photo: in the flow the rule waits until a face attempt has completed, so the officer also sees the face match
+   * against that photo (GYC-07: "face match against the chip photo Low, liveness ✓").
+   */
+  const faceDone = !(route === 'B' || route === 'X') || e.face.readings.some(r => r.result !== 'retry')
+  if (e.chip?.ok && e.chip.record.chip && (!e.chip.record.chip.signatureValid || e.printedDiff.length) && (stage === 'submit' || faceDone)) {
     const sigBad = !e.chip.record.chip.signatureValid
     const fp = fieldsPhrase(e.printedDiff)
     const plural = e.printedDiff.some(f => f === 'dateOfBirth') && e.printedDiff.some(f => f !== 'dateOfBirth')
@@ -402,8 +443,11 @@ export function decide(c: Case, now: Date = new Date(), stage: Stage = 'submit')
     const ff: Flag[] = []
     if (sigBad) ff.push(flag('chip_signature_failed', 'high', reason))
     if (e.printedDiff.length) ff.push(flag('printed_vs_chip_mismatch', 'high', b(`Printed data differs from the chip: ${fp.en}`, `Datos impresos distintos del chip: ${fp.es}`)))
+    const fm = e.face.last?.faceMatch
+    if (fm !== undefined && fm < ENGINE.faceMatchMin) ff.push(flag('low_face_match', 'medium', b('Face match against the chip photo is low (simulated value)', 'Coincidencia facial baja con la foto del chip (valor simulado)')))
     return base('to_officer', 'CHIP-INTEGRITY', {
-      flags: ff, aiReason: reason, suggestedReason: 'REJ-06', citizenMsgs: ['STA-2', 'VER-07'], evidence: ['chip_signature', 'printed_vs_chip'],
+      flags: ff, aiReason: reason, suggestedReason: 'REJ-06', citizenMsgs: ['STA-2', 'VER-07'],
+      evidence: e.face.last ? ['chip_signature', 'printed_vs_chip', 'liveness', 'face_match'] : ['chip_signature', 'printed_vs_chip'],
       auditText: `Chip read: ${sigBad ? 'signature invalid' : 'signature valid'}${e.printedDiff.length ? `, printed data differs from chip (${e.printedDiff.join(', ')})` : ''}: sent to an officer, risk high (rule CHIP-INTEGRITY)`,
     })
   }

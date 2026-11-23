@@ -19,11 +19,11 @@ import type { ClaveActions, RouteAnswersInput, RouteRecommendation, SubmitResult
 import {
   buildSeedState, CHANNEL_NAME, HELPER_RELATIONS, OFFICERS, REJECTION_REASONS, STATE_VERSION, STORAGE_KEY, SYSTEM_ACTOR,
   ageFrom, countryByName, displayDocument, fullName, isFictionalDniNie, hasDniNieShape, isProposedRule, newDraftCase, normaliseDocNumber,
-  personaOf, recommendRoute, statusMsgId,
+  citizenStatus, personaOf, recommendRoute, statusMsgId,
 } from '@/contract/seed'
 import { DEMO_SMS_CODE, HELPER_RELATION_LABELS } from '@/contract/messages'
 import { lookupDocument } from '@/contract/world'
-import { decide, evaluate, readFace, readVideo, riskOf, subjectDocument, type RuleResult } from './engine'
+import { chipPhotoOf, decide, evaluate, readFace, readVideo, riskOf, subjectDocument, type RuleResult } from './engine'
 import { seedHistory } from './history'
 import { createAccountActions } from './accounts'
 import { createStaffActions } from './staff'
@@ -38,7 +38,8 @@ export class ClaveRuleError extends Error {
 /* ------------------------------------------------------------ timing */
 
 /** Engine pacing (ms). `setEngineSpeed(0)` makes it instant (tests). */
-export const ENGINE_TIMING = { toChecking: 600, perCheck: 500 }
+/** toChecking: how long status 1 "Received" (MSG-STA-1) stays on screen after sending, before the checks start. */
+export const ENGINE_TIMING = { toChecking: 1800, perCheck: 500 }
 let speed = 1
 export function setEngineSpeed(factor: number) { speed = Math.max(0, factor) }
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms * speed))
@@ -177,6 +178,10 @@ function updateCase(caseId: string, patch: (c: Case) => Partial<Case>, events: A
   if (!c) throw new ClaveRuleError(`Unknown case "${caseId}"`)
   const evs = typeof events === 'function' ? events(c) : events
   const next = withDerived({ ...c, ...patch(c), updatedAt: nowIso() })
+  // The citizen's tracker history: one entry each time the status the citizen sees changes.
+  const was = citizenStatus(c)
+  const now = citizenStatus(next)
+  if (now !== 'draft' && (now !== was || !next.statusLog?.length)) next.statusLog = [...(c.statusLog ?? []), { status: now, at: next.updatedAt }]
   commit({ ...s, cases: { ...s.cases, [caseId]: next }, audit: [...s.audit, ...evs] }, caseId, action ?? evs[evs.length - 1]?.action ?? null)
 }
 
@@ -525,20 +530,29 @@ export const actions: ClaveActions = {
     const route = c.session.route!
     if (!(route === 'B' || route === 'X')) fail('The face check is Route B and Route X (route C uses the DNI video).')
     const chipOk = c.session.chipReads[c.session.chipReads.length - 1] === 'ok'
-    if (!chipOk) fail('Read the chip first: the face is compared with the chip photo.')
+    // After two failed chip reads the selfie still runs, as a liveness-only check (no chip photo to compare with).
+    const chipGaveUp = c.session.fallback?.offered === 'chip'
+    if (!chipOk && !chipGaveUp) fail('Read the chip first: the face is compared with the chip photo.')
     const doc = subjectDocument(c)!
     const n = c.session.faceAttempts.length
-    const reading = readFace(camera, doc.number, n)
+    const reading = readFace(camera, doc.number, n, chipPhotoOf(c))
+    const scores = reading.liveness !== undefined
+      ? `, liveness ${reading.liveness.toFixed(2)}${reading.faceMatch !== undefined ? `, face match ${reading.faceMatch.toFixed(2)}` : ', no face match (no chip photo)'} (simulated values)`
+      : ''
     updateCase(caseId, cc => ({ session: patchSession(cc, { faceAttempts: [...cc.session.faceAttempts, camera] }) }), [
       audit(caseId, citizenActor(c), 'face_attempt',
-        `Face check attempt ${n + 1} (camera: ${camera}): ${reading.result}${reading.liveness !== undefined ? `, liveness ${reading.liveness.toFixed(2)}, face match ${reading.faceMatch!.toFixed(2)} (simulated values)` : ''}.`, { evidence: ['liveness', 'face_match'] }),
+        `${chipGaveUp ? 'Selfie liveness check' : 'Face check'} attempt ${n + 1} (camera: ${camera}): ${reading.result}${scores}.`, { evidence: chipGaveUp ? ['liveness'] : ['liveness', 'face_match'] }),
     ])
-    const r = decide(getCase(caseId), new Date(), 'flow')
-    if (r.kind === 'fallback') applyRule(caseId, r)
+    const after = getCase(caseId)
+    const r = decide(after, new Date(), 'flow')
+    if (r.kind === 'fallback' && after.session.fallback?.offered === r.fallback) {
+      // The same Fallback is already on offer: only refresh what the officer will see (checks, flags, risk).
+      updateCase(caseId, () => ({ checks: r.checks, flags: r.flags, risk: r.risk, aiReason: r.aiReason }), [])
+    } else if (r.kind === 'fallback' || r.kind === 'to_officer') applyRule(caseId, r)
     return {
       result: reading.result, attempt: n + 1, liveness: reading.liveness, faceMatch: reading.faceMatch,
-      msg: r.kind === 'fallback' ? 'FALL-01' : reading.result === 'pass' ? 'VER-02' : 'VER-05',
-      outcome: r.kind === 'fallback' ? 'fallback' : 'continue',
+      msg: r.kind === 'to_officer' ? 'VER-07' : r.kind === 'fallback' ? 'FALL-01' : reading.result === 'pass' ? 'VER-02' : 'VER-05',
+      outcome: r.kind === 'fallback' ? 'fallback' : r.kind === 'to_officer' ? 'to_officer' : 'continue',
     }
   },
   recordVideoAttempt(caseId, camera: CameraInput) {
@@ -648,7 +662,7 @@ export const actions: ClaveActions = {
     if (route === 'A' && !s.eidLogin) missing.push('national eID login')
     if (route === 'B' || route === 'X') {
       if (s.chipReads[s.chipReads.length - 1] !== 'ok') missing.push('a successful chip read')
-      if (s.faceAttempts.length === 0 || readFace(s.faceAttempts[s.faceAttempts.length - 1], subjectDocument(c)?.number ?? '', s.faceAttempts.length - 1).result !== 'pass') missing.push('a passed face check')
+      if (s.faceAttempts.length === 0 || readFace(s.faceAttempts[s.faceAttempts.length - 1], subjectDocument(c)?.number ?? '', s.faceAttempts.length - 1, chipPhotoOf(c)).result !== 'pass') missing.push('a passed face check')
     }
     if (route === 'C' && readVideo(s.videoAttempts[s.videoAttempts.length - 1] ?? 'reflections') !== 'pass') missing.push('a passed DNI video')
     if (route === 'X' && !s.uploads.redCard) missing.push('the red card photo, number and expiry')
@@ -1111,3 +1125,9 @@ export const plannedChecks = (c: Case): CheckId[] => evaluate(c).checks.map(k =>
 
 /** Exposed for tests and the debug console. */
 export const getState = () => useClave.getState()
+
+/** A simulated score with two decimals, in the current language's format ("0.24" / "0,24"). */
+export const score2 = (n: number): string => {
+  const s = n.toFixed(2)
+  return useClave.getState().lang === 'es' ? s.replace('.', ',') : s
+}

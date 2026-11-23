@@ -18,6 +18,7 @@ import {
   PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_DOCUMENTS, SIGNUP_MIN_AGE, demoHash, fictionalDniNie, hasDniNieShape, isFictionalDniNie,
   newDraftCase, normaliseDocNumber,
 } from '@/contract/seed'
+import { DEMO_PEOPLE } from '@/contract/world'
 
 /* ------------------------------------------------------------ validation */
 
@@ -193,13 +194,22 @@ export function buildSignUpCase(id: string, input: SignUpInput, documentNumber: 
   return newDraftCase(id, 'signup', typedFromSignUp(input, documentNumber, now), now.toISOString(), { caseRef })
 }
 
-/** Lowest free GYC-NN reference (a live sign-up of Giulia gets GYC-01). */
-export function nextCaseRef(s: AppState): string {
+/**
+ * Case reference of a new sign-up. Only the plan's demo people carry a GYC-NN reference: a sign-up whose typed
+ * document number is exactly the demo number of a person the plan types in live (Giulia, GYC-01) gets that
+ * reference while it is free. Every other new account gets a neutral "SOL-XXXX" derived from its case id.
+ */
+export function nextCaseRef(s: AppState, documentNumber?: string, caseId?: string): string {
   const used = new Set(Object.values(s.cases).map(c => c.caseRef).filter(Boolean))
-  for (let n = 1; ; n++) {
-    const ref = `GYC-${String(n).padStart(2, '0')}`
-    if (!used.has(ref)) return ref
+  if (documentNumber) {
+    const wanted = normaliseDocNumber(documentNumber)
+    const demo = DEMO_PEOPLE.find(p => !p.caseId && normaliseDocNumber(p.account.documentNumber) === wanted)
+    if (demo && !used.has(demo.caseRef)) return demo.caseRef
   }
+  const base = (caseId ?? `su-${Date.now().toString(36)}`).replace(/[^a-z0-9]/gi, '').toUpperCase()
+  let ref = `SOL-${base.slice(-4).padStart(4, '0')}`
+  for (let n = 5; used.has(ref) && n <= base.length; n++) ref = `SOL-${base.slice(-n)}`
+  return ref
 }
 
 /** Every document number already used by an account or a case. */
@@ -251,7 +261,7 @@ export function createAccountActions({ get, commit, audit }: AccountDeps): Accou
       }
       const id = newCaseId(s)
       const now = new Date()
-      const c = buildSignUpCase(id, input, documentNumber, now, nextCaseRef(s))
+      const c = buildSignUpCase(id, input, documentNumber, now, nextCaseRef(s, documentNumber, id))
       const account: CitizenAccount = {
         caseId: id,
         documentNumber,

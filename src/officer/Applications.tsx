@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FilterX, Search } from 'lucide-react'
 import type { DocumentType, Level, RouteId, StatusId } from '@/contract/types'
-import { DOCUMENTS, LEVEL_LABELS, ROUTES, ROUTE_ORDER, STATUSES, STATUS_ORDER } from '@/contract/seed'
+import { DOCUMENTS, LEVEL_LABELS, ROUTES, routeCode, ROUTE_ORDER, STATUSES, STATUS_ORDER } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { priorityOf, relativeTime } from '@/core/selectors'
@@ -76,7 +76,7 @@ export function ApplicationsPage() {
           <span>{tr(C.route)}</span>
           <select value={route} onChange={e => setRoute(e.target.value as typeof route)} className={cn(selCls, 'max-w-[220px]')}>
             <option value="all">{tr(C.allRoutes)}</option>
-            {ROUTE_ORDER.map(r => <option key={r} value={r}>{ROUTES[r].code} · {tr(ROUTES[r].name)}</option>)}
+            {ROUTE_ORDER.map(r => <option key={r} value={r}>{tr(routeCode(r))} · {tr(ROUTES[r].name)}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm text-muted">

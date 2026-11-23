@@ -157,6 +157,15 @@ export const MSG = {
     title: b('What we check', 'Qué comprobamos'),
     ...b('To confirm who you are, we check three things: your identity document, that you are the person in it, and your residence data in Spain.', 'Para confirmar quién eres, comprobamos tres cosas: tu documento de identidad, que eres la persona que aparece en él y tus datos de residencia en España.'),
   },
+  /**
+   * DERIVED from MSG-CON-01 for Route X (red card / NIE paper, GYC-05): there is no residence check on this route
+   * (a person checks the card instead), so the residence item is left out. Not verbatim.
+   */
+  'CON-01X': {
+    title: b('What we check', 'Qué comprobamos'),
+    ...b('To confirm who you are, we check two things: your identity document and that you are the person in it.', 'Para confirmar quién eres, comprobamos dos cosas: tu documento de identidad y que eres la persona que aparece en él.'),
+    derivedFrom: 'CON-01',
+  },
   'CON-02': {
     title: b('Why we check', 'Por qué lo comprobamos'),
     ...b('We check so that a Cl@ve is only given to the person it belongs to. We only ask for the data these checks need.', 'Hacemos estas comprobaciones para que una Cl@ve solo se entregue a la persona a la que pertenece. Solo pedimos los datos que estas comprobaciones necesitan.'),
@@ -165,6 +174,16 @@ export const MSG = {
     title: b('Chip and face', 'Chip y cara'),
     ...b('Your phone reads the chip in your document. Then you look at the camera and move your head a little, so we can see that a real person is there. We compare your face with the photo stored in the chip. Your face data is sensitive, so we need your clear permission.', 'Tu móvil lee el chip de tu documento. Después miras a la cámara y mueves un poco la cabeza, para que podamos ver que hay una persona real. Comparamos tu cara con la foto guardada en el chip. Los datos de tu cara son sensibles, por eso necesitamos tu permiso expreso.'),
     checkbox: b('I agree that my face data is used to check that I am the holder of this document.', 'Acepto que se usen los datos de mi cara para comprobar que soy el titular de este documento.'),
+  },
+  /**
+   * DERIVED from MSG-CON-03 for Route C (GYC-03: "MSG-CON-03 without the sentence about the chip"). The DNI video
+   * route reads no chip: the first sentence is dropped and the photo is the one of the document. Not verbatim.
+   */
+  'CON-03C': {
+    title: b('Face', 'Cara'),
+    ...b('You look at the camera and move your head a little, so we can see that a real person is there. We compare your face with the photo of your document. Your face data is sensitive, so we need your clear permission.', 'Miras a la cámara y mueves un poco la cabeza, para que podamos ver que hay una persona real. Comparamos tu cara con la foto de tu documento. Los datos de tu cara son sensibles, por eso necesitamos tu permiso expreso.'),
+    checkbox: b('I agree that my face data is used to check that I am the holder of this document.', 'Acepto que se usen los datos de mi cara para comprobar que soy el titular de este documento.'),
+    derivedFrom: 'CON-03',
   },
   'CON-04': {
     title: b('Residence records', 'Registros de residencia'),

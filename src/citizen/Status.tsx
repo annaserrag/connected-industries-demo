@@ -12,7 +12,7 @@ import { fieldLabel } from '@/core/engine'
 import { LiveIndicator, useRecentRemote } from '@/core/LiveIndicator'
 import type { Case, Decision, StatusId } from '@/contract/types'
 import { GLOSSARY, MSG, REJ_REASONS, fillMsg, type MsgId } from '@/contract/messages'
-import { ROUTES, STATUSES, STATUS_ORDER, fullName, statusMsgId } from '@/contract/seed'
+import { ROUTES, STATUSES, STATUS_ORDER, citizenStatus, fullName, statusMsgId } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, LiveToast, Modal } from './components/basics'
 import { CheckList, CheckListHeader } from './components/checks'
@@ -27,22 +27,48 @@ type StepState = 'done' | 'now' | 'next' | 'notNeeded' | 'ifNeeded' | 'notReache
 const isRefusal = (d: Decision) => d.outcome === 'refused' || d.outcome === 'revoked'
 const lastRefusal = (c: Case) => [...c.decisions].reverse().find(isRefusal)
 
+/**
+ * Tracker step state from the real history (case.statusLog: what the citizen has seen, in order). A step is "done"
+ * only if it was really shown. Cases without a log (background demo data) fall back to the status order.
+ */
 function stepState(c: Case, s: StatusId): StepState {
-  const cur = c.status as StatusId
+  const cur = citizenStatus(c)
+  const log = c.statusLog ?? []
+  const decided = cur === 'approved' || cur === 'not_approved'
+  const seen = (x: StatusId) => (log.length ? log.some(e => e.status === x) : null)
   switch (s) {
-    case 'received': return cur === 'received' ? 'now' : 'done'
-    case 'checking': return cur === 'received' ? 'next' : cur === 'checking' ? 'now' : 'done'
-    case 'need_info':
+    case 'received': {
+      if (cur === 'received') return 'now'
+      const v = seen('received')
+      return v === null || v ? 'done' : 'notNeeded'
+    }
+    case 'checking': {
+      if (cur === 'checking') return 'now'
+      const v = seen('checking')
+      if (v === null) return cur === 'received' ? 'next' : 'done'
+      if (v) return 'done'
+      return decided ? 'notNeeded' : 'next'
+    }
+    case 'need_info': {
       if (cur === 'need_info') return 'now'
-      if (c.infoRequest || c.session.fallback) return 'done'
-      return cur === 'approved' || cur === 'not_approved' ? 'notNeeded' : 'ifNeeded'
+      const v = seen('need_info')
+      if (v === null ? Boolean(c.infoRequest || c.session.fallback) : v) return 'done'
+      return decided ? 'notNeeded' : 'ifNeeded'
+    }
     case 'approved': return cur === 'approved' ? 'now' : cur === 'not_approved' ? 'notReached' : 'next'
     case 'not_approved': return cur === 'not_approved' ? 'now' : cur === 'approved' ? 'notReached' : 'ifNeeded'
   }
 }
 
+/** Time the citizen last reached this status (from the log). */
+function stepTime(c: Case, s: StatusId): string | undefined {
+  const log = c.statusLog ?? []
+  for (let i = log.length - 1; i >= 0; i--) if (log[i].status === s) return log[i].at
+  return undefined
+}
+
 function Tracker({ c }: { c: Case }) {
-  const { tr } = useTr()
+  const { tr, lang } = useTr()
   return (
     <ol className="relative" aria-label={tr(C.progressTitle)} data-testid="tracker">
       {STATUS_ORDER.map((s, idx) => {
@@ -51,8 +77,9 @@ function Tracker({ c }: { c: Case }) {
         const bad = s === 'not_approved' && isNow
         const good = s === 'approved' && isNow
         const dim = st !== 'done' && !isNow
+        const at = st === 'done' || isNow ? stepTime(c, s) : undefined
         return (
-          <li key={s} className="relative flex gap-3 pb-4 last:pb-0" aria-current={isNow ? 'step' : undefined}>
+          <li key={s} className="relative flex gap-3 pb-4 last:pb-0" aria-current={isNow ? 'step' : undefined} data-testid={`tracker-${s}`} data-state={st}>
             {idx < STATUS_ORDER.length - 1 && <span aria-hidden className={cn('absolute left-[15px] top-8 h-[calc(100%-28px)] w-0.5', st === 'done' ? 'bg-success' : 'bg-line')} />}
             <span className={cn(
               'relative z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold',
@@ -66,7 +93,9 @@ function Tracker({ c }: { c: Case }) {
             </span>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-2 pt-1">
               <span className={cn('text-[15px] font-bold', dim ? 'text-muted' : 'text-ink')}>{tr(s === 'approved' && isNow ? MSG[statusMsgId('approved', c.advanced)].title : STATUSES[s].label)}</span>
-              <span className={cn('text-[12px] font-bold uppercase tracking-wide', isNow ? 'text-brand-strong' : 'text-muted')}>{tr(C.stepState[st])}</span>
+              <span className={cn('text-[12px] font-bold uppercase tracking-wide', isNow ? 'text-brand-strong' : 'text-muted')}>
+                {tr(C.stepState[st])}{at && <span className="ml-1.5 font-semibold normal-case tracking-normal" data-testid={`tracker-${s}-time`}>· {clock(at, lang)}</span>}
+              </span>
             </div>
           </li>
         )
@@ -74,6 +103,8 @@ function Tracker({ c }: { c: Case }) {
     </ol>
   )
 }
+
+const clock = (iso: string, lang: 'en' | 'es') => new Date(iso).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 /* ----------------------------------------------------------- video room */
 
@@ -210,6 +241,7 @@ function Approved({ c }: { c: Case }) {
       {c.citizenMsgs.includes('COR-06') && <MsgBlock id="COR-06" tone="success" />}
       {c.citizenMsgs.includes('COR-08') && <MsgBlock id="COR-08" tone="success" />}
       <MsgBlock id={id} as="h2" tone="success" />
+      {id === 'STA-4C' && c.session.who === 'helping' && <SmsMockup c={c} />}
       <div className="grid gap-3 sm:grid-cols-2">
         <BigButton variant="secondary" onClick={() => downloadReceipt(c, lang)} testId="download-receipt"><FileDown size={18} aria-hidden />{tr(id === 'STA-4C' ? MSG['STA-4C'].button : MSG['STA-4'].buttons[0])}</BigButton>
         {id !== 'STA-4C' && <BigButton onClick={() => setMovil(true)} testId="open-clave-movil"><Smartphone size={18} aria-hidden />{tr(MSG['STA-4'].buttons[1])}</BigButton>}
@@ -220,6 +252,36 @@ function Approved({ c }: { c: Case }) {
         <div className="mt-4"><BigButton onClick={() => setMovil(false)}>{tr(C.gotIt)}</BigButton></div>
       </Modal>
     </div>
+  )
+}
+
+/**
+ * GYC-03 (plan block 7, step 7): an assisted applicant gets the advanced-level result by SMS on his own basic phone.
+ * A phone mock-up with the SMS text (MSG-STA-4C), labelled as a simulated SMS. No real message is sent.
+ */
+function SmsMockup({ c }: { c: Case }) {
+  const { tr, lang } = useTr()
+  const m = MSG['STA-4C']
+  const mobile = c.session.contact?.mobile ?? ''
+  const masked = mobile ? `${mobile.slice(0, -4).replace(/\d/g, '•')}${mobile.slice(-4)}` : ''
+  const at = c.decisions.filter(d => d.outcome === 'approved_advanced').at(-1)?.at ?? c.updatedAt
+  return (
+    <figure className="mx-auto w-full max-w-[260px]" data-testid="sms-mockup">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[28px] border-[6px] border-ink bg-ink p-1.5 shadow-pop">
+        <div className="rounded-[20px] bg-surface px-3 pt-2 pb-4">
+          <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-line" aria-hidden />
+          <p className="text-center text-[11px] font-bold tracking-wide text-muted uppercase">{tr({ en: 'Messages', es: 'Mensajes' })}{masked ? ` · ${masked}` : ''}</p>
+          <div className="mt-3 rounded-[14px] rounded-tl-[4px] bg-surface-2 p-3 text-[14px] leading-snug text-ink">
+            <p className="mb-1 flex items-center justify-between gap-2 text-[12px] font-bold text-muted">
+              <span>SMS · Get your Cl@ve</span><span className="tabular-nums font-semibold">{clock(at, lang).slice(0, 5)}</span>
+            </p>
+            <p className="font-bold">{tr(m.title)}</p>
+            <p className="mt-1">{tr(m)}</p>
+          </div>
+        </div>
+      </motion.div>
+      <figcaption className="mt-2 text-center text-[12px] text-muted">{tr({ en: 'Simulated SMS (prototype): no real message is sent.', es: 'SMS simulado (prototipo): no se envía ningún mensaje real.' })}</figcaption>
+    </figure>
   )
 }
 
@@ -237,12 +299,25 @@ function AdvancedRefusal({ c }: { c: Case }) {
       <h3 className="font-display text-[18px] font-bold text-ink">{tr({ en: 'Advanced level not approved', es: 'Nivel avanzado no aprobado' })}</h3>
       <p className="text-[15px] text-muted">{tr({ en: 'Your basic level stays active.', es: 'Tu nivel básico sigue activo.' })}</p>
       {dismissed && reasonId && <MsgBlock id="COR-07" tone="danger" vars={{ reason: tr(REJ_REASONS[reasonId].officerLabel), legal: tr(MSG['COR-07'].legal) }} />}
-      {reasonId && <p className="text-[16px] leading-relaxed text-ink">{fillMsg(tr(MSG[reasonId]), { fields: '—' })}</p>}
+      {reasonId && <p className="text-[16px] leading-relaxed text-ink">{fillMsg(tr(MSG[reasonId]), { fields: discrepancyText(c, reasonId, tr) })}</p>}
       {open && <MsgBlock id="COR-05" tone="info" />}
       {form ? <ReviewRequest c={c} onClose={() => setForm(false)} />
         : !open && !dismissed && <BigButton testId="ask-review" onClick={() => setForm(true)}><Scale size={18} aria-hidden />{tr(MSG['STA-5'].button)}</BigButton>}
     </section>
   )
+}
+
+/**
+ * The REJ-05 placeholder "[field: value on your document / value in the records]", filled from the case's
+ * discrepancy rows (residence rows first; chip rows when the refusal is about the chip), e.g. "Surnames: ROJAS GÓMEZ / ROJAS".
+ */
+export function discrepancyText(c: Case, reasonId: string | undefined, tr: (b: { en: string; es: string }) => string): string {
+  const all = c.discrepancies ?? []
+  const residence = all.filter(x => x.source === 'residence')
+  const rows = reasonId === 'REJ-05' && residence.length ? residence : all
+  if (!rows.length) return '—'
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1)
+  return rows.map(x => `${cap(tr(fieldLabel(x.field)))}: ${x.document} / ${x.records}`).join('; ')
 }
 
 function Refused({ c }: { c: Case }) {
@@ -251,8 +326,7 @@ function Refused({ c }: { c: Case }) {
   const [form, setForm] = useState(false)
   const [call, setCall] = useState(false)
   const reasonId = c.appeal?.state === 'dismissed' ? c.appeal.keptReasonId ?? d?.reasonId : d?.reasonId
-  const fields = (c.discrepancies ?? []).map(x => tr(fieldLabel(x.field)))
-  const vars = { fields: fields.length ? Array.from(new Set(fields)).join(', ') : '—' }
+  const vars = { fields: discrepancyText(c, reasonId, tr) }
   const dismissed = c.appeal?.state === 'dismissed'
   const canAsk = !dismissed && c.appeal?.state !== 'open'
   const offerCall = reasonId === 'REJ-06' || reasonId === 'REJ-07'
@@ -352,11 +426,12 @@ export function StatusPage() {
   const inRoom = Boolean(s.videoCall && (s.videoCall.state === 'waiting' || s.videoCall.state === 'live') && !decided)
   const openInfo = c.status === 'need_info' && c.infoRequest && !c.infoRequest.response
   const offerFallback = !inRoom && !decided && s.fallback && !s.fallback.joined && !s.fallback.comeBackLater
+  const shown = citizenStatus(c)
   const route = c.route ? ROUTES[c.route] : undefined
   const engineRunning = (c.status === 'received' || c.status === 'checking') && !c.awaitingOfficer && !inRoom
 
   return (
-    <div className="relative" data-testid="status-page" data-status={c.status}>
+    <div className="relative" data-testid="status-page" data-status={c.status} data-citizen-status={shown}>
       <Confetti fire={fire} />
       <LiveToast message={tr(C.updatedJustNow)} show={toast} onDone={hideToast} />
 
@@ -369,20 +444,20 @@ export function StatusPage() {
         <div className="min-w-0 flex-1 basis-[60%]">
           <h1 className="font-display text-[20px] font-bold text-ink">{tr(C.statusTitle)}</h1>
           <p className="text-[14px] text-muted">
-            {c.persona.name}{route ? ` · ${tr(C.routeLabel)} ${route.code}` : ''}{c.submittedAt ? ` · ${tr(C.submitted)} ${rel(c.submittedAt, lang)}` : ''}
+            {c.persona.name}{route ? ` · ${route.id === 'F' ? tr(C.routeFallback) : `${tr(C.routeLabel)} ${route.code}`}` : ''}{c.submittedAt ? ` · ${tr(C.submitted)} ${rel(c.submittedAt, lang)}` : ''}
           </p>
           {c.policyProposal && <ProposedRuleTag className="mt-1" />}
         </div>
         <div className="flex basis-full flex-wrap items-center justify-between gap-2 sm:basis-auto sm:flex-col sm:items-end" aria-live="polite">
-          <StatusPill status={c.status} advanced={c.advanced} />
+          <StatusPill status={shown} advanced={c.advanced} />
           <LiveIndicator caseId={c.id} className="!px-0 text-[10px]" />
         </div>
       </motion.div>
 
       <section aria-live="polite" className="mb-6" data-testid="status-main">
-        {inRoom ? <VideoRoom c={c} />
+        {inRoom ? <div className="space-y-4">{shown === 'need_info' && <MsgBlock id="STA-3" as="h2" />}<VideoRoom c={c} /></div>
           : openInfo ? <div className="space-y-4"><MsgBlock id="STA-3" as="h2" /><InfoReply c={c} /></div>
-          : offerFallback ? <div className="space-y-4">{c.status === 'need_info' && <MsgBlock id="STA-3" as="h2" />}<FallbackOffer c={c} /></div>
+          : offerFallback ? <div className="space-y-4">{shown === 'need_info' && <MsgBlock id="STA-3" as="h2" />}<FallbackOffer c={c} /></div>
           : c.status === 'approved' ? <Approved c={c} />
           : c.status === 'not_approved' ? <Refused c={c} />
           : c.status === 'received' ? <MsgBlock id="STA-1" tone="info" />

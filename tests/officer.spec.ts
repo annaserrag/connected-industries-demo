@@ -67,6 +67,7 @@ async function citizenRuns(page: Page, kind: 'kenji' | 'applicant-x' | 'rafael' 
         a.setAnswers('kenji', { document: 'TIE', who: 'self', nfc: 'unsure' })
         a.giveConsents('kenji', { face: true, residence: true })
         a.recordChipRead('kenji'); a.recordChipRead('kenji')
+        a.recordFaceAttempt('kenji', 'person') // selfie liveness check (no chip photo)
         a.joinVideoCall('kenji')
         return null
       case 'applicant-x':
@@ -79,7 +80,8 @@ async function citizenRuns(page: Page, kind: 'kenji' | 'applicant-x' | 'rafael' 
       case 'rafael':
         a.setAnswers('rafael', { document: 'TIE', who: 'self', nfc: 'yes' })
         a.giveConsents('rafael', { face: true, residence: true })
-        return a.recordChipRead('rafael')
+        a.recordChipRead('rafael')
+        return a.recordFaceAttempt('rafael', 'person')
       case 'valentina':
         a.setAnswers('valentina', { document: 'TIE', who: 'self', nfc: 'yes' })
         a.giveConsents('valentina', { face: true, residence: true })
@@ -245,7 +247,7 @@ test('GYC-08 Valentina: Vega refuses REJ-05 → review → Vega sees the notice 
   await page.getByTestId('btn-refuse').click()
   const dlg = page.getByRole('dialog')
   await expect(dlg.getByTestId('reason-REJ-05')).toHaveAttribute('aria-checked', 'true')
-  await expect(dlg.getByTestId('citizen-preview')).toContainText('surnames: ROJAS GOMEZ / ROJAS')
+  await expect(dlg.getByTestId('citizen-preview')).toContainText('Surnames: ROJAS GÓMEZ / ROJAS')
   await dlg.getByTestId('reason-confirm').click()
   await expect.poll(async () => (await getCase(page, 'valentina')).status).toBe('not_approved')
 
@@ -402,4 +404,34 @@ test('1100 px: icon rail, case detail and queue still work', async ({ page }) =>
   await shot(page, 'gyc07-case-1100')
   await openCase(page, 'applicant-x')
   await shot(page, 'gyc06-case-1100')
+})
+
+test('queue layout: 768 px keeps every column visible (secondary info in the applicant cell); 1440 px icons never cover the time', async ({ page }) => {
+  const errors = track(page)
+  await page.setViewportSize({ width: 768, height: 1000 })
+  await boot(page)
+  await citizenRuns(page, 'kenji')
+  await citizenRuns(page, 'rafael')
+  await page.goto(`${D}#/officer`)
+  const row = page.locator('tr[data-case-id="kenji"]')
+  await expect(row.getByTestId('queue-compact-meta')).toBeVisible()
+  await expect(row.getByTestId('queue-ai-reason')).toBeVisible()
+  const fit = await page.evaluate(() => { const t = document.querySelector('table')!; return { table: t.scrollWidth, box: t.parentElement!.clientWidth, doc: document.documentElement.scrollWidth } })
+  expect(fit.table).toBeLessThanOrEqual(fit.box)
+  expect(fit.doc).toBeLessThanOrEqual(768)
+  // the AI reason column is wide enough to read
+  expect((await row.getByTestId('queue-ai-reason').boundingBox())!.width).toBeGreaterThan(150)
+  await shot(page, 'queue-768')
+
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await expect(row.getByTestId('queue-compact-meta')).toBeHidden()
+  for (const id of ['kenji', 'rafael']) {
+    const r = page.locator(`tr[data-case-id="${id}"]`)
+    const cells = r.locator('td')
+    const checks = await cells.nth(5).locator('ul').boundingBox()
+    const time = await cells.nth(6).boundingBox()
+    expect(checks!.x + checks!.width).toBeLessThanOrEqual(time!.x + 1)
+  }
+  await shot(page, 'queue-1440')
+  expect(errors).toEqual([])
 })

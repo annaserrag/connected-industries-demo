@@ -109,12 +109,12 @@ export function LiveToast({ message, show, onDone }: { message: string; show: bo
     return () => window.clearTimeout(id)
   }, [show, onDone])
   return (
-    <div aria-live="polite" role="status" className="pointer-events-none sticky bottom-5 z-40 h-0">
-      <div className="absolute inset-x-0 bottom-0 flex justify-center px-4">
+    <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40" data-testid="live-toast">
+      <div className="flex justify-center px-4">
       <AnimatePresence>
         {show && (
           <motion.div
-            initial={{ opacity: 0, y: -12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }}
             className="flex items-center gap-2 rounded-[2px] bg-ink px-4 py-2 text-sm font-bold text-surface shadow-pop"
           >
             <span className="relative flex size-2">

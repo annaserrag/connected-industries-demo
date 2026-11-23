@@ -155,7 +155,8 @@ export const C = {
 
   /* ---------- route assistant ---------- */
   hello: b('Hi', 'Hola'),
-  questionOf: b('Question {n} of {total}', 'Pregunta {n} de {total}'),
+  /** No total: how many questions are asked depends on the answers still to come (RA-04 only for EU, RA-06 only when route B is possible). */
+  questionN: b('Question {n}', 'Pregunta {n}'),
   chooseOne: b('Choose one option to continue.', 'Elige una opción para continuar.'),
   changeAnswers: b('Change my answers', 'Cambiar mis respuestas'),
   yourRoute: b('Your route', 'Tu vía'),
@@ -178,6 +179,9 @@ export const C = {
   stoppedBody: b('Nothing was sent. You can start again whenever you want.', 'No se ha enviado nada. Puedes empezar de nuevo cuando quieras.'),
   startAgain: b('Start again', 'Empezar de nuevo'),
   signOutSession: b('Sign out', 'Cerrar sesión'),
+  signOutConfirmTitle: b('Sign out now?', '¿Cerrar sesión ahora?'),
+  signOutConfirmBody: b('Your application is not finished. What you have done so far is kept, and you can continue when you sign in again.', 'Tu solicitud no está terminada. Lo que has hecho hasta ahora se guarda y puedes seguir cuando vuelvas a entrar.'),
+  signOutStay: b('Stay and continue', 'Quedarme y seguir'),
   // minor
   guardianCheckTitle: b('First, your own identity', 'Primero, tu identidad'),
   guardianCheckBody: b('{guardian}, read the chip of your own document and do a face check. This confirms who you are; it does not register you.', '{guardian}, lee el chip de tu propio documento y haz la comprobación facial. Así confirmamos quién eres; no te registra a ti.'),
@@ -206,6 +210,10 @@ export const C = {
   chipReading: b('Reading the chip…', 'Leyendo el chip…'),
   cameraSilhouette: b('Camera frame (no camera is used)', 'Recuadro de la cámara (no se usa ninguna cámara)'),
   startFaceCheck: b('Start the face check', 'Empezar la comprobación facial'),
+  selfieTitle: b('Before the video call: a quick selfie', 'Antes de la videollamada: un selfi rápido'),
+  selfieBody: b('Look at the camera and move your head a little, so we can see that a real person is there. Without the chip we cannot compare your face with its photo: the person on the video call will do that.', 'Mira a la cámara y mueve un poco la cabeza, para que podamos ver que hay una persona real. Sin el chip no podemos comparar tu cara con su foto: lo hará la persona de la videollamada.'),
+  startSelfie: b('Take the selfie', 'Hacer el selfi'),
+  selfieDone: b('Selfie done: a real person is in front of the camera.', 'Selfi hecho: hay una persona real ante la cámara.'),
   faceChecking: b('Checking…', 'Comprobando…'),
   facePassed: b('Face check completed', 'Comprobación facial completada'),
   startDniVideo: b('Record the video', 'Grabar el vídeo'),
@@ -232,6 +240,10 @@ export const C = {
   confirmCode: b('Confirm code', 'Confirmar código'),
   wrongCode: b('That code is not right. Check it and try again.', 'Ese código no es correcto. Revísalo e inténtalo de nuevo.'),
   changeNumber: b('Change the number', 'Cambiar el número'),
+  wrongCodeLeft: b('That code is not right. You have {n} more tries.', 'Ese código no es correcto. Te quedan {n} intentos.'),
+  codeLocked: b('You typed a wrong code 3 times. For your security, wait {s} seconds before trying again, or ask for another code.', 'Has escrito un código incorrecto 3 veces. Por tu seguridad, espera {s} segundos antes de volver a intentarlo, o pide otro código.'),
+  resendCode: b('Send another code', 'Enviar otro código'),
+  codeResent: b('We have sent you a new code.', 'Te hemos enviado un código nuevo.'),
   // review
   reviewTitle: b('Check your answers', 'Revisa tus respuestas'),
   sending: b('Sending…', 'Enviando…'),
@@ -258,6 +270,7 @@ export const C = {
   progressTitle: b('Progress', 'Seguimiento'),
   checksTitle: b('Every check we did', 'Cada comprobación que hicimos'),
   routeLabel: b('Route', 'Vía'),
+  routeFallback: b('Alternative route: video call', 'Vía alternativa: videollamada'),
   submitted: b('Sent', 'Enviada'),
   stepState: {
     done: b('Done', 'Hecho'),

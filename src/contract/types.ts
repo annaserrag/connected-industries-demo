@@ -498,6 +498,11 @@ export interface Case {
   answers: AssistantAnswers | null
   route: RouteId | null
   status: StatusId | 'draft'
+  /**
+   * What the citizen's tracker has shown, in order, with the time (citizenStatus() at each change). Lets the
+   * tracker mark a step "done" only when it really happened.
+   */
+  statusLog?: Array<{ status: StatusId; at: string }>
   level: Level
   advanced: AdvancedState
   consentGiven: boolean

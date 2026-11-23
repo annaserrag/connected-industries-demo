@@ -93,7 +93,7 @@ export function HelpPage() {
       subtitle={tr(b('Everything you need to register in Cl@ve from your phone.', 'Todo lo que necesitas para registrarte en Cl@ve desde tu móvil.'))}
       breadcrumb={[{ to: '/', label: tr(b('Home', 'Inicio')) }, { label: tr(b('Help', 'Ayuda')) }]}
     >
-      <div className="grid gap-10 lg:grid-cols-[220px_1fr]" data-testid="help-page">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[220px_minmax(0,1fr)]" data-testid="help-page">
         <div><PageNav items={nav} label={tr(b('On this page', 'En esta página'))} /></div>
         <div className="space-y-10">
           <Section id="what" title={nav[0].label}>
@@ -236,7 +236,7 @@ export function AboutPage() {
       subtitle={tr(b('Who made Get your Cl@ve, what is real and what is simulated.', 'Quién ha hecho Get your Cl@ve, qué es real y qué está simulado.'))}
       breadcrumb={[{ to: '/', label: tr(b('Home', 'Inicio')) }, { label: tr(b('About this platform', 'Sobre esta plataforma')) }]}
     >
-      <div className="grid gap-10 lg:grid-cols-[220px_1fr]" data-testid="about-page">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[220px_minmax(0,1fr)]" data-testid="about-page">
         <div><PageNav items={nav} label={tr(b('On this page', 'En esta página'))} /></div>
         <div className="space-y-10">
           <Section id="project" title={nav[0].label}>

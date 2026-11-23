@@ -13,7 +13,7 @@ import { DOCUMENT_OPTIONS, WHO_OPTIONS, YES_NO_UNSURE, type MsgId } from '@/cont
 import { SIGNUP_COUNTRIES, countryByName, recommendRoute } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar } from './components/basics'
-import { Alert, SelectInput, msg } from './components/flow'
+import { Alert, SelectInput, asHeading, msg } from './components/flow'
 import { flowPath } from './Shell'
 import { errText, useCase, useGo, useReduced, useTr } from './hooks'
 
@@ -123,7 +123,7 @@ export function Assistant() {
           <ChevronLeft size={20} aria-hidden />
         </button>
         <div className="flex-1">
-          <ProgressBar value={q === 'result' ? 1 : (i + 1) / (total + 1)} label={q === 'result' ? tr(C.yourRoute) : fill(tr(C.questionOf), { n: i + 1, total })} />
+          <ProgressBar value={q === 'result' ? 1 : (i + 1) / (total + 1)} label={q === 'result' ? tr(C.yourRoute) : fill(tr(C.questionN), { n: i + 1 })} />
         </div>
       </div>
 
@@ -204,7 +204,7 @@ export function Assistant() {
                 data-testid={`msg-${resultId}`}
               >
                 {rec.policyProposal && <ProposedRuleTag className="mb-2" />}
-                <h1 className="font-display text-[24px] font-bold leading-tight">{tr(msg(resultId).title!)}</h1>
+                <h1 className="font-display text-[24px] font-bold leading-tight">{asHeading(tr(msg(resultId).title!))}</h1>
                 <p className="mt-2 text-[16px] leading-relaxed">{tr(msg(resultId))}</p>
                 {msg(resultId).why && <p className="mt-3 text-[15px] leading-relaxed text-muted">{tr(msg(resultId).why!)}</p>}
               </motion.div>

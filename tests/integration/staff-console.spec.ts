@@ -336,7 +336,7 @@ async function runCase(page: Page, id: 'applicant-x' | 'valentina' | 'kenji' | '
     const finish = async () => { a.setContact(id, { mobile: P.contact.mobile }); a.confirmSms(id, '123456'); a.confirmReview(id); await a.submit(id) }
     if (id === 'kenji') {
       a.setAnswers(id, { document: 'TIE', who: 'self', nfc: 'unsure' }); a.giveConsents(id, { face: true, residence: true })
-      a.recordChipRead(id); a.recordChipRead(id); a.joinVideoCall(id); return
+      a.recordChipRead(id); a.recordChipRead(id); a.recordFaceAttempt(id, 'person'); a.joinVideoCall(id); return
     }
     if (id === 'ernesto') {
       a.setAnswers(id, { document: 'DNI', who: 'helping' }); a.setHelper(id, { name: P.helper.name, relation: P.helper.relation, mobile: P.helper.mobile })

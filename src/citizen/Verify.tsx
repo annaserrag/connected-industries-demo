@@ -20,7 +20,7 @@ import { C, fill } from './copy'
 import { BigButton, OptionCard, ProgressBar } from './components/basics'
 import { ChipReadAnimation, FaceScanAnimation, useProgress } from './components/animations'
 import {
-  Alert, CameraControl, CheckboxCard, ImageField, MsgBlock, ReadAloud, Scores, SelectInput, StepTitle, TextInput, demoPersonFor, isoInDays, msg,
+  Alert, asHeading, CameraControl, CheckboxCard, ImageField, MsgBlock, ReadAloud, Scores, SelectInput, StepTitle, TextInput, demoPersonFor, isoInDays, msg,
 } from './components/flow'
 import { flowPath } from './Shell'
 import { clearHelperDone, errText, markHelperDone, useCase, useGo, useTr } from './hooks'
@@ -30,6 +30,9 @@ type StepId =
   | 'consent' | 'eid' | 'passport' | 'chip' | 'face' | 'redcard' | 'video' | 'contact' | 'review' | 'fallF'
 
 const ANIM_MS = 1400
+/** SMS code: wrong tries before a pause, and the pause (like the staff certificate PIN). */
+const SMS_MAX_TRIES = 3
+const SMS_PAUSE_S = 30
 
 function stepsFor(c: Case): StepId[] {
   const s = c.session
@@ -297,7 +300,10 @@ function ConsentStep({ c }: { c: Case }) {
   const [back, setBack] = useState(false)
   const [err, setErr] = useState('')
   const declined = c.session.consents.declined && !back
-  const ids: MsgId[] = ['CON-01', 'CON-02', ...(needFace ? (['CON-03'] as MsgId[]) : []), ...(needResidence ? (['CON-04'] as MsgId[]) : []), 'CON-05']
+  // Route C reads no chip (CON-03 without the chip sentence); Route X has no residence check (CON-01 without it).
+  const con01: MsgId = route === 'X' ? 'CON-01X' : 'CON-01'
+  const con03: MsgId = route === 'C' ? 'CON-03C' : 'CON-03'
+  const ids: MsgId[] = [con01, 'CON-02', ...(needFace ? [con03] : []), ...(needResidence ? (['CON-04'] as MsgId[]) : []), 'CON-05']
   const readText = ids.map(id => `${tr(msg(id).title!)}. ${tr(msg(id))}${msg(id).checkbox ? ` ${tr(msg(id).checkbox!)}` : ''}`).join(' ')
   const ok = (!needFace || face) && (!needResidence || residence)
   const btns = msg('CON-BUTTONS').buttons!
@@ -325,11 +331,11 @@ function ConsentStep({ c }: { c: Case }) {
         <ReadAloud text={readText} />
       </div>
       <div className="space-y-4">
-        <MsgBlock id="CON-01" as="h1" />
+        <MsgBlock id={con01} as="h1" testId="msg-CON-01" />
         <MsgBlock id="CON-02" />
         {needFace && (
-          <MsgBlock id="CON-03">
-            <div className="mt-3"><CheckboxCard checked={face} onChange={setFace} testId="consent-face" name="consentFace">{tr(msg('CON-03').checkbox!)}</CheckboxCard></div>
+          <MsgBlock id={con03} testId="msg-CON-03">
+            <div className="mt-3"><CheckboxCard checked={face} onChange={setFace} testId="consent-face" name="consentFace">{tr(msg(con03).checkbox!)}</CheckboxCard></div>
           </MsgBlock>
         )}
         {needResidence && (
@@ -360,7 +366,7 @@ function EidStep({ c }: { c: Case }) {
   const name = fullName(c.typed.data)
   return (
     <div data-testid="eid-page">
-      <StepTitle>{tr(msg('RA-07A').title!)}</StepTitle>
+      <StepTitle>{asHeading(tr(msg('RA-07A').title!))}</StepTitle>
       <div className="overflow-hidden rounded-[2px] border border-line-strong bg-surface shadow-lg">
         <div className="flex items-center gap-2 bg-[hsl(215_20%_24%)] px-4 py-3 text-white">
           <span className="grid size-8 place-items-center rounded-full bg-white/15"><ShieldCheck size={16} aria-hidden /></span>
@@ -413,7 +419,7 @@ function ChipStep({ c, hold, release }: { c: Case; hold: () => void; release: ()
   })
   return (
     <div data-testid="chip-step">
-      {res?.msg === 'VER-04' ? <FallbackChoices c={c} intro="VER-04" /> : res?.msg === 'VER-07' ? (
+      {res?.msg === 'VER-04' ? <ChipGaveUp c={c} /> : res?.msg === 'VER-07' ? (
         <div>
           <MsgBlock id="VER-07" as="h1" tone="info" />
           <Actions><BigButton testId="see-status" onClick={() => go(`/citizen/case/${c.id}`)}>{tr(C.seeStatus)}</BigButton></Actions>
@@ -440,8 +446,49 @@ function ChipStep({ c, hold, release }: { c: Case; hold: () => void; release: ()
   )
 }
 
+/**
+ * Chip unreadable twice (GYC-02): MSG-VER-04, then the selfie liveness check still runs (there is no chip photo,
+ * so no face match), then the Fallback choices (MSG-FALL-01).
+ */
+function ChipGaveUp({ c }: { c: Case }) {
+  const { tr } = useTr()
+  const [camera, setCamera] = useState<CameraInput>('person')
+  const [res, setRes] = useState<ReturnType<typeof actions.recordFaceAttempt> | null>(null)
+  const [err, setErr] = useState('')
+  const run = useRun()
+  const attempts = c.session.faceAttempts.length
+  const done = Boolean(res && (res.result !== 'retry' || attempts >= 2))
+  return (
+    <div data-testid="chip-gave-up">
+      <MsgBlock id="VER-04" tone="warning" className="mb-4" />
+      {!done ? (
+        <section data-testid="selfie-step">
+          <StepTitle sub={tr(C.selfieBody)}>{tr(C.selfieTitle)}</StepTitle>
+          <div role="img" aria-label={tr(C.cameraSilhouette)}>
+            <FaceScanAnimation progress={run.running ? run.progress : 0} done={false} />
+          </div>
+          <div className="mt-4"><CameraControl value={camera} onChange={setCamera} disabled={run.running} /></div>
+          <div className="mt-4" aria-live="polite">{res && !run.running && res.result === 'retry' && <MsgBlock id="VER-05" tone="warning" />}</div>
+          <Alert>{err}</Alert>
+          <Actions>
+            <BigButton disabled={run.running} testId="selfie-run" onClick={() => run.start(() => {
+              try { setRes(actions.recordFaceAttempt(c.id, camera)) } catch (e) { setErr(errText(e)) }
+            })}>{run.running ? tr(C.faceChecking) : res ? tr(MSG['VER-05'].button) : tr(C.startSelfie)}</BigButton>
+          </Actions>
+        </section>
+      ) : (
+        <>
+          {res?.result === 'pass' && <div className="mb-4"><Alert tone="success" testId="selfie-passed">{tr(C.selfieDone)}</Alert></div>}
+          <FallbackChoices c={c} intro="FALL-01" />
+        </>
+      )}
+    </div>
+  )
+}
+
 function CameraStep({ c, kind, hold, release }: { c: Case; kind: 'face' | 'video'; hold: () => void; release: () => void }) {
   const { tr } = useTr()
+  const go = useGo()
   const [camera, setCamera] = useState<CameraInput>('person')
   const [res, setRes] = useState<ReturnType<typeof actions.recordFaceAttempt> | null>(null)
   const [err, setErr] = useState('')
@@ -452,6 +499,15 @@ function CameraStep({ c, kind, hold, release }: { c: Case; kind: 'face' | 'video
       <div data-testid={`${kind}-step`}>
         <Scores liveness={res.liveness} faceMatch={res.faceMatch} />
         <div className="mt-3"><FallbackChoices c={c} intro="FALL-01" /></div>
+      </div>
+    )
+  }
+  if (res?.msg === 'VER-07') {
+    // Chip integrity failed (GYC-07): a person reviews. No score and no "fraud" word for the citizen.
+    return (
+      <div data-testid={`${kind}-step`}>
+        <MsgBlock id="VER-07" as="h1" tone="info" />
+        <Actions><BigButton testId="see-status" onClick={() => go(`/citizen/case/${c.id}`)}>{tr(C.seeStatus)}</BigButton></Actions>
       </div>
     )
   }
@@ -466,7 +522,7 @@ function CameraStep({ c, kind, hold, release }: { c: Case; kind: 'face' | 'video
       <div className="mt-4 space-y-3" aria-live="polite">
         {passed && <Alert tone="success" testId={`${kind}-passed`}>{tr(kind === 'face' ? C.facePassed : C.dniPassed)}</Alert>}
         {res && !passed && !run.running && <MsgBlock id={retryMsg} tone="warning" />}
-        {res && kind === 'face' && <Scores liveness={res.liveness} faceMatch={res.faceMatch} />}
+        {res && kind === 'face' && !run.running && <Scores liveness={res.liveness} faceMatch={res.faceMatch} />}
       </div>
       <Alert>{err}</Alert>
       <Actions>
@@ -475,7 +531,7 @@ function CameraStep({ c, kind, hold, release }: { c: Case; kind: 'face' | 'video
             try {
               const r = kind === 'face' ? actions.recordFaceAttempt(c.id, camera) : actions.recordVideoAttempt(c.id, camera)
               setRes(r)
-              if (r.result === 'pass' || r.msg === 'FALL-01') hold()
+              if (r.result === 'pass' || r.msg === 'FALL-01' || r.msg === 'VER-07') hold()
             } catch (e) { setErr(errText(e)) }
           })}>
             {run.running ? tr(C.faceChecking) : res ? tr(MSG[retryMsg].button) : tr(kind === 'face' ? C.startFaceCheck : C.startDniVideo)}
@@ -521,6 +577,18 @@ function ContactStep({ c }: { c: Case }) {
   const [sent, setSent] = useState(Boolean(c.session.contact))
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
+  const [info, setInfo] = useState('')
+  const [wrong, setWrong] = useState(0)
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const locked = secondsLeft > 0
+  useEffect(() => {
+    if (!locked) return
+    const id = window.setTimeout(() => {
+      setSecondsLeft(n => Math.max(0, n - 1))
+      if (secondsLeft <= 1) setWrong(0)
+    }, 1000)
+    return () => window.clearTimeout(id)
+  }, [locked, secondsLeft])
   return (
     <div data-testid="contact-step">
       {helping ? <MsgBlock id="ASS-02" as="h1" className="mb-4" /> : <StepTitle>{tr(C.contactTitle)}</StepTitle>}
@@ -539,14 +607,29 @@ function ContactStep({ c }: { c: Case }) {
       ) : (
         <form noValidate onSubmit={e => {
           e.preventDefault()
-          try { if (!actions.confirmSms(c.id, code)) setErr(tr(C.wrongCode)) } catch (ex) { setErr(errText(ex)) }
+          if (locked) return
+          try {
+            if (actions.confirmSms(c.id, code)) return
+            const n = wrong + 1
+            setWrong(n)
+            setInfo('')
+            if (n >= SMS_MAX_TRIES) { setSecondsLeft(SMS_PAUSE_S); setErr('') }
+            else setErr(fill(tr(C.wrongCodeLeft), { n: SMS_MAX_TRIES - n }))
+          } catch (ex) { setErr(errText(ex)) }
         }}>
           <p className="mb-4 rounded-[2px] border-2 border-dashed border-warning bg-warning-soft px-4 py-3 text-center text-[18px] font-bold text-ink" data-testid="demo-code-banner">{tr(DEMO_SMS_BANNER)}</p>
-          <TextInput label={tr(C.smsCode)} inputMode="numeric" autoComplete="one-time-code" name="smsCode" maxLength={6} value={code} onChange={e => { setCode(e.target.value.replace(/\D/g, '')); setErr('') }} data-testid="sms-code" />
-          <div className="mt-3"><Alert>{err}</Alert></div>
+          <TextInput label={tr(C.smsCode)} inputMode="numeric" autoComplete="one-time-code" name="smsCode" maxLength={6} value={code} disabled={locked} onChange={e => { setCode(e.target.value.replace(/\D/g, '')); setErr('') }} data-testid="sms-code" />
+          <div className="mt-3 space-y-2">
+            {locked && <Alert testId="sms-locked">{fill(tr(C.codeLocked), { s: secondsLeft })}</Alert>}
+            <Alert>{err}</Alert>
+            {info && <Alert tone="success" testId="sms-resent">{info}</Alert>}
+          </div>
           <Actions>
-            <BigButton type="submit" testId="confirm-code">{tr(C.confirmCode)}</BigButton>
-            <BigButton variant="ghost" onClick={() => { setSent(false); setCode('') }}>{tr(C.changeNumber)}</BigButton>
+            <BigButton type="submit" testId="confirm-code" disabled={locked}>{tr(C.confirmCode)}</BigButton>
+            <BigButton variant="secondary" testId="resend-code" disabled={locked} onClick={() => {
+              try { actions.setContact(c.id, { mobile: c.session.contact?.mobile ?? mobile, email: c.session.contact?.email ?? (email.trim() || undefined) }); setWrong(0); setCode(''); setErr(''); setInfo(tr(C.codeResent)) } catch (ex) { setErr(plainError(ex, tr)) }
+            }}>{tr(C.resendCode)}</BigButton>
+            <BigButton variant="ghost" disabled={locked} onClick={() => { setSent(false); setCode(''); setWrong(0); setInfo('') }}>{tr(C.changeNumber)}</BigButton>
           </Actions>
         </form>
       )}
@@ -611,7 +694,7 @@ function ReviewStep({ c, onHelperDone }: { c: Case; onHelperDone: () => void }) 
             <Row k={tr(C.sumExpiry)} v={c.typed.expiry} />
           </>
         )}
-        <Row k={tr(C.sumRoute)} v={tr(msg(`RA-07${s.route}` as MsgId).title!)} />
+        <Row k={tr(C.sumRoute)} v={asHeading(tr(msg(`RA-07${s.route}` as MsgId).title!))} />
         {s.helper && <Row k={tr(C.sumHelper)} v={`${s.helper.name} (${tr(HELPER_RELATION_LABELS[s.helper.relation]).toLowerCase()})`} />}
         {s.passport && <Row k={tr(C.sumPassport)} v={`${s.passport.number} · ${s.passport.expiry}`} />}
         {s.uploads.redCard && <Row k={tr(C.sumRedCard)} v={`${s.uploads.redCard.number} · ${s.uploads.redCard.expiry} · ${tr(C.uploaded)}`} />}
@@ -685,6 +768,12 @@ export function Verify() {
   if (!c) return <Navigate to="/citizen" replace />
   if (entry !== `/citizen/verify/${c.id}`) return <Navigate to={entry} replace />
   if (helperDone) return <HelperDone c={c} />
+  // A held result screen (VER-07, a Fallback offer) follows the case live: when an officer decides, asks for
+  // something or starts the video call, the citizen moves to the status page.
+  const v = c.session.videoCall?.state
+  if (held && (c.status === 'approved' || c.status === 'not_approved' || (c.status === 'need_info' && c.infoRequest && !c.infoRequest.response) || v === 'live' || v === 'ended')) {
+    return <Navigate to={`/citizen/case/${c.id}`} replace />
+  }
 
   const steps = stepsFor(c)
   const current: StepId = held ?? steps.find(st => !isDone(c, st, acks)) ?? 'review'
@@ -704,7 +793,7 @@ export function Verify() {
         </p>
       )}
       <div className="mb-5 flex items-center gap-3">
-        <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-[13px] font-bold text-brand-ink">{tr(C.routeLabel)} {ROUTES[route].code}</span>
+        <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-[13px] font-bold text-brand-ink">{route === 'F' ? tr(C.routeFallback) : `${tr(C.routeLabel)} ${ROUTES[route].code}`}</span>
         <div className="flex-1"><ProgressBar value={(idx + 1) / steps.length} label={fill(tr(C.stepLabel), { n: idx + 1, total: steps.length })} /></div>
       </div>
       {c.policyProposal && <div className="-mt-3 mb-4"><ProposedRuleTag /></div>}

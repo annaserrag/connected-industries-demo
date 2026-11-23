@@ -7,6 +7,7 @@ import type { CheckOutcome, RiskLevel } from '@/contract/types'
 import { cn, SimulatedValuesNote } from '@/ui'
 import { OUTCOME_LABEL, RISK_LABEL } from '../copy'
 import { useTr } from '../lib'
+import { score2 } from '@/core/store'
 
 /* ------------------------------------------------------------------ Kbd */
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
@@ -124,7 +125,7 @@ export function ScoreBar({ score, threshold, label }: { score: number; threshold
         aria-valuemin={0}
         aria-valuemax={1}
         aria-valuenow={score}
-        aria-label={`${label}: ${score.toFixed(2)} (${tr({ en: 'threshold', es: 'umbral' })} ${threshold.toFixed(2)})`}
+        aria-label={`${label}: ${score2(score)} (${tr({ en: 'threshold', es: 'umbral' })} ${score2(threshold)})`}
       >
         <div
           className={cn('absolute inset-y-0 left-0 rounded-full transition-[width] duration-700', ok ? 'bg-success' : 'bg-danger')}
@@ -133,10 +134,10 @@ export function ScoreBar({ score, threshold, label }: { score: number; threshold
         <div className="absolute -top-1 -bottom-1 w-0.5 rounded bg-ink" style={{ left: `calc(${threshold * 100}% - 1px)` }} aria-hidden />
       </div>
       <div className="relative mt-1 h-4 text-[11px] text-muted" aria-hidden>
-        <span className={cn('font-semibold tabular-nums', ok ? 'text-success' : 'text-danger')}>{score.toFixed(2)}</span>
+        <span className={cn('font-semibold tabular-nums', ok ? 'text-success' : 'text-danger')}>{score2(score)}</span>
         <SimulatedValuesNote className="ml-1.5" />
         <span className="absolute -translate-x-1/2 whitespace-nowrap tabular-nums" style={{ left: `${threshold * 100}%` }}>
-          ▲ {threshold.toFixed(2)}
+          ▲ {score2(threshold)}
         </span>
       </div>
     </div>

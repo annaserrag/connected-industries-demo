@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { LifeBuoy, LogOut } from 'lucide-react'
 import { Avatar, GovHeader, Switch, cn } from '@/ui'
@@ -6,6 +6,7 @@ import { MSG } from '@/contract/messages'
 import { actions, useClave } from '@/core/store'
 import type { Case } from '@/contract/types'
 import { C, fill } from './copy'
+import { BigButton, Modal } from './components/basics'
 import { clearHelperDone, useEmbed, useGo, useLargeText, useTr } from './hooks'
 
 /** True while the citizen is still doing the steps (nothing sent, nobody in charge, no Fallback taken). */
@@ -30,32 +31,51 @@ export function safe(fn: () => void) {
   }
 }
 
-/** Signed-in chip in the header: initials, first name and "Sign out". */
+/** Signed-in chip in the header: avatar, first name and a visible "Sign out" button (confirmed mid-flow). */
 function SignedInChip() {
   const { tr } = useTr()
   const go = useGo()
+  const [confirm, setConfirm] = useState(false)
   const activeId = useClave(s => s.activeCitizenCaseId)
   const active = useClave(s => (activeId ? s.cases[activeId] : undefined))
   if (!active) return null
   const label = fill(tr(C.signOutOf), { name: active.persona.name })
+  const midFlow = inFlow(active) && Boolean(active.session.route) && active.status !== 'draft'
+  const doSignOut = () => {
+    setConfirm(false)
+    safe(() => actions.citizenSignOut())
+    clearHelperDone()
+    go('/citizen', { replace: true })
+  }
   return (
-    <button
-      type="button"
-      onClick={() => {
-        safe(() => actions.citizenSignOut())
-        clearHelperDone()
-        go('/citizen', { replace: true })
-      }}
-      className="flex h-9 items-center gap-2 rounded-[2px] border border-line-strong bg-surface pr-1 pl-1 sm:pr-2.5 text-[13px] font-bold text-ink transition-colors hover:border-brand hover:text-brand-strong"
-      aria-label={label}
-      title={label}
-      data-testid="citizen-signout"
-    >
-      <Avatar initials={active.persona.initials} hue={active.persona.hue} size={26} />
-      <span className="hidden max-w-[12ch] truncate sm:inline">{active.persona.name.split(' ')[0]}</span>
-      <LogOut size={15} aria-hidden className="hidden sm:block" />
-      <span className="hidden sm:inline">{tr(C.signOut)}</span>
-    </button>
+    <>
+      <span className="flex items-center gap-2">
+        <span className="hidden items-center gap-2 sm:flex" title={active.persona.name}>
+          <Avatar initials={active.persona.initials} hue={active.persona.hue} size={26} />
+          <span className="max-w-[12ch] truncate text-[13px] font-bold text-ink">{active.persona.name.split(' ')[0]}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => (midFlow ? setConfirm(true) : doSignOut())}
+          className="flex h-9 items-center gap-1.5 rounded-[2px] border border-line-strong bg-surface pr-2.5 pl-1 text-[13px] font-bold whitespace-nowrap text-ink transition-colors hover:border-brand hover:text-brand-strong"
+          aria-label={label}
+          title={label}
+          data-testid="citizen-signout"
+        >
+          <span className="hidden min-[420px]:inline sm:hidden"><Avatar initials={active.persona.initials} hue={active.persona.hue} size={24} /></span>
+          <LogOut size={15} aria-hidden className="ml-1.5 min-[420px]:hidden sm:block sm:ml-0" />
+          {/* Phones: icon only (the accessible name stays on the button), so the service name is never cut. */}
+          <span className="sr-only min-[420px]:not-sr-only">{tr(C.signOutSession)}</span>
+        </button>
+      </span>
+      <Modal open={confirm} onOpenChange={setConfirm} title={tr(C.signOutConfirmTitle)} closeLabel={tr(C.close)}>
+        <p className="text-[16px] leading-relaxed text-ink">{tr(C.signOutConfirmBody)}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <BigButton testId="signout-confirm" onClick={doSignOut}><LogOut size={18} aria-hidden />{tr(C.signOutSession)}</BigButton>
+          <BigButton variant="secondary" testId="signout-cancel" onClick={() => setConfirm(false)}>{tr(C.signOutStay)}</BigButton>
+        </div>
+      </Modal>
+    </>
   )
 }
 
@@ -68,6 +88,7 @@ export function CitizenShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const { tr } = useTr()
   const [large] = useLargeText()
+  const signedIn = useClave(s => Boolean(s.activeCitizenCaseId && s.cases[s.activeCitizenCaseId]))
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -78,7 +99,7 @@ export function CitizenShell({ children }: { children: ReactNode }) {
       <a href="#citizen-main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:font-bold">
         {tr(C.skipToContent)}
       </a>
-      {!embed && <GovHeader actions={<SignedInChip />} />}
+      {!embed && <GovHeader actions={signedIn ? <SignedInChip /> : undefined} />}
       {embed && (
         <div className="flex justify-end border-b border-line px-4 py-2"><SignedInChip /></div>
       )}

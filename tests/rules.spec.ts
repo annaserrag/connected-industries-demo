@@ -75,6 +75,12 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     const kenjiNo = await page.evaluate(() => window.__clave!.DEMO_PEOPLE[1].account.documentNumber)
     const dup = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 9, documentType: 'TIE', documentNumber: kenjiNo, expiryDate: '2030-01-01', password: 'password-1' })
     expect(dup).toEqual({ ok: false, reason: 'duplicate_document' })
+    // Only the plan's demo people carry GYC refs: any other new account gets a neutral SOL- reference.
+    const other = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 1, documentType: 'PASSPORT', documentNumber: 'ZZ1234567', expiryDate: '2030-01-01', password: 'password-1' })
+    expect(other.ok).toBe(true)
+    expect((await getCase(page, other.caseId)).caseRef).toMatch(/^SOL-[0-9A-Z]{4,}$/)
+    const other2 = await ok(page, 'citizenSignUp', { givenNames: 'Otra', surnames: 'Persona', dateOfBirth: '1991-01-01', countryIndex: 1, documentType: 'PASSPORT', documentNumber: 'ZZ7654321', expiryDate: '2030-01-01', password: 'password-1' })
+    expect((await getCase(page, other2.caseId)).caseRef).not.toBe((await getCase(page, other.caseId)).caseRef)
 
     const g = await page.evaluate(() => window.__clave!.DEMO_PEOPLE[0])
     expect(g.caseId).toBeNull() // not preloaded
@@ -109,9 +115,22 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     let c = await getCase(page, 'kenji')
     expect(c).toMatchObject({ status: 'need_info', ruleId: 'CHIP-TWICE', citizenMsgs: ['STA-3', 'VER-04', 'FALL-01'] })
     expect(c.session.fallback.offered).toBe('chip')
+    // The selfie liveness check still runs (plan: "liveness check on his selfie"); no chip photo → no face match.
+    const selfie = await ok(page, 'recordFaceAttempt', 'kenji', 'person')
+    expect(selfie).toMatchObject({ result: 'pass', msg: 'FALL-01', outcome: 'fallback' })
+    expect(selfie.faceMatch).toBeUndefined()
+    c = await getCase(page, 'kenji')
+    expect(c.status).toBe('need_info')
+    const out = (id: string) => c.checks.find((k: AnyCase) => k.id === id)
+    expect(out('chip_read').outcome).toBe('fail')
+    expect(out('liveness').outcome).toBe('pass')
+    expect(out('face_match')).toMatchObject({ outcome: 'skipped', detail: { en: 'Not possible without the chip: there is no chip photo to compare with' } })
+    expect(out('residence').outcome).toBe('pass')
+    expect((await auditOf(page, 'kenji')).filter(e => e.action === 'fallback_offered')).toHaveLength(1)
 
     await ok(page, 'joinVideoCall', 'kenji')
     c = await getCase(page, 'kenji')
+    expect(c.checks.find((k: AnyCase) => k.id === 'liveness').outcome).toBe('pass')
     expect(c).toMatchObject({ status: 'checking', awaitingOfficer: true, risk: 'medium', route: 'F' })
     expect(c.aiReason.en).toBe('Chip could not be read twice; document integrity not verified')
     expect(await tier(page, 'kenji')).toBe('p5_video_call')
@@ -244,11 +263,24 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     expect((await ok(page, 'setAnswers', 'rafael', { document: 'TIE', who: 'self', nfc: 'yes' })).route).toBe('B')
     await ok(page, 'giveConsents', 'rafael', { face: true, residence: true })
     const r = await ok(page, 'recordChipRead', 'rafael')
-    expect(r).toMatchObject({ read: 'ok', signatureValid: false, msg: 'VER-07', outcome: 'to_officer' })
+    // The chip answered: the integrity rule waits for the face check against the chip photo.
+    expect(r).toMatchObject({ read: 'ok', signatureValid: false, msg: 'VER-01', outcome: 'continue' })
     expect(r.printedMismatch).toEqual(['surnames', 'dateOfBirth'])
+    expect((await getCase(page, 'rafael')).awaitingOfficer).toBe(false)
+    const f = await ok(page, 'recordFaceAttempt', 'rafael', 'person')
+    // A real person is there, but the chip photo is another record's (world fact) → face match low.
+    expect(f).toMatchObject({ result: 'fail', msg: 'VER-07', outcome: 'to_officer' })
+    expect(f.liveness).toBeGreaterThanOrEqual(0.93)
+    expect(f.faceMatch).toBeLessThan(0.5)
     let c = await getCase(page, 'rafael')
     expect(c).toMatchObject({ status: 'checking', awaitingOfficer: true, risk: 'high', ruleId: 'CHIP-INTEGRITY', suggestedReason: 'REJ-06', citizenMsgs: ['STA-2', 'VER-07'] })
     expect(c.aiReason.en).toBe('The chip answered but its security signature is not valid, and the name and date of birth on the chip differ from the printed name and date of birth.')
+    const out = (id: string) => c.checks.find((k: AnyCase) => k.id === id)
+    expect(out('chip_signature').outcome).toBe('fail')
+    expect(out('printed_vs_chip').outcome).toBe('fail')
+    expect(out('liveness').outcome).toBe('pass')
+    expect(out('face_match').outcome).toBe('fail')
+    expect(out('face_match').score).toBeLessThan(0.5)
     expect(c.discrepancies.filter((d: AnyCase) => d.source === 'chip')).toEqual([
       { field: 'surnames', document: 'DUARTE', records: 'DUARTE SOUZA', source: 'chip' },
       { field: 'dateOfBirth', document: '1988-04-13', records: '1988-03-14', source: 'chip' },
@@ -268,7 +300,7 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     let c = await getCase(page, 'valentina')
     expect(c).toMatchObject({ risk: 'medium', suggestedReason: 'REJ-05', awaitingOfficer: true })
     expect(c.aiReason.en).toBe('The name in the residence record has one surname; the chip has two. Other checks passed')
-    expect(c.discrepancies).toEqual([{ field: 'surnames', document: 'ROJAS GOMEZ', records: 'ROJAS', source: 'residence' }])
+    expect(c.discrepancies).toEqual([{ field: 'surnames', document: 'ROJAS GÓMEZ', records: 'ROJAS', source: 'residence' }])
 
     await ok(page, 'officerRefuse', 'valentina', 'REJ-05')
     expect((await getCase(page, 'valentina')).status).toBe('not_approved')

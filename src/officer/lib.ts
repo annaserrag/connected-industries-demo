@@ -103,9 +103,12 @@ export function officerName(id: string | undefined | null): string {
 
 /** The citizen text of MSG-REJ-0x, with {fields} filled from the case's discrepancy table (REJ-05). */
 export function rejCitizenText(c: Case, id: RejectionReasonId, lang: Lang): string {
-  const rows = c.discrepancies ?? []
+  const all = c.discrepancies ?? []
+  const residence = all.filter(r => r.source === 'residence')
+  const rows = id === 'REJ-05' && residence.length ? residence : all
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1)
   const fields = rows.length
-    ? rows.map(r => `${fieldLabel(r.field)[lang]}: ${r.document} / ${r.records}`).join('; ')
+    ? rows.map(r => `${cap(fieldLabel(r.field)[lang])}: ${r.document} / ${r.records}`).join('; ')
     : lang === 'es' ? 'los datos que no coinciden' : 'the data that does not match'
   return fillMsg(REJECTION_REASONS[id].citizenMessage[lang], { fields })
 }
