@@ -32,70 +32,56 @@ The app is a static site (relative paths, hash routing), so it runs as a Hugging
    The script builds the app, creates the Space (public, SDK "static") if it does not exist, and uploads the build. Run it again after every change to redeploy. The token is read from the environment only; it is never saved to disk or committed.
 3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.static.hf.space`), so both windows share the same browser storage: `…static.hf.space/#/citizen` and `…static.hf.space/#/officer`.
 
+## How the prototype decides
+
+No result is scripted per person. Each case ends where the general rules of the plan take it, from:
+
+1. what the applicant types (account data, answers, uploads, contact details);
+2. what the **simulated registers** return for that document: whether its chip can be read, whether the chip signature is valid, the data stored in the chip, the expiry date and the residence record;
+3. what the **simulated camera** sees on each attempt, chosen on the camera screen: *Real person*, *Reflections or low light* or *Synthetic video*;
+4. the rules (two failed chip reads → video call; two failed face checks → video call offered; invalid chip signature or printed data ≠ chip → officer; residence not found or different → officer; minor or red card → always an officer; otherwise automatic basic level, and advanced level to review on routes B and C);
+5. an officer's decision. Only an officer refuses, always with a reason from the closed list (REJ-01…08), and a review request is decided by a different officer.
+
+Any document that is not in the registers behaves as a genuine, readable document with a matching residence record, so a person typed in from scratch (Giulia) is approved by the rules if nothing else fails.
+
 ## Citizen accounts (team only)
 
-The eight library personas have saved citizen accounts. **These logins are intentionally not shown anywhere in the app**: sign in on `/#/citizen` with **Applicant number and password** like any citizen would. All people, documents and numbers are fictional (DNI/NIE-shaped numbers carry a deliberately wrong check letter, so they fail the real check-letter test); the passwords are for the prototype only.
+These people are preloaded **without having started**: sign in on `/#/citizen` with *Applicant number and password* and do the process live. Giulia is not preloaded: create her with **Create an account** during the demo. All people, documents and numbers are fictional; DNI/NIE-shaped numbers carry a deliberately wrong check letter.
 
-| Persona | Who they are | Scenario it shows | Applicant number (sign-in) | Password |
-|---|---|---|---|---|
-| Giulia Ferraro | Italian master's student in Madrid (24) | Passport chip + face check, basic level in minutes; an officer approves the advanced level live (video 0:40–2:00) | `YB4829137` | `giulia-demo` |
-| Daniel Mwangi | Kenyan master's student with a TIE (23) | Non-EU student, TIE chip + face check from the phone instead of an office appointment | `Y8042719P` | `daniel-demo` |
-| Ernesto Medina | The neighbour: 80, no smartphone, helped by his daughter | Assisted mode on Lucía's phone: helper form, hand-over message in large text, one face retry for reflections, his own mobile for the answer, and Lucía's last screen without the result (video 3:40–4:20) | `X9019583W` | `rafael-demo` |
-| Noah Becker | German minor (16) registering with his mother | Mother signs in with her German eID and confirms him; an officer confirms the link | `C01X58RT2` | `noah-demo` |
-| Yusuf Haddad | International protection applicant with a red card (31) | Policy proposal: no chip, straight to a video call with an officer | `Y9117004D` | `yusuf-demo` |
-| Ivo Petrov (identity claimed by an impostor) | Deepfake attempt: someone else's passport, synthetic face video | Liveness fails, the engine stops it and an officer refuses with a reason (video 2:50–3:40) | `391027844` | `ivo-demo` |
-| Hana Kovač (identity on a forged passport) | Fake document: cloned and edited passport chip | Chip signature invalid, high risk; the officer refuses with "Chip signature invalid" | `205521963` | `hana-demo` |
-| Lin Wei | Engineer with a TIE who moved last month (29) | Refused for "Residence not found", she corrects her padrón, presses "I have corrected it" and is approved | `Z9088104B` | `linwei-demo` |
+| Case | Person | Applicant number | Password | What the registers say | What to do to show the case |
+|---|---|---|---|---|---|
+| GYC-01 | Giulia Ferri, 24, Italy (create her) | type `CA48213KF` (EU eID), born 2002-04-18, expiry 2031-03-14 | choose one, e.g. `giulia-demo` | not in the registers: genuine eID, matching residence | Route A, eID login, consent, SMS `123456` → approved basic automatically |
+| GYC-02 | Kenji Mori, 26, Japan | `Y4126021A` | `kenji-demo` | TIE chip cannot be read | Read chip twice → video call → officer starts the call and approves basic; advanced goes to review |
+| GYC-03 | Ernesto Navarro, 80, Spain | `05218734H` | `ernesto-demo` | DNI, normal | "I am helping someone" (helper Marta Navarro, her mobile `+34 600 000 102`), camera *Reflections* first, then *Real person*; his own mobile `+34 600 000 002` → basic now, advanced to review; Marta sees only the end-of-session screen |
+| GYC-04 | Laura Ruiz → her son Mateo Ruiz, 16, Argentina | `X9318254H` | `laura-demo` | TIE each, normal | "A child I am responsible for", upload a proof photo (one edge cut), Mateo's TIE `X9318277H` → officer asks for a new photo → Laura uploads it → officer approves |
+| GYC-05 | Daniel Herrera, 34, Venezuela | `VE1441730` | `daniel-demo` | passport normal; the red card has no register | Document "Red card", passport chip + face, upload the red card (number `DEMO-0005`) → an officer always checks it and approves |
+| GYC-06 | Applicant X with Ana Costa's passport | `CB2918470` | `applicantx-demo` | genuine passport | Camera *Synthetic video* twice → "Come back later" → high risk → officer refuses REJ-07. With *Real person* the same passport is approved: it is the camera, not the person |
+| GYC-07 | Rafael Duarte, 37, Brazil | `Y7350418F` | `rafael-demo` | chip signature invalid; chip says DUARTE SOUZA, 1988-03-14 vs printed DUARTE, 1988-04-13 | Read chip → a person reviews → officer refuses REJ-06 |
+| GYC-08 | Valentina Rojas Gómez, 27, Colombia | `Z1846203M` | `valentina-demo` | residence record has only "ROJAS" | All checks pass but the residence name differs → officer Vega refuses REJ-05 → she asks for a review with a passport photo → Vega cannot decide it → officer Ortiz approves |
 
-Sign-in ignores letter case and spaces. Anyone can also choose **Create an account** and register a new (fictional) person: the platform assigns an applicant number on the spot in a realistic shape (DNI 8 digits + letter, TIE / NIE / red card X|Y|Z + 7 digits + letter — always with a wrong check letter —, passport 2 letters + 7 digits, EU eID 9 alphanumerics), and every check passes for those accounts.
+The SMS code is always `123456` (shown on screen as a demo code). Sign-in ignores letter case and spaces.
 
 ## Staff accounts
 
-Staff sign in at `/#/officer` like on the real Cl@ve gateway, with one of two method cards: **Electronic certificate** (pick a certificate, then type its PIN) or **User and password**. For recording, the sign-in page also shows a **Demo access** box with Laura Navarro's certificate PIN and her user and password (all fictional). Everything is fictional: the DNI numbers below carry a deliberately wrong check letter, so they can never belong to a real person. Every attempt goes to the audit trail with the method used, never the PIN or password.
+Staff sign in at `/#/officer` with **Electronic certificate** (pick it, then type the PIN) or **User and password**. The sign-in page shows a *Demo access* box with these fictional credentials.
 
-Certificates (the picker lists all five):
+| Officer | Certificate PIN | User | Password | Role in the demo |
+|---|---|---|---|---|
+| Lucía Vega | `2580` | `lvega` | `Vega-2026` | First decisions (queue, video calls, refusals) |
+| Andrés Ortiz | `1357` | `aortiz` | `Ortiz-2026` | Reviews (appeals must be decided by a different officer) |
+| Marta Gil Herrero | `4826` | `mgil` | `GilHerrero-2026` | Another authorised officer |
+| Diego Romero | `9031` | `dromero` | `Romero-2026` | Refused: not staff of a registration authority |
 
-| Holder | Certificate | PIN | Expected outcome |
-|---|---|---|---|
-| Laura Navarro (`50731842J`) | Public employee certificate (cryptocard), Tax Agency, valid until 30 Jun 2028 | `2580` | First time: job details form, then the console. Afterwards straight to the console |
-| Javier Prieto (`29640157H`) | Electronic DNI (DNIe), valid until 14 Feb 2029 | `1357` | First time: job details form (he picks organisation, office and post himself), then the console |
-| Marta Gil Herrero (`71385096A`) | Public employee certificate (cryptocard), Government Delegation, valid until 2 Nov 2027 | `4826` | First time: job details form, then the console |
-| Diego Romero (`33918274C`) | Personal certificate, valid until 20 May 2027 | `9031` | Refused: not staff of a Cl@ve registration authority |
-| Laura Navarro (`50731842J`) | Public employee certificate, expired 30 Jun 2025 | `2580` | Refused: certificate expired (shown only after the right PIN) |
-
-A wrong PIN gives a generic "The PIN is not correct" with the attempts left, and reveals nothing about the certificate (not even that it expired). After three wrong PINs the field pauses for 30 seconds; it never locks for good.
-
-Staff users (second card):
-
-| User ID | Password | Expected outcome |
-|---|---|---|
-| `lnavarro` | `Navarro-2026` | Laura Navarro: job details the first time, then the console |
-| `jprieto` | `Prieto-2026` | Javier Prieto: job details the first time, then the console |
-| `mgil` | `GilHerrero-2026` | Marta Gil Herrero: job details the first time, then the console |
-| `dromero` | `Romero-2026` | Refused: not staff of a Cl@ve registration authority |
-
-A wrong user ID or password always gives the same message ("The user or password is not correct"). The user ID ignores letter case.
-
-Personnel number (NRP) to type on the first sign-in: the officer's own DNI number and letter, `A`, and a 4-digit body code. Any 4-digit body code works, but the DNI part must be the officer's own:
-
-| Officer | NRP |
-|---|---|
-| Laura Navarro | `50731842JA0611` |
-| Javier Prieto | `29640157HA0384` |
-| Marta Gil Herrero | `71385096AA0952` |
-
-An NRP built on a DNI with the real check letter is refused, like any real-looking number. Job details are saved per officer, so the second sign-in (by either method) goes straight to the console.
+The first sign-in asks for job details; the personnel number (NRP) is the officer's own DNI number and letter + `A` + any 4 digits (see the officer's profile for the DNI). A wrong PIN or password never says which part was wrong; three wrong PINs pause the field for 30 seconds.
 
 ### How to record each case
 
 1. Delete the data in this browser (`/#/privacy`) before each take.
-2. Window 1 (1440 × 900): `/#/officer`, sign the officer in. Window 2 (phone size, or a phone-sized window): `/#/citizen`.
-3. Sign in with the persona's applicant number and password from the table above (type them off-camera or crop the first seconds), then follow route assistant → verification → status.
-4. The staff window updates live: open the case from the queue and approve, request information, complete the video call or refuse with a reason, depending on the scenario.
-5. Press **Sign out** in the citizen header before the next persona.
-6. **Hard cases with any account** (cases 2, 6, 7 and 8): on the verification screen, open **Demo: simulate a result** at the bottom and pick *Chip cannot be read* (two failed reads, then the case moves to a video call), *Chip signature invalid* or *Liveness check fails* (high risk, an officer refuses with a reason the citizen sees and can appeal) or *Data does not match* (refuse with "Residence not found", the citizen presses "I have corrected it" and the officer re-approves). Leave it on *No failure* for a normal run.
-7. **Minor** (case 4): on the last assistant question choose *I am registering a minor in my care* and fill in the minor's name and age. **Red card** (case 5): sign up with a non-EU country and *Red card*. Route B, the Fallback video call for foreigners, the red card and assisted mode all carry the tag *Proposed rule, not yet in force*.
-8. Staff menu: **Appeals** and **Advanced-level review** list those cases on their own. An approved citizen sees **Download receipt (PDF)** (marked as a prototype with no official value) and **Open Cl@ve Móvil** (explains that the prototype opens no app). For the closing numbers open `/#/dashboard` (Service statistics; its weekly numbers are invented, as disclosed on About).
+2. Window 1 (1440 × 900): `/#/officer`, sign in as Lucía Vega. Window 2 (phone size): `/#/citizen`.
+3. Sign in with the person's applicant number and password (or create Giulia), then follow the route assistant → consent → verification → contact and SMS → review → status.
+4. The staff window updates live: open the case from the queue, *Appeals* or *Advanced-level review* and act (start the video call, approve, request information, or reject with a reason).
+5. For a review (GYC-08), sign out and sign in as Andrés Ortiz.
+6. Route B, C-assisted, the red card and the video call for foreigners carry the tag *Proposed rule, not yet in force*.
 
 ## Structure
 
