@@ -23,7 +23,7 @@ function phasesFor(c: Case): Phase[] {
   if (route === 'A') p.push('eidas')
   if (route === 'B') p.push(...(c.guardian ? (['guardian'] as Phase[]) : []), 'chip', 'face')
   if (route === 'C') p.push('dni')
-  if (route === 'FALLBACK') p.push('book')
+  if (route === 'F') p.push('book')
   if (assisted) p.push('contact')
   p.push('checks')
   return p
@@ -140,7 +140,7 @@ function EidasHandoff({ person, country, onDone, children }: { person: string; c
 }
 
 function eidCountry(c: Case) {
-  return c.otherDocuments?.find(d => d.type === 'EU_EID')?.issuingCountry ?? (c.document.type === 'EU_EID' ? c.document.issuingCountry : c.persona.nationality)
+  return c.typed.nationality
 }
 
 /* -------------------------------------------------------- guardian (minor) */

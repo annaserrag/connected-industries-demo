@@ -1,9 +1,12 @@
 /**
- * CONTRACT — owned by the orchestrator. Subagents import from here and must NOT edit it.
+ * CONTRACT — static data and the seed state.
  *
  * All people, documents and numbers are FICTIONAL. DNI/NIE-shaped numbers always carry a wrong check letter
  * (see isFictionalDniNie), so none can be a real person's number.
  * Real figures appear only in REFERENCE_FIGURES, exactly as in the plan's reference sheet.
+ *
+ * No outcome is scripted here: preloaded accounts hold only what their owner typed at sign-up. World facts
+ * live in ./world.ts, the rules in src/core/engine.ts, the citizen texts in ./messages.ts.
  */
 import type {
   StaffAccount,
@@ -27,219 +30,129 @@ import type {
   Officer,
   ReferenceFigure,
   RejectionReason,
+  RejId,
   RouteDef,
   RouteId,
+  Session,
   SimulatedIndicator,
   StatusDef,
   StatusId,
   AdvancedState,
   SimFailure,
-  SimulationScript,
+  TypedDocument,
+  PersonData,
+  Persona,
 } from './types'
+import { MSG, REJ_REASONS, PROPOSED_RULE_TAG, HELPER_RELATION_LABELS } from './messages'
+import { DEMO_PEOPLE } from './world'
+import { demoHash, fictionalDniNie, isFictionalDniNie, normaliseDocNumber } from './ids'
+
+export { demoHash, normaliseDocNumber, hasDniNieShape, hasValidDniNieLetter, isFictionalDniNie, fictionalDniNie, normaliseName } from './ids'
 
 export const SERVICE_NAME = 'Get your Cl@ve'
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 
 /* ------------------------------------------------------------- key rule */
 
 export const KEY_RULE: Bilingual = {
-  en: 'The platform can approve automatically; only an officer can refuse or revoke, always with a reason and a way to appeal.',
-  es: 'La plataforma puede aprobar automáticamente; solo una persona funcionaria puede denegar o revocar, siempre con un motivo y una forma de recurrir.',
+  en: 'The platform can approve automatically; only an officer can refuse or revoke, always with a reason, and the citizen can always ask for a review.',
+  es: 'La plataforma puede aprobar automáticamente; solo una persona de la Administración puede denegar o revocar, siempre con un motivo, y siempre puedes pedir una revisión.',
 }
 
 /* ---------------------------------------------------------------- routes */
 
 export const ROUTES: Record<RouteId, RouteDef> = {
   A: {
-    id: 'A',
-    code: 'A',
-    name: { en: 'EU digital ID (eIDAS)', es: 'Identidad digital de la UE (eIDAS)' },
-    forWhom: {
-      en: 'EU citizens who can log in with their own national eID.',
-      es: 'Ciudadanos de la UE que pueden entrar con su identidad electrónica nacional.',
-    },
+    id: 'A', code: 'A', msg: 'RA-07A',
+    name: { en: 'Your EU digital ID', es: 'Tu identidad digital de la UE' },
+    forWhom: { en: 'EU citizens who can log in with their own national eID.', es: 'Ciudadanía de la UE que puede iniciar sesión con su identidad electrónica nacional.' },
     checks: ['eidas_login', 'residence'],
   },
   B: {
-    id: 'B',
-    code: 'B',
-    name: { en: 'Passport or TIE chip + face check', es: 'Chip del pasaporte o TIE + comprobación facial' },
-    forWhom: {
-      en: 'Anyone with a passport or TIE: the phone reads the chip and checks your face (reading the TIE chip by phone is still being confirmed).',
-      es: 'Cualquier persona con pasaporte o TIE: el móvil lee el chip y comprueba tu cara (la lectura del chip de la TIE con el móvil está pendiente de confirmar).',
-    },
-    checks: ['chip_read', 'chip_signature', 'document_validity', 'liveness', 'face_match', 'residence'],
+    id: 'B', code: 'B', msg: 'RA-07B',
+    name: { en: 'Your document chip and a face check', es: 'El chip de tu documento y una comprobación facial' },
+    forWhom: { en: 'Anyone with a passport or TIE and a phone that can read it.', es: 'Cualquier persona con pasaporte o TIE y un móvil que pueda leerlo.' },
+    checks: ['chip_read', 'chip_signature', 'printed_vs_chip', 'document_validity', 'liveness', 'face_match', 'residence'],
   },
   C: {
-    id: 'C',
-    code: 'C',
-    name: { en: 'DNI video call', es: 'Videollamada con DNI' },
-    forWhom: {
-      en: "Spaniards with a DNI. Today's route, kept as it is.",
-      es: 'Españoles con DNI. La vía de hoy, sin cambios.',
-    },
-    checks: ['dni_video'],
+    id: 'C', code: 'C', msg: 'RA-07C',
+    name: { en: 'Your DNI and a short video', es: 'Tu DNI y un vídeo corto' },
+    forWhom: { en: "Spaniards with a DNI. Today's route, kept as it is.", es: 'Personas españolas con DNI. La vía de hoy, sin cambios.' },
+    checks: ['dni_video', 'document_validity', 'residence'],
   },
-  FALLBACK: {
-    id: 'FALLBACK',
-    code: 'Fallback',
-    name: {
-      en: 'Video call with an officer, then office',
-      es: 'Videollamada con una persona funcionaria y, si hace falta, oficina',
-    },
-    forWhom: {
-      en: 'Cases that fail twice, documents without a chip, or anything that looks like fraud.',
-      es: 'Casos que fallan dos veces, documentos sin chip o cualquier indicio de fraude.',
-    },
+  F: {
+    id: 'F', code: 'Fallback', msg: 'RA-07F',
+    name: { en: 'A video call with an officer', es: 'Una videollamada con una persona de la Administración' },
+    forWhom: { en: 'Anyone who cannot finish on their own: an office appointment is the last option.', es: 'Quien no puede terminar por su cuenta: la cita en oficina es la última opción.' },
     checks: ['officer_video'],
   },
+  X: {
+    id: 'X', code: 'X', msg: 'RA-07X',
+    name: { en: 'Register with your passport', es: 'Regístrate con tu pasaporte' },
+    forWhom: { en: 'Red-card or NIE-paper holders with a passport: a person checks the card.', es: 'Titulares de tarjeta roja o documento de NIE con pasaporte: una persona revisa la tarjeta.' },
+    checks: ['chip_read', 'chip_signature', 'printed_vs_chip', 'document_validity', 'liveness', 'face_match', 'red_card'],
+  },
 }
-export const ROUTE_ORDER: RouteId[] = ['A', 'B', 'C', 'FALLBACK']
+export const ROUTE_ORDER: RouteId[] = ['A', 'B', 'C', 'X', 'F']
 
 /* -------------------------------------------------------------- statuses */
 
+const sta = (id: 'STA-1' | 'STA-2' | 'STA-3' | 'STA-4' | 'STA-5'): Bilingual => ({ en: MSG[id].en, es: MSG[id].es })
 export const STATUSES: Record<StatusId, StatusDef> = {
-  received: {
-    id: 'received',
-    step: 1,
-    label: { en: 'Received', es: 'Recibida' },
-    message: {
-      en: 'We have your application. You do not need to do anything right now.',
-      es: 'Tenemos tu solicitud. Ahora mismo no tienes que hacer nada.',
-    },
-  },
-  checking: {
-    id: 'checking',
-    step: 2,
-    label: { en: 'Checking', es: 'Comprobando' },
-    message: {
-      en: 'We are checking your document, your face and your residence record. Most checks finish in a few minutes. If a person needs to look at it, we will tell you here.',
-      es: 'Estamos comprobando tu documento, tu cara y tus datos de residencia. La mayoría termina en pocos minutos. Si tiene que revisarlo una persona, te lo diremos aquí.',
-    },
-  },
-  need_info: {
-    id: 'need_info',
-    step: 3,
-    label: { en: 'We need something from you', es: 'Necesitamos algo de ti' },
-    message: {
-      en: 'An officer needs one more thing before deciding. Read what they ask below and answer from this screen. Your application stays open.',
-      es: 'Una persona funcionaria necesita una cosa más antes de decidir. Lee lo que te pide abajo y responde desde esta pantalla. Tu solicitud sigue abierta.',
-    },
-  },
-  approved: {
-    id: 'approved',
-    step: 4,
-    label: { en: 'Approved', es: 'Aprobada' },
-    message: {
-      en: 'You have Cl@ve. With the basic level you can already use most online services; the advanced level, if pending, is reviewed by a person and you will see it here.',
-      es: 'Ya tienes Cl@ve. Con el nivel básico ya puedes usar la mayoría de servicios en línea; el nivel avanzado, si está pendiente, lo revisa una persona y lo verás aquí.',
-    },
-  },
-  not_approved: {
-    id: 'not_approved',
-    step: 5,
-    label: { en: 'Not approved', es: 'No aprobada' },
-    message: {
-      en: 'A person reviewed your application and could not approve it. Below you can see the exact reason, how to fix it and how to appeal.',
-      es: 'Una persona revisó tu solicitud y no pudo aprobarla. Abajo tienes el motivo exacto, cómo corregirlo y cómo recurrir.',
-    },
-  },
+  received: { id: 'received', step: 1, label: MSG['STA-1'].title, message: sta('STA-1') },
+  checking: { id: 'checking', step: 2, label: MSG['STA-2'].title, message: sta('STA-2') },
+  need_info: { id: 'need_info', step: 3, label: MSG['STA-3'].title, message: sta('STA-3') },
+  approved: { id: 'approved', step: 4, label: { en: 'Approved', es: 'Aprobada' }, message: sta('STA-4') },
+  not_approved: { id: 'not_approved', step: 5, label: MSG['STA-5'].title, message: sta('STA-5') },
 }
 export const STATUS_ORDER: StatusId[] = ['received', 'checking', 'need_info', 'approved', 'not_approved']
 
+/** MSG id of the status text for a case (4 / 4B / 4C for approvals). */
+export function statusMsgId(status: StatusId, advanced?: AdvancedState): 'STA-1' | 'STA-2' | 'STA-3' | 'STA-4' | 'STA-4B' | 'STA-4C' | 'STA-5' {
+  switch (status) {
+    case 'received': return 'STA-1'
+    case 'checking': return 'STA-2'
+    case 'need_info': return 'STA-3'
+    case 'not_approved': return 'STA-5'
+    case 'approved': return advanced === 'granted' ? 'STA-4C' : advanced === 'pending_review' ? 'STA-4B' : 'STA-4'
+  }
+}
+
 /** Full status name shown to citizens and staff; 'approved' says which level. */
 export function statusLabel(status: StatusId, advanced?: AdvancedState): Bilingual {
-  if (status !== 'approved') return STATUSES[status].label
-  if (advanced === 'granted') return { en: 'Approved: advanced level', es: 'Aprobada: nivel avanzado' }
-  if (advanced === 'pending_review') return { en: 'Approved: basic level, advanced level under review', es: 'Aprobada: nivel básico, nivel avanzado en revisión' }
-  return { en: 'Approved: basic level', es: 'Aprobada: nivel básico' }
+  return MSG[statusMsgId(status, advanced)].title
 }
 
 /** Shown next to every liveness / face-match score. */
 export const SIMULATED_VALUES: Bilingual = { en: 'simulated values', es: 'valores simulados' }
 
-/** Tag on everything that depends on a rule change we propose (route B, Fallback for foreigners, red card, assisted mode). */
-export const PROPOSED_RULE: Bilingual = { en: 'Proposed rule, not yet in force', es: 'Norma propuesta, aún no vigente' }
+/** Tag on everything that depends on a rule change we propose (route B, C-assisted, X, Fallback for foreigners). */
+export const PROPOSED_RULE: Bilingual = PROPOSED_RULE_TAG
 
 /** True when the route or mode only exists under a proposed rule change. */
-export function isProposedRule(route: RouteId | null | undefined, answers?: Pick<AssistantAnswers, 'assisted' | 'document' | 'nationalityGroup'> | null): boolean {
-  if (answers?.assisted) return true
+export function isProposedRule(route: RouteId | null | undefined, answers?: Pick<AssistantAnswers, 'assisted' | 'document' | 'nationalityGroup'> & { who?: AssistantAnswers['who'] } | null): boolean {
+  const helping = answers?.who ? answers.who === 'helping' : Boolean(answers?.assisted)
+  if (route === 'B' || route === 'X') return true
+  if (route === 'C') return helping
+  if (route === 'F') return answers?.nationalityGroup !== 'spanish'
   if (answers?.document === 'RED_CARD' || answers?.document === 'NIE_PAPER') return true
-  if (route === 'B') return true
-  if (route === 'FALLBACK') return answers?.nationalityGroup !== 'spanish'
   return false
 }
 
-/** Relations offered in the assisted-mode helper form. */
-export const HELPER_RELATIONS: Bilingual[] = [
-  { en: 'daughter', es: 'hija' },
-  { en: 'son', es: 'hijo' },
-  { en: 'neighbour', es: 'vecina o vecino' },
-  { en: 'other relative', es: 'otro familiar' },
-  { en: 'social worker or volunteer', es: 'trabajadora social o voluntariado' },
-]
+/** @deprecated UI migration: relations for the old helper form. New code uses HELPER_RELATION_LABELS (family · friend · support). */
+export const HELPER_RELATIONS: Bilingual[] = [HELPER_RELATION_LABELS.family, HELPER_RELATION_LABELS.friend, HELPER_RELATION_LABELS.support]
 
-/* ------------------------------------------------ simulated failures */
+/* ------------------------------------------------ removed: simulated failures */
 
-type Attempt = SimulationScript['attempts'][number]
-const PASS_LIVE: Attempt = {
-  liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
-  face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
+/** @deprecated UI migration: the "simulate a failure" control was removed (outcomes come from the rules). No route offers any. */
+export const SIM_FAILURES: Record<SimFailure, { label: Bilingual; hint: Bilingual; routes: RouteId[] }> = {
+  chip_unreadable: { label: { en: 'Chip cannot be read', es: 'Chip no legible' }, hint: { en: '', es: '' }, routes: [] },
+  chip_signature: { label: { en: 'Chip signature invalid', es: 'Firma del chip inválida' }, hint: { en: '', es: '' }, routes: [] },
+  liveness: { label: { en: 'Liveness check fails', es: 'Prueba de vida fallida' }, hint: { en: '', es: '' }, routes: [] },
+  data_mismatch: { label: { en: 'Data does not match', es: 'Datos que no coinciden' }, hint: { en: '', es: '' }, routes: [] },
 }
-
-/**
- * The verification screen's "Simulate a failure" control. Each entry says on which routes it applies and
- * the script the engine then runs (attempt 1, and attempt 2 after a correction).
- */
-export const SIM_FAILURES: Record<SimFailure, { label: Bilingual; hint: Bilingual; routes: RouteId[]; script: (route: RouteId) => SimulationScript }> = {
-  chip_unreadable: {
-    label: { en: 'Chip cannot be read', es: 'Chip no legible' },
-    hint: { en: 'The phone fails to read the chip twice: the case moves to a video call with an officer.', es: 'El móvil no consigue leer el chip dos veces: el caso pasa a videollamada con una persona funcionaria.' },
-    routes: ['B'],
-    script: () => ({ attempts: [{
-      chip_read: { outcome: 'fail', detail: { en: 'Chip could not be read on two tries (damaged or shielded card)', es: 'No se pudo leer el chip en dos intentos (tarjeta dañada o apantallada)' } },
-      chip_signature: { outcome: 'skipped', detail: { en: 'Not possible without reading the chip', es: 'No es posible sin leer el chip' } },
-      document_validity: { outcome: 'skipped', detail: { en: 'Checked by the officer on the video call', es: 'La comprueba la persona funcionaria en la videollamada' } },
-      liveness: { outcome: 'skipped', detail: { en: 'Done on the video call instead', es: 'Se hace en la videollamada' } },
-      face_match: { outcome: 'skipped', detail: { en: 'No chip photo to compare with', es: 'No hay foto del chip con la que comparar' } },
-    }] }),
-  },
-  chip_signature: {
-    label: { en: 'Chip signature invalid', es: 'Firma del chip inválida' },
-    hint: { en: 'The chip reads, but its signature is not from a trusted issuing country: high risk, an officer decides.', es: 'El chip se lee, pero su firma no es de un país emisor de confianza: riesgo alto, decide una persona funcionaria.' },
-    routes: ['B'],
-    script: () => ({ attempts: [{
-      chip_signature: { outcome: 'fail', detail: { en: 'Signature not issued by a trusted country signing authority (CSCA)', es: 'Firma no emitida por una autoridad firmante de confianza del país (CSCA)' } },
-      document_validity: { outcome: 'warn', detail: { en: 'Expiry date in chip differs from printed page', es: 'La caducidad del chip difiere de la página impresa' } },
-      ...PASS_LIVE,
-    }] }),
-  },
-  liveness: {
-    label: { en: 'Liveness check fails', es: 'Prueba de vida fallida' },
-    hint: { en: 'The face matches the chip photo but the video is not a live person (injected video): an officer decides.', es: 'La cara coincide con la foto del chip, pero el vídeo no es de una persona real (vídeo inyectado): decide una persona funcionaria.' },
-    routes: ['B'],
-    script: () => ({ attempts: [{
-      liveness: { outcome: 'fail', score: 0.22, detail: { en: 'Injected video stream: no depth, screen-replay pattern, frozen micro-movement', es: 'Vídeo inyectado: sin profundidad, patrón de pantalla, micromovimiento congelado' } },
-      face_match: { outcome: 'pass', score: 0.97, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-    }] }),
-  },
-  data_mismatch: {
-    label: { en: 'Data does not match', es: 'Datos que no coinciden' },
-    hint: { en: 'Your residence details are not found at the address given. After "I have corrected it", the second check passes.', es: 'Tus datos de residencia no aparecen en la dirección indicada. Tras «Ya lo he corregido», la segunda comprobación pasa.' },
-    routes: ['A', 'B'],
-    script: route => ({ attempts: [
-      {
-        ...(route === 'B' ? PASS_LIVE : {}),
-        residence: { outcome: 'fail', detail: { en: 'No residence record at the declared address', es: 'Sin datos de residencia en la dirección declarada' } },
-      },
-      {
-        ...(route === 'B' ? PASS_LIVE : {}),
-        residence: { outcome: 'pass', detail: { en: 'Residence confirmed after the update', es: 'Residencia confirmada tras la actualización' } },
-      },
-    ] }),
-  },
-}
-export const SIM_FAILURE_ORDER: SimFailure[] = ['chip_unreadable', 'chip_signature', 'liveness', 'data_mismatch']
+/** @deprecated UI migration: empty. */
+export const SIM_FAILURE_ORDER: SimFailure[] = []
 
 export const LEVEL_LABELS: Record<'basic' | 'advanced', Bilingual> = {
   basic: { en: 'Basic level', es: 'Nivel básico' },
@@ -310,9 +223,19 @@ export const CHECKS: Record<CheckId, CheckDef> = {
     label: { en: 'DNI video call', es: 'Videollamada con DNI' },
     explains: { en: "Today's video identification for DNI holders.", es: 'La videoidentificación actual para titulares de DNI.' },
   },
+  printed_vs_chip: {
+    id: 'printed_vs_chip', simulated: sim,
+    label: { en: 'Printed data vs chip data', es: 'Datos impresos frente a datos del chip' },
+    explains: { en: 'The name and date of birth printed on the document match the ones stored in the chip.', es: 'El nombre y la fecha de nacimiento impresos coinciden con los guardados en el chip.' },
+  },
+  red_card: {
+    id: 'red_card', simulated: sim,
+    label: { en: 'Red card or NIE paper', es: 'Tarjeta roja o documento de NIE' },
+    explains: { en: 'No register can confirm it automatically: a person checks the card image, number and expiry.', es: 'Ningún registro puede confirmarla automáticamente: una persona revisa la imagen, el número y la caducidad.' },
+  },
   officer_video: {
     id: 'officer_video', simulated: sim,
-    label: { en: 'Video call with an officer', es: 'Videollamada con una persona funcionaria' },
+    label: { en: 'Video call with an officer', es: 'Videollamada con una persona de la Administración' },
     explains: { en: 'An officer checks your document and identity live.', es: 'Una persona funcionaria comprueba tu documento e identidad en directo.' },
   },
 }
@@ -324,155 +247,44 @@ export const ENGINE: EngineThresholds = {
 }
 
 /* ---------------------------------------------------------- decision rules
- * The first four rows are the plan's table (Part 3, section 2). The last two are how the
- * prototype handles the minor and red-card cases; the red-card row is a POLICY PROPOSAL.
- *
- * Engine semantics (core must implement exactly this):
- *  1. Run the route's checks (plus guardian_link for minors) reading `simulation.attempts[attempt-1]`.
- *  2. Any check 'fail', liveness < livenessMin, face_match < faceMatchMin, or any 'high' flag →
- *     NO automatic outcome; case goes to the officer queue (awaitingOfficer = true), status 'checking'.
- *     If this was attempt >= maxAttemptsBeforeFallback, the route becomes 'FALLBACK'.
- *  3. Route A, all pass → auto 'approved_basic'; advanced 'not_requested'.
- *  4. Route B, all pass (warn allowed) → auto 'approved_basic'; advanced 'pending_review' and the case
- *     joins the officer queue as a low-risk advanced-level review.
- *  5. Minor, red card (FALLBACK/policy proposal) → never automatic; always officer.
- *  6. Route C → as today: simulated DNI video passes → auto 'approved_basic', advanced 'pending_review'.
- *  7. The system NEVER refuses or revokes. Only `officerRefuse` / `officerRevoke` with a reasonId can.
+ * SPEC §4, in order; first match wins. The engine (src/core/engine.ts) implements exactly this list.
+ * The platform may approve; only an officer refuses or revokes, always with a REJ reason.
  */
+const r = (id: string, order: number, route: RouteId | null, situation: Bilingual, automaticOutcome: Bilingual, toOfficerWhen: Bilingual): DecisionRule =>
+  ({ id, order, route, situation, automaticOutcome, toOfficerWhen })
+const NONE: Bilingual = { en: 'None', es: 'Ninguno' }
 export const DECISION_RULES: DecisionRule[] = [
-  {
-    situation: { en: 'EU citizen with national eID', es: 'Ciudadano de la UE con eID nacional' },
-    route: 'A',
-    automaticOutcome: { en: 'Basic level granted', es: 'Nivel básico concedido' },
-    toOfficerWhen: { en: 'eID data does not match the records', es: 'Los datos del eID no coinciden con los registros' },
-  },
-  {
-    situation: { en: 'Passport or TIE with readable chip', es: 'Pasaporte o TIE con chip legible' },
-    route: 'B',
-    automaticOutcome: { en: 'Basic level granted; advanced level queued', es: 'Nivel básico concedido; nivel avanzado en cola' },
-    toOfficerWhen: {
-      en: 'Face match or liveness is low, chip signature fails, residence check fails',
-      es: 'Coincidencia facial o prueba de vida baja, falla la firma del chip o fallan los datos de residencia',
-    },
-  },
-  {
-    situation: { en: 'Spaniard with DNI', es: 'Español con DNI' },
-    route: 'C',
-    automaticOutcome: { en: 'As today', es: 'Como hoy' },
-    toOfficerWhen: { en: 'As today', es: 'Como hoy' },
-  },
-  {
-    situation: { en: 'Chip unreadable or checks failed twice', es: 'Chip ilegible o comprobaciones fallidas dos veces' },
-    route: 'FALLBACK',
-    automaticOutcome: { en: 'None', es: 'Ninguno' },
-    toOfficerWhen: {
-      en: 'Always: video call with an officer, then office if needed',
-      es: 'Siempre: videollamada con una persona funcionaria y, si hace falta, oficina',
-    },
-  },
-  {
-    situation: { en: 'Minor registering with a parent', es: 'Menor que se registra con su madre o padre' },
-    route: 'B',
-    automaticOutcome: { en: 'None', es: 'Ninguno' },
-    toOfficerWhen: { en: 'Always: an officer confirms the guardian link', es: 'Siempre: una persona funcionaria confirma el vínculo' },
-  },
-  {
-    situation: { en: 'Red-card holder', es: 'Titular de tarjeta roja' },
-    route: 'FALLBACK',
-    automaticOutcome: { en: 'None', es: 'Ninguno' },
-    toOfficerWhen: { en: 'Always: video call with an officer', es: 'Siempre: videollamada con una persona funcionaria' },
-  },
+  r('CONSENT-DECLINED', 1, null, { en: 'Consent declined', es: 'Consentimiento no aceptado' }, NONE, { en: 'No checks run; the citizen can choose a video call (Fallback)', es: 'No se hace ninguna comprobación; puede elegir una videollamada (vía alternativa)' }),
+  r('CHIP-TWICE', 2, 'B', { en: 'Chip read failed twice', es: 'Lectura del chip fallida dos veces' }, NONE, { en: 'Video call offered; risk Medium; officer approves on the call', es: 'Se ofrece videollamada; riesgo medio; la persona aprueba en la llamada' }),
+  r('NO-NFC', 3, 'F', { en: 'Phone without NFC, or document unknown', es: 'Móvil sin NFC o documento desconocido' }, NONE, { en: 'Always: video call with an officer', es: 'Siempre: videollamada con una persona' }),
+  r('FACE-TWICE', 4, 'B', { en: 'Face check failed twice', es: 'Comprobación facial fallida dos veces' }, NONE, { en: 'Video call offered; High risk when an attempt was synthetic, otherwise Medium. Never auto-refused', es: 'Se ofrece videollamada; riesgo alto si algún intento fue sintético, si no medio. Nunca se deniega automáticamente' }),
+  r('CHIP-INTEGRITY', 5, 'B', { en: 'Chip signature invalid or printed data differs from the chip', es: 'Firma del chip no válida o datos impresos distintos del chip' }, NONE, { en: 'Always, risk High; the citizen sees MSG-VER-07', es: 'Siempre, riesgo alto; la persona ve MSG-VER-07' }),
+  r('DOC-EXPIRED', 6, null, { en: 'Document expired', es: 'Documento caducado' }, NONE, { en: 'Always, risk Medium; suggested REJ-01', es: 'Siempre, riesgo medio; sugerido REJ-01' }),
+  r('RES-NOT-FOUND', 7, null, { en: 'No residence record', es: 'Sin registro de residencia' }, NONE, { en: 'Always, risk Medium; suggested REJ-04', es: 'Siempre, riesgo medio; sugerido REJ-04' }),
+  r('RES-MISMATCH', 7, null, { en: 'Residence record differs from the document', es: 'El registro de residencia difiere del documento' }, NONE, { en: 'Always, risk Medium, discrepancy table; suggested REJ-05', es: 'Siempre, riesgo medio, tabla de diferencias; sugerido REJ-05' }),
+  r('MINOR', 8, 'B', { en: 'Minor registered by a parent or guardian', es: 'Menor registrado por su madre, padre o tutor' }, NONE, { en: 'Always: a person checks the proof of parental authority', es: 'Siempre: una persona revisa la acreditación de patria potestad' }),
+  r('RED-CARD', 9, 'X', { en: 'Red card or NIE paper (proposed rule)', es: 'Tarjeta roja o documento de NIE (norma propuesta)' }, NONE, { en: 'Always: a person checks the card; passport chip and face must pass', es: 'Siempre: una persona revisa la tarjeta; el chip del pasaporte y la cara deben superarse' }),
+  r('A-OK', 10, 'A', { en: 'EU eID login and residence record match', es: 'Acceso con eID de la UE y residencia coincidente' }, { en: 'Basic level, automatically', es: 'Nivel básico, automático' }, { en: 'Any check above', es: 'Cualquiera de las anteriores' }),
+  r('B-OK', 10, 'B', { en: 'Chip, face and residence pass', es: 'Chip, cara y residencia superados' }, { en: 'Basic level automatically; advanced level to review', es: 'Nivel básico automático; nivel avanzado a revisión' }, { en: 'Any check above', es: 'Cualquiera de las anteriores' }),
+  r('C-OK', 10, 'C', { en: 'DNI video passes', es: 'Vídeo con DNI superado' }, { en: 'Basic level automatically; advanced level to review (as today)', es: 'Nivel básico automático; nivel avanzado a revisión (como hoy)' }, { en: 'Any check above', es: 'Cualquiera de las anteriores' }),
+  r('APPEAL-SECOND-OFFICER', 11, null, { en: 'Review request after a refusal', es: 'Solicitud de revisión tras una denegación' }, NONE, { en: 'Always: decided by an officer other than the one who refused', es: 'Siempre: decide una persona distinta de la que denegó' }),
+  r('INFO-REQUEST', 12, null, { en: 'Officer asks for more information', es: 'La persona pide más información' }, NONE, { en: 'The citizen replies; back to the officer', es: 'La persona responde; vuelve a quien revisa' }),
 ]
 
 /* ------------------------------------------------------ rejection reasons
- * Closed list. Exactly one citizen message per reason (EN + ES).
+ * Closed list REJ-01…08 (plan 3.4, provisional). One citizen message per reason (MSG-REJ-0x).
  */
-export const REJECTION_REASONS: Record<import('./types').RejectionReasonId, RejectionReason> = {
-  document_expired: {
-    id: 'document_expired',
-    officerLabel: { en: 'Document expired', es: 'Documento caducado' },
-    citizenMessage: {
-      en: 'The document you used has expired, so we cannot use it to confirm who you are.',
-      es: 'El documento que usaste está caducado, así que no podemos usarlo para confirmar quién eres.',
-    },
-    howToFix: {
-      en: 'Apply again with a document that is in date, or appeal if you think the date is wrong.',
-      es: 'Vuelve a solicitarlo con un documento en vigor, o recurre si crees que la fecha es errónea.',
-    },
-  },
-  face_mismatch: {
-    id: 'face_mismatch',
-    officerLabel: { en: 'Face does not match', es: 'La cara no coincide' },
-    citizenMessage: {
-      en: 'The face in the camera did not match the photo stored in your document chip.',
-      es: 'La cara de la cámara no coincidía con la foto guardada en el chip de tu documento.',
-    },
-    howToFix: {
-      en: 'Try again in good light without glasses, or book a video call with an officer.',
-      es: 'Inténtalo de nuevo con buena luz y sin gafas, o pide una videollamada con una persona funcionaria.',
-    },
-  },
-  liveness_failed: {
-    id: 'liveness_failed',
-    officerLabel: { en: 'Liveness failed', es: 'Prueba de vida fallida' },
-    citizenMessage: {
-      en: 'We could not confirm that a real person was in front of the camera.',
-      es: 'No pudimos confirmar que hubiera una persona real ante la cámara.',
-    },
-    howToFix: {
-      en: 'Book a video call with an officer, who can confirm it with you live.',
-      es: 'Pide una videollamada con una persona funcionaria, que puede confirmarlo contigo en directo.',
-    },
-  },
-  chip_invalid: {
-    id: 'chip_invalid',
-    officerLabel: { en: 'Chip signature invalid', es: 'Firma del chip no válida' },
-    citizenMessage: {
-      en: 'The chip in your document did not carry a valid signature from the country that issued it.',
-      es: 'El chip de tu documento no tenía una firma válida del país que lo emitió.',
-    },
-    howToFix: {
-      en: 'If your document is genuine, book a video call so an officer can check it, or appeal.',
-      es: 'Si tu documento es auténtico, pide una videollamada para que una persona lo revise, o recurre.',
-    },
-  },
-  residence_not_found: {
-    id: 'residence_not_found',
-    officerLabel: { en: 'Residence not found', es: 'Residencia no encontrada' },
-    citizenMessage: {
-      en: 'We could not confirm your residence details at the address you gave.',
-      es: 'No hemos podido confirmar tus datos de residencia en la dirección que indicaste.',
-    },
-    howToFix: {
-      en: 'If your address changed recently, update your residence details and press "I have corrected it" so we check again.',
-      es: 'Si cambiaste de dirección hace poco, actualiza tus datos de residencia y pulsa «Ya lo he corregido» para que volvamos a comprobarlo.',
-    },
-  },
-  data_mismatch: {
-    id: 'data_mismatch',
-    officerLabel: { en: 'Data mismatch', es: 'Los datos no coinciden' },
-    citizenMessage: {
-      en: 'Your name or date of birth is different in your document and in our records.',
-      es: 'Tu nombre o fecha de nacimiento no coincide entre tu documento y nuestros registros.',
-    },
-    howToFix: {
-      en: 'Tell us which one is right and send proof, or appeal.',
-      es: 'Indícanos cuál es el correcto y envía una prueba, o recurre.',
-    },
-  },
-  suspected_fraud: {
-    id: 'suspected_fraud',
-    officerLabel: { en: 'Suspected fraud', es: 'Sospecha de fraude' },
-    citizenMessage: {
-      en: 'Our checks found signs that the identity or document may not be genuine.',
-      es: 'Nuestras comprobaciones encontraron indicios de que la identidad o el documento pueden no ser auténticos.',
-    },
-    howToFix: {
-      en: 'If this is a mistake, appeal and book a video call; an officer will review it with you.',
-      es: 'Si es un error, recurre y pide una videollamada; una persona funcionaria lo revisará contigo.',
-    },
-  },
-}
+export const REJECTION_REASONS: Record<RejId, RejectionReason> = Object.fromEntries(
+  Object.values(REJ_REASONS).map(x => [x.id, {
+    id: x.id,
+    officerLabel: x.officerLabel,
+    when: x.when,
+    canCorrect: x.canCorrect,
+    msg: x.id,
+    citizenMessage: { en: MSG[x.id].en, es: MSG[x.id].es },
+    howToFix: x.canCorrect,
+  } satisfies RejectionReason]),
+) as Record<RejId, RejectionReason>
 
 /* ------------------------------------------------- other citizen messages */
 
@@ -515,65 +327,24 @@ export const ASSISTANT_QUESTIONS = {
 } as const
 
 /**
- * Route recommendation used by the assistant. Deterministic.
- * Returns the route and the reason shown to the citizen.
+ * Route recommendation (RA-07A/B/C/F/X). Deterministic.
+ *   red card / NIE paper → X · document "I am not sure" → F · DNI → C · EU national with an EU eID (not for a
+ *   minor) → A · NFC "No" → F · otherwise (passport, TIE, EU eID card) → B.
  */
-export function recommendRoute(a: AssistantAnswers): { route: RouteId; reason: Bilingual; policyProposal: boolean } {
-  if (a.document === 'RED_CARD' || a.document === 'NIE_PAPER') {
-    return {
-      route: 'FALLBACK',
-      policyProposal: true,
-      reason: {
-        en: 'Your document has no chip, so an officer confirms your identity on a video call. Under current rules this document is excluded; we propose to include it.',
-        es: 'Tu documento no tiene chip, así que una persona funcionaria confirma tu identidad por videollamada. Con las normas actuales este documento está excluido; proponemos incluirlo.',
-      },
-    }
+export function recommendRoute(a: AssistantAnswers): { route: RouteId; msg: string; reason: Bilingual; policyProposal: boolean } {
+  const who = a.who ?? (a.forMinor ? 'child' : a.assisted ? 'helping' : 'self')
+  const euEid = a.euEid ?? (a.hasEuEid ? 'yes' : null)
+  const pick = (route: RouteId) => {
+    const m = MSG[ROUTES[route].msg as 'RA-07A' | 'RA-07F'] as { title: Bilingual; why?: Bilingual }
+    const why = m.why ?? m.title
+    return { route, msg: ROUTES[route].msg, reason: why, policyProposal: isProposedRule(route, { ...a, who }) }
   }
-  if (a.forMinor && (a.document === 'PASSPORT' || a.document === 'TIE')) {
-    return {
-      route: 'B',
-      policyProposal: false,
-      reason: {
-        en: 'You are registering a minor in your care. You confirm the link first; then the minor’s document is read and the minor does the face check. An officer always confirms the link before anything is granted.',
-        es: 'Registras a un menor a tu cargo. Primero confirmas el vínculo; después se lee el documento del menor y el menor hace la comprobación facial. Una persona funcionaria siempre confirma el vínculo antes de conceder nada.',
-      },
-    }
-  }
-  if (a.nationalityGroup === 'spanish' && a.document === 'DNI') {
-    return {
-      route: 'C',
-      policyProposal: false,
-      reason: { en: 'You have a DNI, so you can use today’s DNI video call.', es: 'Tienes DNI, así que puedes usar la videollamada con DNI de hoy.' },
-    }
-  }
-  if (a.nationalityGroup === 'eu' && a.hasEuEid) {
-    return {
-      route: 'A',
-      policyProposal: false,
-      reason: {
-        en: 'You can confirm who you are with your own country’s digital ID, through eIDAS, the European network that connects national digital IDs. It is the route that best fits you.',
-        es: 'Puedes confirmar quién eres con la identidad digital de tu país, a través de eIDAS, la red europea que conecta las identidades digitales nacionales. Es la vía que mejor te encaja.',
-      },
-    }
-  }
-  if (a.document === 'TIE') {
-    return {
-      route: 'B',
-      policyProposal: true,
-      reason: {
-        en: 'Your phone reads the chip in your TIE, then a short face check. No appointment needed. (Reading the TIE chip by phone is an assumption we are still confirming.)',
-        es: 'Tu móvil lee el chip de tu TIE y luego hace una breve comprobación facial. Sin cita. (La lectura del chip de la TIE con el móvil es un supuesto pendiente de confirmar.)',
-      },
-    }
-  }
-  return {
-    route: 'B',
-    policyProposal: true,
-    reason: {
-      en: 'Your passport has a chip your phone can read, then a short face check. No appointment needed.',
-      es: 'Tu pasaporte tiene un chip que tu móvil puede leer, y luego una breve comprobación facial. Sin cita.',
-    },
-  }
+  if (a.document === 'RED_CARD' || a.document === 'NIE_PAPER') return pick('X')
+  if (a.documentUnsure) return pick('F')
+  if (a.document === 'DNI') return pick('C')
+  if (a.nationalityGroup === 'eu' && euEid === 'yes' && who !== 'child') return pick('A')
+  if (a.nfc === 'no') return pick('F')
+  return pick('B')
 }
 
 /** The two rule changes the plan proposes openly. Show them as proposals, never as current rules. */
@@ -638,14 +409,14 @@ export const SIMULATED_DASHBOARD = {
   rejections: { total: 412, correctedAndApproved: 167 },
   appeals: { filed: 58, upheld: 21, dismissed: 29, open: 8 },
   /** Registrations per route over the 8 weeks after launch. */
-  byRoute: { A: 1840, B: 6215, C: 9930, FALLBACK: 702 },
+  byRoute: { A: 1840, B: 6215, C: 9930, X: 214, F: 702 } as Record<RouteId, number>,
 }
 
 /* ---------------------------------------------------------------- officers */
 
 export const OFFICERS: Officer[] = [
-  { id: 'OF-DEMO-07', name: 'Laura Navarro', office: { en: 'Registration office · Madrid', es: 'Oficina de registro · Madrid' } },
-  { id: 'OF-DEMO-12', name: 'Javier Prieto', office: { en: 'Registration office · Valencia', es: 'Oficina de registro · Valencia' } },
+  { id: 'OF-DEMO-07', name: 'Lucía Vega', office: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' } },
+  { id: 'OF-DEMO-12', name: 'Andrés Ortiz', office: { en: 'Registration office · Madrid Centro', es: 'Oficina de registro · Madrid Centro' } },
   { id: 'OF-DEMO-21', name: 'Marta Gil Herrero', office: { en: 'Registration office · Sevilla', es: 'Oficina de registro · Sevilla' } },
 ]
 
@@ -679,65 +450,36 @@ export const STAFF_CREDENTIAL_LABELS: Record<StaffCertificate['credential'], Bil
 }
 
 /**
- * What the simulated certificate picker offers. Covers every outcome: two staff who sign in directly
- * once their profile exists, one authorised officer signing in for the first time, one person with a valid
- * certificate who is NOT authorised for Cl@ve, and one expired certificate.
- */
-/**
- * Staff secrets for the team, documented ONLY in the README (never rendered in the app).
+ * Staff secrets for the team, documented in the README and in the visible demo-access box (all fictional).
  * Certificate PINs and staff user passwords. Stored in state/seed only as demoHash.
  */
 export const STAFF_DEMO_SECRETS = {
-  pins: { 'cert-laura': '2580', 'cert-javier': '1357', 'cert-marta': '4826', 'cert-diego': '9031', 'cert-old': '2580' } as Record<string, string>,
-  passwords: { lnavarro: 'Navarro-2026', jprieto: 'Prieto-2026', mgil: 'GilHerrero-2026', dromero: 'Romero-2026' } as Record<string, string>,
+  pins: { 'cert-vega': '2580', 'cert-ortiz': '1357', 'cert-marta': '4826', 'cert-diego': '9031', 'cert-old': '2580' } as Record<string, string>,
+  passwords: { lvega: 'Vega-2026', aortiz: 'Ortiz-2026', mgil: 'GilHerrero-2026', dromero: 'Romero-2026' } as Record<string, string>,
 }
 
 /**
- * Staff user accounts for the "user + password" sign-in method (the second card on the staff sign-in page).
+ * Staff user accounts for the "user + password" sign-in method.
  * Same authorisation rules as certificates: Diego has an account but is not authorised for Cl@ve registration.
  */
 export const STAFF_ACCOUNTS: StaffAccount[] = [
-  { userId: 'lnavarro', holderName: 'Laura Navarro', holderId: '50731842J', officerId: 'OF-DEMO-07', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.lnavarro) },
-  { userId: 'jprieto', holderName: 'Javier Prieto', holderId: '29640157H', officerId: 'OF-DEMO-12', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.jprieto) },
+  { userId: 'lvega', holderName: 'Lucía Vega', holderId: '50731842J', officerId: 'OF-DEMO-07', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.lvega) },
+  { userId: 'aortiz', holderName: 'Andrés Ortiz', holderId: '29640157H', officerId: 'OF-DEMO-12', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.aortiz) },
   { userId: 'mgil', holderName: 'Marta Gil Herrero', holderId: '71385096A', officerId: 'OF-DEMO-21', authorisedForClave: true, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.mgil) },
   { userId: 'dromero', holderName: 'Diego Romero', holderId: '33918274C', authorisedForClave: false, passwordHash: demoHash(STAFF_DEMO_SECRETS.passwords.dromero) },
 ]
 
-export const STAFF_CERTIFICATES: StaffCertificate[] = [
-  { id: 'cert-laura', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-laura'])},
-  { id: 'cert-javier', credential: 'dnie', holderName: 'Javier Prieto', holderId: '29640157H', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-javier'])},
-  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: '71385096A', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-marta'])},
-  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: '33918274C', validUntil: '2027-05-20', authorisedForClave: false , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-diego'])},
-  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Laura Navarro', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true , pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-old'])},
-]
-
-/** Fake personnel-number format (NRP). Real formats must never be typed into the prototype. */
-/* ------------------------------------------------- fictional identifiers
- * The app shows realistic-looking identifiers, but every DNI/NIE-shaped value carries a WRONG check letter,
- * so it can never be a real person's number. Anything a user types in a DNI/NIE/NRP-shaped field must
- * fail the real check-letter test (isFictionalDniNie), otherwise the app refuses it.
+/**
+ * What the simulated certificate picker offers: two staff who sign in directly once their profile exists, one more
+ * authorised officer, one person with a valid certificate who is NOT authorised for Cl@ve, and one expired certificate.
  */
-const DNI_LETTERS = 'TRWAGMYFPDXBNJZSQVHLCKE'
-/** True when value has DNI (8 digits + letter) or NIE (X/Y/Z + 7 digits + letter) shape. */
-export const hasDniNieShape = (v: string) => /^(\d{8}|[XYZ]\d{7})[A-Z]$/.test(v.trim().toUpperCase())
-/** True when the check letter is the real one (i.e. could be a real person's number). */
-export function hasValidDniNieLetter(v: string): boolean {
-  const s = v.trim().toUpperCase()
-  if (!hasDniNieShape(s)) return false
-  const digits = s[0] >= 'X' && s[0] <= 'Z' ? String('XYZ'.indexOf(s[0])) + s.slice(1, 8) : s.slice(0, 8)
-  return DNI_LETTERS[Number(digits) % 23] === s[8]
-}
-/** Fictional = has the shape but a wrong check letter. */
-export const isFictionalDniNie = (v: string) => hasDniNieShape(v) && !hasValidDniNieLetter(v)
-
-/** Builds a fictional DNI/NIE from digits: same shape as a real one, deliberately wrong check letter. */
-export function fictionalDniNie(prefix: '' | 'X' | 'Y' | 'Z', digits: number): string {
-  const body = prefix ? String(digits).padStart(7, '0').slice(-7) : String(digits).padStart(8, '0').slice(-8)
-  const n = Number((prefix ? String('XYZ'.indexOf(prefix)) : '') + body)
-  const ok = DNI_LETTERS[n % 23]
-  const wrong = DNI_LETTERS[(n % 23 + 7) % 23]
-  return `${prefix}${body}${wrong === ok ? 'Z' : wrong}`
-}
+export const STAFF_CERTIFICATES: StaffCertificate[] = [
+  { id: 'cert-vega', credential: 'employee_certificate', holderName: 'Lucía Vega', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2028-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true, pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-vega']) },
+  { id: 'cert-ortiz', credential: 'dnie', holderName: 'Andrés Ortiz', holderId: '29640157H', validUntil: '2029-02-14', officerId: 'OF-DEMO-12', authorisedForClave: true, pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-ortiz']) },
+  { id: 'cert-marta', credential: 'employee_certificate', holderName: 'Marta Gil Herrero', holderId: '71385096A', authorityId: 'delegacion', post: STAFF_POSTS[2], validUntil: '2027-11-02', officerId: 'OF-DEMO-21', authorisedForClave: true, pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-marta']) },
+  { id: 'cert-diego', credential: 'personal_certificate', holderName: 'Diego Romero', holderId: '33918274C', validUntil: '2027-05-20', authorisedForClave: false, pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-diego']) },
+  { id: 'cert-old', credential: 'employee_certificate', holderName: 'Lucía Vega', holderId: '50731842J', authorityId: 'aeat', post: STAFF_POSTS[0], validUntil: '2025-06-30', officerId: 'OF-DEMO-07', authorisedForClave: true, pinHash: demoHash(STAFF_DEMO_SECRETS.pins['cert-old']) },
+]
 
 /**
  * Personnel registration number (NRP) shape used in the prototype: the holder's 8-digit DNI number with its
@@ -749,7 +491,6 @@ export const isFictionalPersonnelNumber = (v: string) => {
   const s = v.trim().toUpperCase().replace(/\s+/g, '')
   return PERSONNEL_NUMBER_PATTERN.test(s) && isFictionalDniNie(s.slice(0, 9))
 }
-
 /** Queue priority tiers, highest first, with the reason shown to officers. */
 export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bilingual }> = [
   { id: 'p1_high_risk', label: { en: 'P1 · High risk', es: 'P1 · Riesgo alto' }, why: { en: 'Possible fraud: decide before anything else so nothing is granted by mistake.', es: 'Posible fraude: se decide antes que nada para no conceder nada por error.' } },
@@ -763,282 +504,7 @@ export const PRIORITY_TIERS: Array<{ id: PriorityTier; label: Bilingual; why: Bi
 export const PRIORITY_AGE_BUMP_HOURS = 24
 export const SYSTEM_ACTOR = { kind: 'system' as const, id: 'ENGINE', name: 'Verification engine (simulated)' }
 
-/* -------------------------------------------------------------- the cases */
-
-const d = (type: DocumentType, number: string, issuingCountry: string, expires: string): IdentityDocument => ({ type, number, issuingCountry, expires })
-
-type LibrarySeed = Omit<Case, 'answers' | 'route' | 'status' | 'level' | 'advanced' | 'consentGiven' | 'attempt' | 'checks' | 'risk' | 'flags' | 'awaitingOfficer' | 'decisions' | 'correctedAfterRefusal' | 'updatedAt'>
-
-/** The case library (plan Part 2): 8 runnable personas. Order = order in the demo panel. */
-export const CASE_LIBRARY: LibrarySeed[] = [
-  {
-    id: 'giulia',
-    origin: 'library',
-    persona: {
-      name: 'Giulia Ferraro', age: 24, nationality: 'Italian', initials: 'GF', hue: 12,
-      profile: { en: "Italian master's student in Madrid", es: 'Estudiante italiana de máster en Madrid' },
-    },
-    document: d('PASSPORT', 'YB4829137', 'Italy', '2031-03-14'),
-    otherDocuments: [d('EU_EID', 'CA77310XK', 'Italy', '2030-09-01')],
-    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
-    scenario: {
-      en: 'Her Italian eID PIN is at home, so she uses her passport chip + face check. Basic level in minutes; an officer approves the advanced level live.',
-      es: 'El PIN de su eID italiano está en casa, así que usa el chip del pasaporte + cara. Nivel básico en minutos; una funcionaria aprueba el avanzado en directo.',
-    },
-    demoBeat: { en: "Video 0:40–2:00 · Giulia's new journey", es: 'Vídeo 0:40–2:00 · El nuevo recorrido de Giulia' },
-    simulation: {
-      attempts: [{
-        eidas_login: { outcome: 'pass', detail: { en: 'Italian eID confirmed identity via eIDAS node', es: 'El eID italiano confirmó la identidad por el nodo eIDAS' } },
-        chip_read: { outcome: 'pass', detail: { en: 'Chip read in 2.1 s', es: 'Chip leído en 2,1 s' } },
-        liveness: { outcome: 'pass', score: 0.98, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
-        face_match: { outcome: 'pass', score: 0.96, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Residence confirmed in Madrid', es: 'Residencia confirmada en Madrid' } },
-      }],
-    },
-  },
-  {
-    id: 'daniel',
-    origin: 'library',
-    persona: {
-      name: 'Daniel Mwangi', age: 23, nationality: 'Kenyan', initials: 'DM', hue: 150,
-      profile: { en: "Kenyan master's student with a TIE", es: 'Estudiante keniano de máster con TIE' },
-    },
-    document: d('TIE', 'Y8042719P', 'Spain', '2027-09-30'),
-    presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: false },
-    scenario: {
-      en: 'Non-EU student, TIE chip + face check. Today he would need an office appointment with originals; now it is done from the phone.',
-      es: 'Estudiante de fuera de la UE, chip de la TIE + cara. Hoy necesitaría cita en oficina con originales; ahora lo hace desde el móvil.',
-    },
-    demoBeat: { en: 'Guide slide 4 · Which route is yours', es: 'Guía diapositiva 4 · Qué vía es la tuya' },
-    simulation: {
-      attempts: [{
-        liveness: { outcome: 'pass', score: 0.97, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
-        face_match: { outcome: 'pass', score: 0.94, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid ', es: 'Residencia confirmada en Madrid' } },
-      }],
-    },
-  },
-  {
-    id: 'rafael',
-    origin: 'library',
-    persona: {
-      name: 'Ernesto Medina', age: 80, nationality: 'Argentine', initials: 'EM', hue: 32,
-      profile: { en: 'The neighbour: 80, no smartphone, helped by his daughter', es: 'El vecino: 80 años, sin smartphone, le ayuda su hija' },
-    },
-    document: d('TIE', 'X9019583W', 'Spain', '2029-05-12'),
-    presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: true },
-    assisted: { helperName: 'Lucía Medina', relation: { en: 'daughter', es: 'hija' }, deviceOwner: 'Lucía Medina' },
-    scenario: {
-      en: 'Registers on his daughter Lucía’s phone in assisted mode. He does the face check himself; the Cl@ve is his.',
-      es: 'Se registra en el móvil de su hija Lucía en modo asistido. Él hace la comprobación facial; la Cl@ve es suya.',
-    },
-    demoBeat: { en: 'Video 3:40–4:20 · Nobody left behind', es: 'Vídeo 3:40–4:20 · Nadie se queda atrás' },
-    simulation: {
-      attempts: [{
-        liveness: { outcome: 'pass', score: 0.91, detail: { en: 'Live person confirmed (slower movement, within range)', es: 'Persona real confirmada (movimiento más lento, dentro del rango)' } },
-        face_match: { outcome: 'pass', score: 0.92, detail: { en: 'Matches chip photo (Ernesto, not the device owner)', es: 'Coincide con la foto del chip (Ernesto, no la dueña del móvil)' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Getafe ', es: 'Residencia confirmada en Getafe' } },
-      }],
-    },
-  },
-  {
-    id: 'noah',
-    origin: 'library',
-    persona: {
-      name: 'Noah Becker', age: 16, nationality: 'German', initials: 'NB', hue: 210,
-      profile: { en: 'A minor (16) registering with his mother', es: 'Un menor (16) que se registra con su madre' },
-    },
-    document: d('PASSPORT', 'C01X58RT2', 'Germany', '2030-02-02'),
-    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false, forMinor: true },
-    guardian: {
-      name: 'Anke Becker',
-      relation: { en: 'mother', es: 'madre' },
-      document: d('EU_EID', 'L01X44TZ7', 'Germany', '2032-07-20'),
-      route: 'A',
-    },
-    scenario: {
-      en: 'His mother signs in with her German eID (route A) and confirms him; he does the chip + face check. An officer confirms the link.',
-      es: 'Su madre entra con su eID alemán (vía A) y le confirma; él hace chip + cara. Una funcionaria confirma el vínculo.',
-    },
-    demoBeat: { en: 'Guide slide 9 · Special cases', es: 'Guía diapositiva 9 · Casos especiales' },
-    simulation: {
-      attempts: [{
-        liveness: { outcome: 'pass', score: 0.95, detail: { en: 'Natural micro-movement and depth', es: 'Micromovimiento y profundidad naturales' } },
-        face_match: { outcome: 'pass', score: 0.93, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid with his mother ', es: 'Residencia confirmada en Madrid con su madre' } },
-        guardian_link: { outcome: 'pass', detail: { en: 'Mother signed in via German eID (eIDAS); same address in padrón', es: 'La madre entró con eID alemán (eIDAS); mismo domicilio en el padrón' } },
-      }],
-    },
-  },
-  {
-    id: 'yusuf',
-    origin: 'library',
-    persona: {
-      name: 'Yusuf Haddad', age: 31, nationality: 'Syrian', initials: 'YH', hue: 280,
-      profile: { en: 'International protection applicant with a red card', es: 'Solicitante de protección internacional con tarjeta roja' },
-    },
-    document: d('RED_CARD', 'Y9117004D', 'Spain', '2027-01-15'),
-    presetAnswers: { nationalityGroup: 'non_eu', document: 'RED_CARD', hasEuEid: false, assisted: false },
-    policyProposal: true,
-    scenario: {
-      en: 'His red card has no chip, so he goes straight to a video call with an officer.',
-      es: 'Su tarjeta roja no tiene chip, así que va directo a videollamada con una funcionaria.',
-    },
-    demoBeat: { en: 'Red-card holders', es: 'Titulares de tarjeta roja' },
-    simulation: {
-      attempts: [{
-        chip_read: { outcome: 'skipped', detail: { en: 'Document has no chip', es: 'El documento no tiene chip' } },
-        residence: { outcome: 'pass', detail: { en: 'Registered in Madrid ', es: 'Residencia confirmada en Madrid' } },
-        officer_video: { outcome: 'pending', detail: { en: 'Waiting for officer video call', es: 'Esperando videollamada con funcionaria' } },
-      }],
-    },
-  },
-  {
-    id: 'deepfake',
-    origin: 'library',
-    persona: {
-      name: 'Ivo Petrov', age: 35, nationality: 'Bulgarian', initials: 'IP', hue: 0,
-      profile: { en: 'Deepfake attempt: someone else’s passport, a synthetic face video', es: 'Intento de deepfake: pasaporte ajeno y vídeo facial sintético' },
-    },
-    document: d('PASSPORT', '391027844', 'Bulgaria', '2029-11-08'),
-    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
-    scenario: {
-      en: 'The face matches the chip photo, but liveness fails: an injected video. The engine stops it and an officer refuses with a reason.',
-      es: 'La cara coincide con la foto del chip, pero falla la prueba de vida: vídeo inyectado. El motor lo para y una funcionaria deniega con motivo.',
-    },
-    demoBeat: { en: 'Video 2:50–3:40 · A hard case', es: 'Vídeo 2:50–3:40 · Un caso difícil' },
-    simulation: {
-      attempts: [{
-        liveness: { outcome: 'fail', score: 0.22, detail: { en: 'Injected video stream: no depth, screen-replay pattern, frozen micro-movement', es: 'Vídeo inyectado: sin profundidad, patrón de pantalla, micromovimiento congelado' } },
-        face_match: { outcome: 'pass', score: 0.97, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-        residence: { outcome: 'warn', detail: { en: 'Address registered 3 days ago', es: 'Domicilio registrado hace 3 días' } },
-      }],
-    },
-  },
-  {
-    id: 'fakedoc',
-    origin: 'library',
-    persona: {
-      name: 'Hana Kovač', age: 41, nationality: 'Croatian', initials: 'HK', hue: 330,
-      profile: { en: 'Fake document: a passport whose chip was cloned and edited', es: 'Documento falso: pasaporte con el chip clonado y modificado' },
-    },
-    document: d('PASSPORT', '205521963', 'Croatia', '2028-04-30'),
-    presetAnswers: { nationalityGroup: 'eu', document: 'PASSPORT', hasEuEid: false, assisted: false },
-    scenario: {
-      en: 'The chip reads, but its signature is not from a trusted issuing country. Flagged high risk; the officer refuses with "Chip signature invalid".',
-      es: 'El chip se lee, pero su firma no es de un país emisor de confianza. Riesgo alto; la funcionaria deniega con «Firma del chip no válida».',
-    },
-    demoBeat: { en: 'Guide slide 7 · What we check, and why', es: 'Guía diapositiva 7 · Qué comprobamos y por qué' },
-    simulation: {
-      attempts: [{
-        chip_signature: { outcome: 'fail', detail: { en: 'Signature not issued by a trusted country signing authority (CSCA)', es: 'Firma no emitida por una autoridad firmante de confianza del país (CSCA)' } },
-        document_validity: { outcome: 'warn', detail: { en: 'Expiry date in chip differs from printed page', es: 'La caducidad del chip difiere de la página impresa' } },
-        liveness: { outcome: 'pass', score: 0.94, detail: { en: 'Live person', es: 'Persona real' } },
-        face_match: { outcome: 'pass', score: 0.91, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-      }],
-    },
-  },
-  {
-    id: 'linwei',
-    origin: 'library',
-    persona: {
-      name: 'Lin Wei', age: 29, nationality: 'Chinese', initials: 'LW', hue: 190,
-      profile: { en: 'Engineer with a TIE who moved last month', es: 'Ingeniera con TIE que se mudó el mes pasado' },
-    },
-    document: d('TIE', 'Z9088104B', 'Spain', '2028-12-01'),
-    presetAnswers: { nationalityGroup: 'non_eu', document: 'TIE', hasEuEid: false, assisted: false },
-    scenario: {
-      en: 'Her residence details were not updated after moving, so the officer refuses with "Residence not found". She updates it, presses "I have corrected it" and is approved.',
-      es: 'No actualizó sus datos de residencia al mudarse, así que la funcionaria deniega con «Residencia no encontrada». Lo actualiza, pulsa «Ya lo he corregido» y queda aprobada.',
-    },
-    demoBeat: { en: 'Video 2:50–3:40 · A rejection corrected', es: 'Vídeo 2:50–3:40 · Una denegación corregida' },
-    simulation: {
-      attempts: [
-        {
-          liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
-          face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-          residence: { outcome: 'fail', detail: { en: 'No residence record at the declared address', es: 'Sin datos de residencia en la dirección declarada' } },
-        },
-        {
-          liveness: { outcome: 'pass', score: 0.96, detail: { en: 'Live person', es: 'Persona real' } },
-          face_match: { outcome: 'pass', score: 0.95, detail: { en: 'Matches chip photo', es: 'Coincide con la foto del chip' } },
-          residence: { outcome: 'pass', detail: { en: 'Residence confirmed after the update', es: 'Residencia confirmada tras la actualización' } },
-        },
-      ],
-    },
-  },
-]
-
-/* ---------------------------------------------------- background cases
- * Filler so the officer queue looks alive. Not runnable from the citizen side.
- */
-interface BackgroundSeed {
-  id: string
-  name: string; age: number; nationality: string; initials: string; hue: number
-  profile: Bilingual
-  doc: IdentityDocument
-  route: RouteId
-  status: StatusId
-  level: Case['level']
-  advanced: Case['advanced']
-  awaitingOfficer: boolean
-  minutesAgo: number
-  checks: Array<[CheckId, Case['checks'][number]['outcome'], number | undefined, string]>
-  flags: Case['flags']
-  risk: Case['risk']
-  infoRequest?: string
-  refusedWith?: import('./types').RejectionReasonId
-  appeal?: string
-}
-
-const bg = (x: BackgroundSeed) => x
-const BACKGROUND: BackgroundSeed[] = [
-  bg({ id: 'bg-01', name: 'Amélie Laurent', age: 27, nationality: 'French', initials: 'AL', hue: 240, profile: { en: 'French designer', es: 'Diseñadora francesa' }, doc: d('EU_EID', 'X4RT90213', 'France', '2031-01-10'), route: 'A', status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 14, checks: [['eidas_login', 'pass', undefined, 'French eID confirmed via eIDAS'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-02', name: 'Mateo Rojas', age: 34, nationality: 'Colombian', initials: 'MR', hue: 50, profile: { en: 'Colombian nurse with a TIE', es: 'Enfermero colombiano con TIE' }, doc: d('TIE', 'Y8063377N', 'Spain', '2028-06-01'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 22, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.96, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Zaragoza']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
-  bg({ id: 'bg-03', name: 'Priya Nair', age: 31, nationality: 'Indian', initials: 'PN', hue: 20, profile: { en: 'Indian data scientist with a passport', es: 'Científica de datos india con pasaporte' }, doc: d('PASSPORT', 'K7712093', 'India', '2033-08-19'), route: 'B', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 9, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.93, 'Live person'], ['face_match', 'warn', 0.86, 'Below threshold: new glasses and beard vs chip photo'], ['residence', 'pass', undefined, 'Registered in Barcelona']], flags: [{ code: 'low_face_match', severity: 'medium', reason: { en: 'Face match 0.86 is below the 0.90 threshold', es: 'Coincidencia facial 0,86 por debajo del umbral 0,90' } }], risk: 'medium' }),
-  bg({ id: 'bg-04', name: 'Oluwaseun Adeyemi', age: 26, nationality: 'Nigerian', initials: 'OA', hue: 120, profile: { en: 'Nigerian MBA student with a TIE', es: 'Estudiante nigeriano de MBA con TIE' }, doc: d('TIE', 'Y8071240D', 'Spain', '2027-07-15'), route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two residence records found (old and new address)']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'Residence record ambiguous', es: 'Datos de residencia ambiguos' } }], risk: 'medium', infoRequest: 'Please confirm which of your two addresses is current (Calle Mayor or Calle Alcalá).' }),
-  bg({ id: 'bg-05', name: 'Carmen Ruiz Ortega', age: 45, nationality: 'Spanish', initials: 'CR', hue: 0, profile: { en: 'Spanish teacher with a DNI', es: 'Profesora española con DNI' }, doc: d('DNI', '48219360M', 'Spain', '2030-04-04'), route: 'C', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 140, checks: [['dni_video', 'pass', undefined, 'DNI video identification completed']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-06', name: 'Tomás Ferreira', age: 38, nationality: 'Portuguese', initials: 'TF', hue: 100, profile: { en: 'Portuguese chef', es: 'Cocinero portugués' }, doc: d('EU_EID', '152198027ZX4', 'Portugal', '2029-10-10'), route: 'A', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 31, checks: [['eidas_login', 'warn', undefined, 'Surname order differs from residence record'], ['residence', 'pass', undefined, 'Registered in Sevilla']], flags: [{ code: 'eid_data_mismatch', severity: 'medium', reason: { en: 'eID data does not match the records (surname order)', es: 'Los datos del eID no coinciden con los registros (orden de apellidos)' } }], risk: 'medium' }),
-  bg({ id: 'bg-07', name: 'Aisha Rahman', age: 29, nationality: 'Bangladeshi', initials: 'AR', hue: 160, profile: { en: 'Bangladeshi researcher with a passport', es: 'Investigadora bangladesí con pasaporte' }, doc: d('PASSPORT', 'A11902588', 'Bangladesh', '2026-10-30'), route: 'B', status: 'not_approved', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 1440, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'fail', undefined, 'Passport expired on 30 Oct 2026'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Madrid']], flags: [{ code: 'appeal_filed', severity: 'medium', reason: { en: 'Appeal filed against the refusal', es: 'Recurso presentado contra la denegación' } }], risk: 'medium', refusedWith: 'document_expired', appeal: 'My passport renewal is in progress; I attach the consulate receipt.' }),
-  bg({ id: 'bg-08', name: 'Jonas Lindqvist', age: 52, nationality: 'Swedish', initials: 'JL', hue: 200, profile: { en: 'Swedish retiree in Málaga', es: 'Jubilado sueco en Málaga' }, doc: d('PASSPORT', '99821470', 'Sweden', '2032-03-03'), route: 'B', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 300, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.94, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Málaga']], flags: [], risk: 'low' }),
-  bg({ id: 'bg-09', name: 'Valentina Costa', age: 19, nationality: 'Brazilian', initials: 'VC', hue: 300, profile: { en: 'Brazilian undergraduate with a TIE', es: 'Estudiante brasileña de grado con TIE' }, doc: d('TIE', 'Y8090011N', 'Spain', '2027-09-30'), route: 'FALLBACK', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 48, checks: [['chip_read', 'fail', undefined, 'Chip could not be read twice (damaged card)'], ['officer_video', 'pending', undefined, 'Waiting for officer video call']], flags: [{ code: 'second_attempt', severity: 'medium', reason: { en: 'Chip unreadable twice: moved to Fallback', es: 'Chip ilegible dos veces: pasa a vía alternativa' } }], risk: 'medium' }),
-  bg({ id: 'bg-10', name: 'Marek Nowak', age: 40, nationality: 'Polish', initials: 'MN', hue: 260, profile: { en: 'Polish logistics manager', es: 'Responsable de logística polaco' }, doc: d('PASSPORT', 'EP4401872', 'Poland', '2030-12-12'), route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 5, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.96, 'Matches chip photo'], ['residence', 'pass', undefined, 'Registered in Valencia']], flags: [{ code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }], risk: 'low' }),
-]
-
-const both = (s: string): Bilingual => ({ en: s, es: s })
-
 /* ------------------------------------------------------- citizen accounts */
-
-/**
- * Tiny deterministic hash (FNV-1a, 32-bit, hex) so the store never keeps passwords in plain text.
- * DEMO ONLY: this is not a secure password hash. Never reuse a real password in the prototype.
- */
-export function demoHash(input: string): string {
-  let h = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i)
-    h = Math.imul(h, 0x01000193) >>> 0
-  }
-  return h.toString(16).padStart(8, '0')
-}
-
-/** Normalises a typed document number for sign-in (case and spaces don't matter). */
-export const normaliseDocNumber = (s: string) => s.trim().toUpperCase().replace(/\s+/g, '')
-
-/**
- * Saved demo accounts for the 8 library personas: sign in with the document number + this password.
- * These credentials are documented ONLY in the README for the team. They must never be rendered in the UI.
- */
-export const DEMO_ACCOUNT_PASSWORDS: Record<string, string> = {
-  giulia: 'giulia-demo',
-  daniel: 'daniel-demo',
-  rafael: 'rafael-demo',
-  noah: 'noah-demo',
-  yusuf: 'yusuf-demo',
-  deepfake: 'ivo-demo',
-  fakedoc: 'hana-demo',
-  linwei: 'linwei-demo',
-}
 
 export const PASSWORD_MIN_LENGTH = 8
 export const SIGNUP_MIN_AGE = 18
@@ -1061,6 +527,8 @@ export const SIGNUP_COUNTRIES: SignUpCountry[] = [
   { name: { en: 'United States', es: 'Estados Unidos' }, nationality: 'American', group: 'non_eu' },
   { name: { en: 'United Kingdom', es: 'Reino Unido' }, nationality: 'British', group: 'non_eu' },
   { name: { en: 'China', es: 'China' }, nationality: 'Chinese', group: 'non_eu' },
+  { name: { en: 'Japan', es: 'Japón' }, nationality: 'Japanese', group: 'non_eu' },
+  { name: { en: 'Brazil', es: 'Brasil' }, nationality: 'Brazilian', group: 'non_eu' },
   { name: { en: 'India', es: 'India' }, nationality: 'Indian', group: 'non_eu' },
   { name: { en: 'Ukraine', es: 'Ucrania' }, nationality: 'Ukrainian', group: 'non_eu' },
   { name: { en: 'Nigeria', es: 'Nigeria' }, nationality: 'Nigerian', group: 'non_eu' },
@@ -1074,66 +542,182 @@ export const SIGNUP_DOCUMENTS: Record<SignUpCountry['group'], DocumentType[]> = 
   non_eu: ['PASSPORT', 'TIE', 'NIE_PAPER', 'RED_CARD'],
 }
 
-function libraryAccount(c: { id: string; document: IdentityDocument }, at: string): CitizenAccount {
-  return { caseId: c.id, documentNumber: c.document.number, passwordHash: demoHash(DEMO_ACCOUNT_PASSWORDS[c.id]), createdAt: at, origin: 'library' }
+/** Country row for a typed nationality (English short name). */
+export function countryByName(name: string): SignUpCountry | undefined {
+  const n = (name ?? '').trim().toLowerCase()
+  return SIGNUP_COUNTRIES.find(c => c.name.en.toLowerCase() === n || c.name.es.toLowerCase() === n)
 }
+
+/* ------------------------------------------------------ building a case */
+
+export function emptySession(): Session {
+  return { route: null, who: 'self', nfc: null, euEid: null, consents: {}, chipReads: [], faceAttempts: [], videoAttempts: [], uploads: {} }
+}
+
+export const fullName = (p: Pick<PersonData, 'givenNames' | 'surnames'>) => `${p.givenNames} ${p.surnames}`.replace(/\s+/g, ' ').trim()
+
+/** Whole years between the date of birth and `today` (null for an invalid date). */
+export function ageFrom(dateOfBirth: string, today: Date = new Date()): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth ?? '')
+  if (!m) return null
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
+  let age = today.getFullYear() - y
+  if (today.getMonth() + 1 < mo || (today.getMonth() + 1 === mo && today.getDate() < d)) age--
+  return age
+}
+
+const initialsOfName = (name: string) => {
+  const w = name.split(' ').filter(Boolean)
+  return ((w[0]?.[0] ?? '?') + (w.length > 1 ? w[w.length - 1][0] : (w[0]?.[1] ?? ''))).toUpperCase()
+}
+const hueOfName = (name: string) => parseInt(demoHash(name.toLowerCase()), 16) % 360
+const ISSUED_IN_SPAIN: DocumentType[] = ['DNI', 'TIE', 'NIE_PAPER', 'RED_CARD']
+
+/** Display persona for a typed person + document. */
+export function personaOf(data: PersonData, doc: TypedDocument, now: Date = new Date()): Persona {
+  const name = fullName(data)
+  const country = countryByName(doc.nationality)
+  return {
+    name,
+    age: ageFrom(data.dateOfBirth, now) ?? 0,
+    nationality: country?.nationality ?? doc.nationality,
+    initials: initialsOfName(name),
+    hue: hueOfName(name),
+    profile: { en: `${country?.nationality ?? doc.nationality} · ${DOCUMENTS[doc.type].label.en}`, es: `${country?.name.es ?? doc.nationality} · ${DOCUMENTS[doc.type].label.es}` },
+  }
+}
+
+export function displayDocument(doc: TypedDocument): IdentityDocument {
+  return { type: doc.type, number: doc.number, issuingCountry: ISSUED_IN_SPAIN.includes(doc.type) ? 'Spain' : doc.nationality, expires: doc.expiry }
+}
+
+/** Assistant prefill derived from the typed data. */
+export function presetAnswersFor(doc: TypedDocument): AssistantAnswers {
+  const group = countryByName(doc.nationality)?.group ?? 'non_eu'
+  return {
+    nationalityGroup: group, nationality: doc.nationality, document: doc.type,
+    euEid: group === 'eu' ? (doc.type === 'EU_EID' ? 'yes' : null) : null, who: 'self', nfc: null,
+    hasEuEid: doc.type === 'EU_EID', assisted: false, forMinor: false,
+  }
+}
+
+/** A fresh draft application for a typed account. */
+export function newDraftCase(id: string, origin: Case['origin'], typed: TypedDocument, at: string, extra: Partial<Case> = {}): Case {
+  return {
+    id, origin, typed,
+    persona: personaOf(typed.data, typed, new Date(at)),
+    document: displayDocument(typed),
+    presetAnswers: presetAnswersFor(typed),
+    scenario: { en: 'Typed at sign-up. What happens next depends on the checks and the rules.', es: 'Datos escritos al registrarse. Lo que pase después depende de las comprobaciones y las normas.' },
+    demoBeat: origin === 'signup' ? { en: 'New sign-up', es: 'Nuevo registro' } : { en: 'Preloaded demo account', es: 'Cuenta de demo precargada' },
+    session: emptySession(),
+    answers: null, route: null, status: 'draft', level: 'none', advanced: 'not_requested', consentGiven: false,
+    attempt: 0, checks: [], risk: 'low', flags: [], citizenMsgs: [], awaitingOfficer: false, decisions: [], correctedAfterRefusal: false,
+    updatedAt: at,
+    ...extra,
+  }
+}
+
+/* ------------------------------------------------------------ preloaded accounts
+ * SPEC §7: all in DRAFT (nobody has done anything yet). Giulia is NOT preloaded: she is typed in live.
+ * Passwords are documented in the README (and DEMO_PEOPLE in ./world.ts).
+ */
+export const DEMO_ACCOUNT_PASSWORDS: Record<string, string> = Object.fromEntries(
+  DEMO_PEOPLE.filter(p => p.caseId).map(p => [p.caseId!, p.account.password]),
+)
+
+export function typedFromDemo(p: (typeof DEMO_PEOPLE)[number]): TypedDocument {
+  const a = p.account
+  return { type: a.documentType, number: a.documentNumber, expiry: a.expiryDate, nationality: a.country, data: { givenNames: a.givenNames, surnames: a.surnames, dateOfBirth: a.dateOfBirth } }
+}
+
+/** @deprecated UI migration: the old persona library is gone. Preloaded accounts, as draft cases. */
+export const CASE_LIBRARY: Array<Pick<Case, 'id' | 'caseRef' | 'caseLabel' | 'typed'>> = DEMO_PEOPLE.filter(p => p.caseId).map(p => ({
+  id: p.caseId!, caseRef: p.caseRef, caseLabel: p.caseLabel, typed: typedFromDemo(p),
+}))
+
+/* ---------------------------------------------------- background cases
+ * Filler so the officer queue looks alive. Not runnable from the citizen side. Already decided or waiting.
+ */
+interface BackgroundSeed {
+  id: string
+  givenNames: string; surnames: string; dob: string; country: string
+  doc: { type: DocumentType; number: string; expiry: string }
+  route: RouteId
+  status: StatusId
+  level: Case['level']
+  advanced: Case['advanced']
+  awaitingOfficer: boolean
+  minutesAgo: number
+  checks: Array<[CheckId, Case['checks'][number]['outcome'], number | undefined, string]>
+  flags: Case['flags']
+  risk: Case['risk']
+  aiReason?: string
+  infoRequest?: string
+  refusedWith?: RejId
+  appeal?: string
+}
+
+const bg = (x: BackgroundSeed) => x
+const ADV: Case['flags'][number] = { code: 'advanced_level_review', severity: 'low', reason: { en: 'Advanced level always gets a human review', es: 'El nivel avanzado siempre lo revisa una persona' } }
+const BACKGROUND: BackgroundSeed[] = [
+  bg({ id: 'bg-01', givenNames: 'Amélie', surnames: 'Laurent', dob: '1999-02-11', country: 'France', doc: { type: 'EU_EID', number: 'X4RT90213', expiry: '2031-01-10' }, route: 'A', status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 14, checks: [['eidas_login', 'pass', undefined, 'French eID confirmed via eIDAS'], ['residence', 'pass', undefined, 'Residence record matched (Madrid)']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-02', givenNames: 'Julián', surnames: 'Rendón', dob: '1992-06-01', country: 'Colombia', doc: { type: 'TIE', number: fictionalDniNie('Y', 8063377), expiry: '2028-06-01' }, route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 22, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.96, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Residence record matched (Zaragoza)']], flags: [ADV], risk: 'low' }),
+  bg({ id: 'bg-03', givenNames: 'Priya', surnames: 'Nair', dob: '1995-09-23', country: 'India', doc: { type: 'PASSPORT', number: 'K7712093', expiry: '2033-08-19' }, route: 'B', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 9, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.93, 'Live person'], ['face_match', 'pass', 0.94, 'Matches chip photo'], ['residence', 'fail', undefined, 'No residence record found']], flags: [{ code: 'residence_not_found', severity: 'medium', reason: { en: 'No residence record was found for this document. Other checks passed.', es: 'No se ha encontrado registro de residencia para este documento. El resto de comprobaciones se superaron.' } }], risk: 'medium', aiReason: 'No residence record was found for this document. Other checks passed.' }),
+  bg({ id: 'bg-04', givenNames: 'Oluwaseun', surnames: 'Adeyemi', dob: '2000-01-30', country: 'Nigeria', doc: { type: 'TIE', number: fictionalDniNie('Y', 8071240), expiry: '2027-07-15' }, route: 'B', status: 'need_info', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 75, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.93, 'Matches chip photo'], ['residence', 'warn', undefined, 'Two residence records found (old and new address)']], flags: [{ code: 'residence_mismatch', severity: 'medium', reason: { en: 'Two residence records found', es: 'Dos registros de residencia' } }], risk: 'medium', infoRequest: 'a document that shows which of your two addresses is current' }),
+  bg({ id: 'bg-05', givenNames: 'Carmen', surnames: 'Ruiz Ortega', dob: '1981-03-12', country: 'Spain', doc: { type: 'DNI', number: fictionalDniNie('', 48219360), expiry: '2030-04-04' }, route: 'C', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 140, checks: [['dni_video', 'pass', undefined, 'DNI video identification completed'], ['document_validity', 'pass', undefined, 'In date'], ['residence', 'pass', undefined, 'Residence record matched (Madrid)']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-06', givenNames: 'Tomás', surnames: 'Ferreira', dob: '1988-12-02', country: 'Portugal', doc: { type: 'EU_EID', number: '152198027ZX4', expiry: '2029-10-10' }, route: 'A', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 31, checks: [['eidas_login', 'pass', undefined, 'Portuguese eID confirmed via eIDAS'], ['residence', 'fail', undefined, 'Surname order differs from the residence record']], flags: [{ code: 'residence_mismatch', severity: 'medium', reason: { en: 'The residence record differs from the document in: surnames. Other checks passed.', es: 'El registro de residencia difiere del documento en: apellidos. El resto de comprobaciones se superaron.' } }], risk: 'medium', aiReason: 'The residence record differs from the document in: surnames. Other checks passed.' }),
+  bg({ id: 'bg-07', givenNames: 'Aisha', surnames: 'Rahman', dob: '1997-04-04', country: 'Other country outside the EU', doc: { type: 'PASSPORT', number: 'A11902588', expiry: '2026-10-30' }, route: 'B', status: 'not_approved', level: 'none', advanced: 'not_requested', awaitingOfficer: false, minutesAgo: 1440, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'fail', undefined, 'Passport expired on 30 Oct 2026'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.95, 'Matches chip photo'], ['residence', 'pass', undefined, 'Residence record matched (Madrid)']], flags: [{ code: 'appeal_filed', severity: 'medium', reason: { en: 'Review requested against the refusal', es: 'Revisión solicitada contra la denegación' } }], risk: 'medium', refusedWith: 'REJ-01', appeal: 'My passport renewal is in progress; I attach the consulate receipt.' }),
+  bg({ id: 'bg-08', givenNames: 'Jonas', surnames: 'Lindqvist', dob: '1974-07-19', country: 'Other country outside the EU', doc: { type: 'PASSPORT', number: '99821470', expiry: '2032-03-03' }, route: 'B', status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false, minutesAgo: 300, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.95, 'Live person'], ['face_match', 'pass', 0.94, 'Matches chip photo'], ['residence', 'pass', undefined, 'Residence record matched (Málaga)']], flags: [], risk: 'low' }),
+  bg({ id: 'bg-09', givenNames: 'Larissa', surnames: 'Prado', dob: '2007-05-05', country: 'Brazil', doc: { type: 'TIE', number: fictionalDniNie('Y', 8090011), expiry: '2027-09-30' }, route: 'F', status: 'checking', level: 'none', advanced: 'not_requested', awaitingOfficer: true, minutesAgo: 48, checks: [['chip_read', 'fail', undefined, 'Chip could not be read twice'], ['officer_video', 'pending', undefined, 'Waiting for the officer to start the video call']], flags: [{ code: 'chip_unreadable', severity: 'medium', reason: { en: 'Chip could not be read twice; document integrity not verified', es: 'El chip no se pudo leer dos veces; integridad del documento no verificada' } }], risk: 'medium', aiReason: 'Chip could not be read twice; document integrity not verified' }),
+  bg({ id: 'bg-10', givenNames: 'Marek', surnames: 'Nowak', dob: '1986-11-11', country: 'Poland', doc: { type: 'PASSPORT', number: 'EP4401872', expiry: '2030-12-12' }, route: 'B', status: 'approved', level: 'basic', advanced: 'pending_review', awaitingOfficer: true, minutesAgo: 5, checks: [['chip_read', 'pass', undefined, 'Chip read'], ['chip_signature', 'pass', undefined, 'Valid signature'], ['printed_vs_chip', 'pass', undefined, 'Printed data matches the chip'], ['document_validity', 'pass', undefined, 'In date'], ['liveness', 'pass', 0.97, 'Live person'], ['face_match', 'pass', 0.96, 'Matches chip photo'], ['residence', 'pass', undefined, 'Residence record matched (Valencia)']], flags: [ADV], risk: 'low' }),
+]
+
+const both = (s: string): Bilingual => ({ en: s, es: s })
 
 /**
  * Builds the initial state. Deterministic for a given `now`.
- * Library cases start as 'draft' (the citizen runs them). Background cases start mid-flow.
+ * Preloaded accounts start as 'draft'. Background cases start mid-flow.
  */
 export function buildSeedState(now: Date = new Date()): AppState {
   const iso = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString()
   const cases: Record<string, Case> = {}
+  const accounts: Record<string, CitizenAccount> = {}
 
-  for (const c of CASE_LIBRARY) {
-    cases[c.id] = {
-      ...c,
-      answers: null,
-      route: null,
-      status: 'draft',
-      level: 'none',
-      advanced: 'not_requested',
-      consentGiven: false,
-      attempt: 0,
-      checks: [],
-      risk: 'low',
-      flags: [],
-      awaitingOfficer: false,
-      decisions: [],
-      correctedAfterRefusal: false,
-      updatedAt: iso(0),
-    }
+  for (const p of DEMO_PEOPLE) {
+    if (!p.caseId) continue
+    const typed = typedFromDemo(p)
+    cases[p.caseId] = newDraftCase(p.caseId, 'library', typed, iso(0), { caseRef: p.caseRef, caseLabel: p.caseLabel })
+    accounts[p.caseId] = { caseId: p.caseId, documentNumber: typed.number, passwordHash: demoHash(p.account.password), createdAt: iso(0), origin: 'library' }
   }
 
-  const officer = OFFICERS[1]
+  const marta = OFFICERS[2]
+  const martaActor = { kind: 'officer' as const, id: marta.id, name: marta.name }
   for (const b of BACKGROUND) {
     const at = iso(b.minutesAgo)
+    const typed: TypedDocument = { type: b.doc.type, number: b.doc.number, expiry: b.doc.expiry, nationality: b.country, data: { givenNames: b.givenNames, surnames: b.surnames, dateOfBirth: b.dob } }
     const decisions: Case['decisions'] = []
-    if (b.level === 'basic' || b.level === 'advanced') {
-      decisions.push({ outcome: 'approved_basic', by: SYSTEM_ACTOR, at })
-    }
-    if (b.advanced === 'granted') {
-      decisions.push({ outcome: 'approved_advanced', by: { kind: 'officer', id: officer.id, name: officer.name }, at })
-    }
-    if (b.refusedWith) {
-      decisions.push({ outcome: 'refused', by: { kind: 'officer', id: officer.id, name: officer.name }, reasonId: b.refusedWith, at })
-    }
-    const answers: AssistantAnswers = {
-      nationalityGroup: b.nationality === 'Spanish' ? 'spanish' : ['French', 'Portuguese', 'Swedish', 'Polish'].includes(b.nationality) ? 'eu' : 'non_eu',
-      document: b.doc.type,
-      hasEuEid: b.route === 'A',
-      assisted: false,
+    if (b.level === 'basic' || b.level === 'advanced') decisions.push({ outcome: 'approved_basic', by: SYSTEM_ACTOR, at, ruleId: `${b.route}-OK` })
+    if (b.advanced === 'granted') decisions.push({ outcome: 'approved_advanced', by: martaActor, at })
+    if (b.refusedWith) decisions.push({ outcome: 'refused', by: martaActor, reasonId: b.refusedWith, at })
+    const answers: AssistantAnswers = { ...presetAnswersFor(typed), nfc: b.route === 'B' ? 'yes' : null }
+    const session: Session = {
+      ...emptySession(),
+      route: b.route,
+      consents: { face: b.route !== 'A', residence: true, at },
+      chipReads: b.route === 'F' ? ['failed', 'failed'] : b.route === 'B' ? ['ok'] : [],
+      faceAttempts: b.route === 'B' ? ['person'] : [],
+      videoAttempts: b.route === 'C' ? ['person'] : [],
+      fallback: b.route === 'F' ? { offered: 'chip', joined: true, at } : undefined,
+      videoCall: b.route === 'F' ? { state: 'waiting' } : undefined,
+      contact: { mobile: '+34 600 000 9' + b.id.slice(-2), smsConfirmed: true },
+      confirmedReview: true,
     }
     cases[b.id] = {
-      id: b.id,
-      origin: 'background',
-      persona: { name: b.name, age: b.age, nationality: b.nationality, initials: b.initials, hue: b.hue, profile: b.profile },
-      document: b.doc,
-      presetAnswers: answers,
-      scenario: b.profile,
+      ...newDraftCase(b.id, 'background', typed, at),
       demoBeat: both('Background case'),
-      simulation: { attempts: [] },
+      scenario: both('Background case (queue filler)'),
+      session,
       answers,
       route: b.route,
       status: b.status,
@@ -1144,20 +728,16 @@ export function buildSeedState(now: Date = new Date()): AppState {
       checks: b.checks.map(([id, outcome, score, detail]) => ({ id, outcome, score, detail: both(detail) })),
       risk: b.risk,
       flags: b.flags,
+      aiReason: b.aiReason ? both(b.aiReason) : undefined,
       awaitingOfficer: b.awaitingOfficer || Boolean(b.appeal),
       decisions,
-      infoRequest: b.infoRequest
-        ? { message: b.infoRequest, at, by: { kind: 'officer', id: officer.id, name: officer.name } }
-        : undefined,
-      appeal: b.appeal ? { text: b.appeal, at, state: 'open' } : undefined,
-      correctedAfterRefusal: false,
+      infoRequest: b.infoRequest ? { message: b.infoRequest, at, by: martaActor } : undefined,
+      appeal: b.appeal ? { text: b.appeal, at, state: 'open', refusedBy: marta.id, refusedReasonId: b.refusedWith } : undefined,
+      policyProposal: isProposedRule(b.route, answers),
       submittedAt: at,
       updatedAt: at,
     }
   }
-
-  const accounts: Record<string, CitizenAccount> = {}
-  for (const c of CASE_LIBRARY) accounts[c.id] = libraryAccount(c, iso(0))
 
   return {
     version: STATE_VERSION,
@@ -1170,6 +750,9 @@ export function buildSeedState(now: Date = new Date()): AppState {
     officerProfiles: {},
   }
 }
+
+/** True for a typed DNI/NIE-shaped number that could be real (correct check letter): sign-up refuses it. */
+export const isRealLookingDniNie = (v: string) => !isFictionalDniNie(v) && /^(\d{8}|[XYZ]\d{7})[A-Z]$/.test(normaliseDocNumber(v))
 
 /** localStorage key and BroadcastChannel name. */
 export const STORAGE_KEY = 'getyourclave.state.v1'

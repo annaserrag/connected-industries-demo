@@ -165,7 +165,7 @@ export function HelpPage() {
               {ROUTE_ORDER.map(r => (
                 <div key={r} className="rounded-card border border-line p-4">
                   <dt className="font-bold">
-                    <span className="mr-2 inline-grid h-6 min-w-6 place-items-center rounded-[2px] bg-brand px-1.5 text-[12px] text-brand-ink">{r === 'FALLBACK' ? tr(b('Alt.', 'Alt.')) : ROUTES[r].code}</span>
+                    <span className="mr-2 inline-grid h-6 min-w-6 place-items-center rounded-[2px] bg-brand px-1.5 text-[12px] text-brand-ink">{r === 'F' ? tr(b('Alt.', 'Alt.')) : ROUTES[r].code}</span>
                     {tr(ROUTES[r].name)}
                   </dt>
                   <dd className="mt-1 text-[15px] text-muted">{tr(ROUTES[r].forWhom)}</dd>

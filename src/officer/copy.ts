@@ -252,6 +252,18 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, Bilingual> = {
   staff_access_denied: b('Staff access denied', 'Acceso de personal denegado'),
   staff_profile_completed: b('Job details confirmed', 'Datos del puesto confirmados'),
   demo_reset: b('Data reset', 'Datos reiniciados'),
+  consent_declined: b('Consent declined', 'Consentimiento no aceptado'),
+  chip_read: b('Chip read', 'Lectura del chip'),
+  face_attempt: b('Face check attempt', 'Intento de comprobación facial'),
+  video_attempt: b('DNI video attempt', 'Intento de vídeo con DNI'),
+  upload_added: b('Image uploaded', 'Imagen subida'),
+  contact_confirmed: b('Contact details', 'Datos de contacto'),
+  submitted: b('Application sent', 'Solicitud enviada'),
+  fallback_offered: b('Video call offered', 'Videollamada ofrecida'),
+  video_call_joined: b('Joined video-call room', 'Entró en la sala de videollamada'),
+  video_call_started: b('Video call started', 'Videollamada iniciada'),
+  video_call_ended: b('Video call ended', 'Videollamada finalizada'),
+  appeal_decided: b('Review decided', 'Revisión decidida'),
 }
 
 /** Quick templates for "Request more information". */

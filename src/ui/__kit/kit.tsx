@@ -88,7 +88,7 @@ function Kit() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RiskBadge risk="low" /><RiskBadge risk="medium" /><RiskBadge risk="high" />
-            <RouteBadge route="A" /><RouteBadge route="B" /><RouteBadge route="C" /><RouteBadge route="FALLBACK" /><RouteBadge route="B" compact />
+            <RouteBadge route="A" /><RouteBadge route="B" /><RouteBadge route="C" /><RouteBadge route="F" /><RouteBadge route="B" compact />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {[['GF', 12], ['DM', 150], ['RM', 32], ['NB', 210], ['YH', 280], ['IP', 0], ['HK', 330], ['LW', 190]].map(([i, h]) => <Avatar key={i} initials={i as string} hue={h as number} size={44} />)}

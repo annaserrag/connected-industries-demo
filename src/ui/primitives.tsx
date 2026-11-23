@@ -201,8 +201,8 @@ export const RouteBadge = ({ route, compact, className }: { route: RouteId; comp
       className={cn('inline-flex max-w-full items-center gap-1.5 rounded-[2px] bg-brand-soft py-0.5 pr-2.5 pl-0.5 text-xs font-bold text-brand-strong ring-1 ring-inset ring-brand/40', compact && 'pr-0.5', className)}
       title={tr(r.name)}
     >
-      <span className={cn('grid h-5 min-w-5 place-items-center rounded-[1px] bg-brand px-1.5 text-[11px] font-bold text-brand-ink', route === 'FALLBACK' && 'px-2')}>
-        {route === 'FALLBACK' ? tr('Fallback', 'Alternativa') : r.code}
+      <span className={cn('grid h-5 min-w-5 place-items-center rounded-[1px] bg-brand px-1.5 text-[11px] font-bold text-brand-ink', route === 'F' && 'px-2')}>
+        {route === 'F' ? tr('Fallback', 'Alternativa') : r.code}
       </span>
       {!compact && <span className="truncate">{tr(r.name)}</span>}
       {compact && <span className="sr-only">{tr(r.name)}</span>}

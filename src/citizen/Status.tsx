@@ -22,8 +22,8 @@ type StepState = 'done' | 'now' | 'next' | 'notNeeded' | 'ifNeeded' | 'notReache
 
 const isRefusal = (d: Decision) => d.outcome === 'refused' || d.outcome === 'revoked'
 const lastRefusal = (c: Case) => [...c.decisions].reverse().find(isRefusal)
-const BOOK_REASONS: RejectionReasonId[] = ['liveness_failed', 'face_mismatch', 'chip_invalid', 'suspected_fraud']
-const CORRECT_REASONS: RejectionReasonId[] = ['residence_not_found', 'data_mismatch']
+const BOOK_REASONS: RejectionReasonId[] = ['REJ-02', 'REJ-03', 'REJ-06', 'REJ-07']
+const CORRECT_REASONS: RejectionReasonId[] = ['REJ-04', 'REJ-05', 'REJ-08']
 
 function stepState(c: Case, s: StatusId): StepState {
   const cur = c.status as StatusId
@@ -466,7 +466,7 @@ export function StatusPage() {
       )}
       {awaiting && (
         <div className="mb-5 space-y-2" role="status">
-          {c.route === 'FALLBACK' && slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
+          {c.route === 'F' && slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
             <div className="flex items-center gap-3 rounded-card border border-line bg-surface p-4">
               <span className="grid size-10 place-items-center rounded-[2px] bg-brand text-brand-ink"><Video size={18} aria-hidden /></span>
               <div>
@@ -476,7 +476,7 @@ export function StatusPage() {
               <span className="ml-auto"></span>
             </div>
           )}
-          {c.route === 'FALLBACK' && !slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
+          {c.route === 'F' && !slot && c.checks.some(r => r.id === 'officer_video' && r.outcome === 'pending') && (
             <div className="rounded-card border-2 border-brand bg-brand-soft p-4" data-testid="fallback-book">
               <p className="flex items-center gap-2 font-display text-[18px] font-bold text-ink"><Video size={20} className="text-brand" aria-hidden />{tr(C.fallbackBookTitle)}</p>
               <p className="mt-1 text-[14px] leading-snug text-ink">{tr(C.fallbackBookBody)}</p>

@@ -273,7 +273,7 @@ export function Assistant() {
                         <span className="text-[13px] leading-snug">
                           <span className="font-bold text-ink">{tr(ROUTES[r].name)}</span>
                           <span className="block text-muted">{tr(ROUTES[r].forWhom)}</span>
-                          {(r === 'B' || r === 'FALLBACK') && <ProposedRuleTag className="mt-1" />}
+                          {(r === 'B' || r === 'F') && <ProposedRuleTag className="mt-1" />}
                         </span>
                       </li>
                     ))}

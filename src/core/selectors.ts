@@ -1,14 +1,14 @@
 /* Derived selectors — Platform agent (A). Implements ClaveSelectors from contract/api.ts. */
-import type { AppState, AuditEvent, Case, Lang, PriorityTier } from '@/contract/types'
+import type { AppState, AuditEvent, Case, Lang, PriorityTier, RejId } from '@/contract/types'
+import { REJ_ORDER } from '@/contract/messages'
 import { PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS } from '@/contract/seed'
 
 /* ------------------------------------------------------------ priority
  * Tier mapping (first match wins):
- *   P1 any high-risk flag · P2 open appeal · P3 citizen answered an info request (status 'checking') ·
- *   P5 Fallback route with the officer video call pending · P6 basic granted + advanced pending_review and
- *   nothing else flagged · P4 everything else that needs a decision.
- * A case always stays in the tier that matches its reason (an appeal is never shown as "possible fraud").
- * Waiting longer than PRIORITY_AGE_BUMP_HOURS moves it to the front of its own tier and marks it as overdue.
+ *   P1 any high-risk flag · P2 open review request (appeal) · P3 citizen answered an info request ·
+ *   P5 Fallback: the citizen joined the video-call room or a call is live · P6 basic granted + advanced
+ *   pending_review and only low flags (e.g. "Assisted session") · P4 everything else that needs a decision.
+ * A case always stays in the tier that matches its reason. Waiting time never moves it to another tier.
  */
 export const TIER_ORDER: PriorityTier[] = PRIORITY_TIERS.map(t => t.id)
 const tierIndex = (t: PriorityTier) => TIER_ORDER.indexOf(t)
@@ -21,13 +21,16 @@ export function waitingSince(c: Case): string {
   return times.reduce((a, b) => (b > a ? b : a))
 }
 
+const inVideoCallTier = (c: Case) =>
+  c.route === 'F' && (c.session?.videoCall?.state === 'waiting' || c.session?.videoCall?.state === 'live' || Boolean(c.session?.fallback?.joined && c.session?.videoCall?.state !== 'ended'))
+
 /** The priority tier that matches the reason the case needs an officer. */
 export function baseTierOf(c: Case): PriorityTier {
   if (c.risk === 'high' || c.flags.some(f => f.severity === 'high')) return 'p1_high_risk'
   if (c.appeal?.state === 'open') return 'p2_appeal'
   if (c.status === 'checking' && c.infoRequest?.response) return 'p3_citizen_replied'
-  if (c.route === 'FALLBACK' && c.checks.some(k => k.id === 'officer_video' && k.outcome === 'pending')) return 'p5_video_call'
-  if (c.level === 'basic' && c.advanced === 'pending_review' && c.flags.every(f => f.code === 'advanced_level_review')) return 'p6_advanced_review'
+  if (inVideoCallTier(c)) return 'p5_video_call'
+  if (c.level === 'basic' && c.advanced === 'pending_review' && c.flags.every(f => f.severity === 'low')) return 'p6_advanced_review'
   return 'p4_medium_risk'
 }
 
@@ -79,9 +82,62 @@ export function relativeTime(iso: string, lang: Lang, now: number = Date.now()):
   return es ? `hace ${d} d` : `${d} d ago`
 }
 
-/* ---- extras beyond the contract ---- */
+/* ---- lists ---- */
 
-/** Library cases in demo-panel order. */
+/** Open review requests (Apelaciones), oldest first. */
+export function appealsQueue(s: AppState, now: Date = new Date()): Case[] {
+  return officerQueue(s, now).filter(c => c.appeal?.state === 'open')
+}
+
+/** Advanced-level reviews (Revisión del nivel avanzado), oldest first. */
+export function advancedQueue(s: AppState, now: Date = new Date()): Case[] {
+  return officerQueue(s, now).filter(c => c.level === 'basic' && c.advanced === 'pending_review' && c.appeal?.state !== 'open')
+}
+
+/** Fallback cases waiting for a video call. */
+export function videoCallQueue(s: AppState, now: Date = new Date()): Case[] {
+  return officerQueue(s, now).filter(inVideoCallTier)
+}
+
+/* ---- dashboard counters (live, computed from state) ---- */
+
+export interface DashboardCounters {
+  /** Applications sent or decided (drafts excluded). */
+  applications: number
+  /** Basic level granted by the rules, with no person involved. */
+  autoApprovals: number
+  /** Applications where the basic-level decision needed (or is waiting for) an officer. */
+  neededOfficer: number
+  /** Officer refusals by reason (latest refusal per application, appeals included). */
+  refusalsByReason: Record<RejId, number>
+  /** Refusals later corrected on review. */
+  correctedOnReview: number
+  /** Applications decided under a proposed rule (route B, C-assisted, X, Fallback for foreigners). */
+  decidedUnderProposedRule: number
+  /** Open review requests. */
+  appealsOpen: number
+}
+
+export function dashboardCounters(s: AppState): DashboardCounters {
+  const refusalsByReason = Object.fromEntries(REJ_ORDER.map(r => [r, 0])) as Record<RejId, number>
+  let applications = 0, autoApprovals = 0, neededOfficer = 0, correctedOnReview = 0, decidedUnderProposedRule = 0, appealsOpen = 0
+  for (const c of Object.values(s.cases)) {
+    if (c.status === 'draft' && !c.submittedAt) continue
+    applications++
+    const basic = c.decisions.find(d => d.outcome === 'approved_basic')
+    if (basic?.by.kind === 'system') autoApprovals++
+    else if (basic || c.decisions.some(d => d.outcome === 'refused') || (c.awaitingOfficer && c.level === 'none')) neededOfficer++
+    for (const d of c.decisions) if ((d.outcome === 'refused' || d.outcome === 'revoked') && d.reasonId) refusalsByReason[d.reasonId]++
+    if (c.correctedAfterRefusal) correctedOnReview++
+    if (c.policyProposal && c.decisions.length) decidedUnderProposedRule++
+    if (c.appeal?.state === 'open') appealsOpen++
+  }
+  return { applications, autoApprovals, neededOfficer, refusalsByReason, correctedOnReview, decidedUnderProposedRule, appealsOpen }
+}
+
+/* ---- extras ---- */
+
+/** Preloaded demo accounts. */
 export function libraryCases(s: AppState): Case[] {
   return Object.values(s.cases).filter(c => c.origin === 'library')
 }

@@ -282,6 +282,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
     if (!res.ok) {
       const map: Record<typeof res.reason, Bilingual> = {
         invalid_name: C.errName, underage: C.errUnderage, weak_password: C.errWeakPassword, invalid_document_for_country: C.errDocForCountry,
+        invalid_document_number: C.errGeneric, real_document_number: C.errGeneric, duplicate_document: C.errGeneric, invalid_expiry: C.errGeneric,
       }
       setFormError(fill(tr(map[res.reason]), { n: res.reason === 'underage' ? SIGNUP_MIN_AGE : PASSWORD_MIN_LENGTH }))
       return

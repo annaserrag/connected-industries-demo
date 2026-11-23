@@ -261,7 +261,7 @@ function FieldError({ id, children }: { id: string; children: ReactNode }) {
 /** Visible demo credentials so anyone recording or grading can sign in. Fictional accounts only. */
 function DemoAccess({ certId, compact }: { certId?: string; compact?: boolean }) {
   const tr = useTr()
-  const cert = STAFF_CERTIFICATES.find(c => c.id === (certId ?? 'cert-laura'))
+  const cert = STAFF_CERTIFICATES.find(c => c.id === (certId ?? 'cert-vega'))
   const pin = cert ? STAFF_DEMO_SECRETS.pins[cert.id] : undefined
   return (
     <aside data-testid="staff-demo-access" className={cn('mx-auto rounded-[2px] border-2 border-dashed border-brand/60 bg-brand-soft p-4 text-[14px] text-ink', compact ? 'mt-4 max-w-[520px]' : 'mt-8 max-w-[760px]')}>
@@ -270,8 +270,8 @@ function DemoAccess({ certId, compact }: { certId?: string; compact?: boolean })
         <p className="mt-1.5">{tr({ en: 'PIN for', es: 'PIN de' })} {cert.holderName}: <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono text-[15px] font-bold" data-testid="demo-pin">{pin}</code></p>
       ) : (
         <ul className="mt-1.5 grid gap-1 sm:grid-cols-2">
-          <li>{tr({ en: 'Electronic certificate: Laura Navarro · PIN', es: 'Certificado electrónico: Laura Navarro · PIN' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold" data-testid="demo-pin">{STAFF_DEMO_SECRETS.pins['cert-laura']}</code></li>
-          <li>{tr({ en: 'User and password:', es: 'Usuario y contraseña:' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">lnavarro</code> · <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{STAFF_DEMO_SECRETS.passwords.lnavarro}</code></li>
+          <li>{tr({ en: 'Electronic certificate: Lucía Vega · PIN', es: 'Certificado electrónico: Lucía Vega · PIN' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold" data-testid="demo-pin">{STAFF_DEMO_SECRETS.pins['cert-vega']}</code></li>
+          <li>{tr({ en: 'User and password:', es: 'Usuario y contraseña:' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">lvega</code> · <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{STAFF_DEMO_SECRETS.passwords.lvega}</code></li>
         </ul>
       )}
     </aside>

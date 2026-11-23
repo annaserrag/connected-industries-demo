@@ -1,9 +1,12 @@
 /**
- * CONTRACT — owned by the orchestrator. Subagents import from here and must NOT edit it.
- * Need a change? Ask the orchestrator.
+ * CONTRACT — data shapes shared by core and the UI areas.
  *
- * Source of truth: "Group 10 – Get your Cl@ve – Project plan", Shared reference sheet + Part 1.
- * Everything here is fictional. Every check is SIMULATED.
+ * Source of truth: the group's project plan (case library GYC-01…08, message bank, rejection list) and
+ * docs/SPEC-rules.md. Everything here is fictional. Every check is SIMULATED.
+ *
+ * The one principle: no outcome is scripted per person. A case ends where the typed data, the simulated
+ * outside world (src/contract/world.ts), the simulated camera input of each attempt, the general rules
+ * (src/core/engine.ts) and an officer's decisions take it.
  */
 
 export type Lang = 'en' | 'es'
@@ -12,27 +15,32 @@ export type Bilingual = { en: string; es: string }
 
 /* ------------------------------------------------------------------ routes */
 
-/** Routes exactly as in the reference sheet. */
-export type RouteId = 'A' | 'B' | 'C' | 'FALLBACK'
+/**
+ * A = EU digital ID (eIDAS) · B = document chip + face check · C = DNI + short video (today's route) ·
+ * F = Fallback (video call with an officer, office as last option) · X = red card or NIE paper (passport chip
+ * + face, an officer checks the card; proposed rule).
+ */
+export type RouteId = 'A' | 'B' | 'C' | 'F' | 'X'
 
 export interface RouteDef {
   id: RouteId
-  /** Short code shown in badges: "A", "B", "C", "Fallback". */
+  /** Short code shown in badges: "A", "B", "C", "Fallback", "X". */
   code: string
-  /** Exact reference-sheet name. */
+  /** Short route name (never the letter alone). */
   name: Bilingual
   /** Who the route is for. */
   forWhom: Bilingual
-  /** The checks the simulated engine runs on this route, in order. */
+  /** The checks the simulated engine computes on this route, in order. */
   checks: CheckId[]
+  /** Result message id in MSG (e.g. 'RA-07B'). */
+  msg: string
 }
 
 /* ---------------------------------------------------------------- statuses */
 
 /**
- * The five citizen-view statuses, exactly as in the reference sheet:
- * 1. Received → 2. Checking → 3. We need something from you →
- * 4. Approved (basic / advanced level) → 5. Not approved, with the reason and how to appeal.
+ * The five citizen-view statuses: 1 Received → 2 Checking → 3 We need something from you →
+ * 4 Approved (4 basic / 4B basic + advanced under review / 4C advanced) → 5 Not approved, with reason and review.
  */
 export type StatusId = 'received' | 'checking' | 'need_info' | 'approved' | 'not_approved'
 
@@ -59,13 +67,95 @@ export interface DocumentDef {
   hasChip: boolean
 }
 
+/** Display form of a document (derived from the typed document). */
 export interface IdentityDocument {
   type: DocumentType
-  /** Realistic-looking but fictional: DNI/NIE-shaped numbers always carry a wrong check letter (isFictionalDniNie). */
+  /** Fictional: DNI/NIE-shaped numbers always carry a wrong check letter (isFictionalDniNie). */
   number: string
   issuingCountry: string
   /** ISO date. */
   expires: string
+}
+
+/** Name and date of birth as written on a document or in a record. */
+export interface PersonData {
+  givenNames: string
+  surnames: string
+  /** YYYY-MM-DD */
+  dateOfBirth: string
+}
+
+/** What the applicant typed about a document (printed data). */
+export interface TypedDocument {
+  type: DocumentType
+  number: string
+  /** YYYY-MM-DD, as printed. */
+  expiry: string
+  /** Nationality / issuing country (English short name, e.g. "Italy"). */
+  nationality: string
+  /** Name and date of birth as printed on the document. */
+  data: PersonData
+}
+
+/* ------------------------------------------------------- simulated inputs */
+
+/** What the simulated camera sees on one attempt. An INPUT chosen on the camera screen, never an outcome. */
+export type CameraInput = 'person' | 'reflections' | 'synthetic'
+
+/** A small image the citizen added. Stays in this browser (state), ≤ 1.5 MB. */
+export interface Upload {
+  name: string
+  dataUrl: string
+  at: string
+  mime?: string
+  size?: number
+}
+
+export type Who = 'self' | 'helping' | 'child'
+export type YesNoUnsure = 'yes' | 'no' | 'unsure'
+export type HelperRelation = 'family' | 'friend' | 'support'
+export type FallbackReason = 'chip' | 'face' | 'no_nfc' | 'consent' | 'no_passport'
+export type VideoCallState = 'waiting' | 'live' | 'ended'
+
+export interface MinorData extends PersonData {
+  document: TypedDocument
+}
+
+/** Everything the citizen did in the session. Inputs only: results are computed by the engine. */
+export interface Session {
+  /** Route the assistant recommended (the case's `route` becomes 'F' when the Fallback takes over). */
+  route: RouteId | null
+  who: Who
+  nfc: YesNoUnsure | null
+  euEid: YesNoUnsure | null
+  consents: { face?: boolean; residence?: boolean; declined?: boolean; at?: string }
+  /** Route A: the mock national eID page returned the typed data. */
+  eidLogin?: { at: string; data: PersonData }
+  /** One entry per "Read chip" press. */
+  chipReads: Array<'ok' | 'failed'>
+  /** One per face-check attempt (route B / X / minor). */
+  faceAttempts: CameraInput[]
+  /** DNI video attempts (route C). */
+  videoAttempts: CameraInput[]
+  helper?: { name: string; relation: HelperRelation; mobile?: string }
+  /** MSG-ASS-01 answered "Sí, quiero registrarme yo". */
+  applicantConfirmed?: boolean
+  minor?: MinorData
+  /** Guardian's own chip + face check (does not register her). */
+  guardianChecks?: 'passed'
+  uploads: {
+    proof?: Upload
+    redCard?: Upload & { number: string; expiry: string }
+    appeal?: Upload
+    info?: Upload
+  }
+  /** Route X: the passport whose chip is read. */
+  passport?: TypedDocument
+  contact?: { mobile: string; email?: string; smsConfirmed: boolean }
+  fallback?: { offered: FallbackReason; joined: boolean; comeBackLater?: boolean; at: string }
+  videoCall?: { state: VideoCallState; officerId?: string; officerName?: string; startedAt?: string; endedAt?: string }
+  /** MSG-AI-04 box ticked. */
+  confirmedReview?: boolean
 }
 
 /* ------------------------------------------------------------------ checks */
@@ -74,11 +164,13 @@ export type CheckId =
   | 'eidas_login'
   | 'chip_read'
   | 'chip_signature'
+  | 'printed_vs_chip'
   | 'document_validity'
   | 'liveness'
   | 'face_match'
   | 'residence'
   | 'guardian_link'
+  | 'red_card'
   | 'dni_video'
   | 'officer_video'
 
@@ -96,10 +188,22 @@ export interface CheckDef {
 export interface CheckResult {
   id: CheckId
   outcome: CheckOutcome
-  /** 0–1 for scored checks (liveness, face_match). */
+  /** 0–1 for scored checks (liveness, face_match). Always shown with "simulated values". */
   score?: number
-  /** Officer-facing explanation of the result ("Chip signature not issued by a trusted authority"). */
+  /** Officer-facing explanation of the result. */
   detail: Bilingual
+  /** Differing fields (printed_vs_chip, residence). */
+  fields?: Array<keyof PersonData>
+}
+
+/** One row of the officer's discrepancy table. */
+export interface DiscrepancyRow {
+  field: keyof PersonData
+  /** Value on the document / chip. */
+  document: string
+  /** Value in the other source (chip data for printed_vs_chip, residence record for residence). */
+  records: string
+  source: 'chip' | 'residence'
 }
 
 /* -------------------------------------------------------------------- risk */
@@ -110,42 +214,48 @@ export type FlagCode =
   | 'low_liveness'
   | 'low_face_match'
   | 'chip_signature_failed'
+  | 'printed_vs_chip_mismatch'
   | 'chip_unreadable'
   | 'document_invalid'
   | 'residence_not_found'
+  | 'residence_mismatch'
   | 'eid_data_mismatch'
   | 'minor_with_guardian'
   | 'assisted_shared_device'
   | 'policy_proposal_route'
+  | 'red_card_check'
+  | 'consent_declined'
+  | 'no_nfc'
   | 'second_attempt'
   | 'appeal_filed'
   | 'advanced_level_review'
 
 export interface Flag {
   code: FlagCode
-  /** Why the AI engine flagged it — shown in the officer queue. */
+  /** Why the engine flagged it — shown in the officer queue. */
   reason: Bilingual
   severity: RiskLevel
 }
 
 /* -------------------------------------------------------------- rejections */
 
-export type RejectionReasonId =
-  | 'document_expired'
-  | 'face_mismatch'
-  | 'liveness_failed'
-  | 'chip_invalid'
-  | 'residence_not_found'
-  | 'data_mismatch'
-  | 'suspected_fraud'
+/** The closed list (plan 3.4, provisional). Only an officer picks one. */
+export type RejId = 'REJ-01' | 'REJ-02' | 'REJ-03' | 'REJ-04' | 'REJ-05' | 'REJ-06' | 'REJ-07' | 'REJ-08'
+export type RejectionReasonId = RejId
 
 export interface RejectionReason {
-  id: RejectionReasonId
+  id: RejId
   /** What the officer picks in the closed list. */
   officerLabel: Bilingual
-  /** The ONE citizen message for this reason. */
+  /** When an officer would pick it (proposed). */
+  when: Bilingual
+  /** Can the citizen correct it, and how. */
+  canCorrect: Bilingual
+  /** MSG id of the citizen text (e.g. 'REJ-05'). */
+  msg: RejId
+  /** The citizen message (MSG-REJ-0x, verbatim). */
   citizenMessage: Bilingual
-  /** What the citizen can do next (correct, retry, video call). */
+  /** What the citizen can do next (= canCorrect, citizen wording). */
   howToFix: Bilingual
 }
 
@@ -259,30 +369,48 @@ export interface Decision {
   outcome: DecisionOutcome
   by: Actor
   /** REQUIRED when outcome is 'refused' or 'revoked'. Enforced in core. */
-  reasonId?: RejectionReasonId
+  reasonId?: RejId
+  /** Officer's internal note. The citizen never sees it. */
   note?: string
+  /** Rule that applied (engine decisions) or the context ('APPEAL', 'INFO-REQUEST', 'VIDEO-CALL'). */
+  ruleId?: string
   at: string
 }
 
 export interface InfoRequest {
-  /** What the officer asks for, shown to the citizen. */
+  /** What the officer asks for: fills {whatWeNeed} in MSG-COR-01. */
   message: string
+  /** Why, in one sentence: fills {reason} in MSG-COR-01. */
+  reason?: string
   at: string
   by: Actor
-  response?: { text: string; at: string }
+  response?: { text: string; at: string; upload?: Upload }
 }
 
+/**
+ * A review request ("Pedir una revisión") after a refusal.
+ * state: 'open' → waiting · 'upheld' = the review approved (refusal corrected, MSG-COR-06) ·
+ * 'dismissed' = the original refusal was kept (MSG-COR-07).
+ */
 export interface Appeal {
   text: string
   at: string
   state: 'open' | 'upheld' | 'dismissed'
+  upload?: Upload
+  /** Officer who took the refusal under review: must not decide the appeal. */
+  refusedBy?: string
+  refusedReasonId?: RejId
+  decidedBy?: Actor
+  decidedAt?: string
+  /** Reason kept when dismissed. */
+  keptReasonId?: RejId
 }
 
 export interface Persona {
   name: string
   age: number
   nationality: string
-  /** e.g. "Italian master's student in Madrid". */
+  /** e.g. "Japanese · TIE". */
   profile: Bilingual
   /** Two-letter initials for the generated avatar (no real faces). */
   initials: string
@@ -290,84 +418,99 @@ export interface Persona {
   hue: number
 }
 
-/** Answers the route assistant collects (screen 2). */
+/** Answers the route assistant collects (RA-02…RA-06). */
 export interface AssistantAnswers {
   nationalityGroup: 'spanish' | 'eu' | 'non_eu'
+  /** Country short name (EN), when known. */
+  nationality?: string
   document: DocumentType
+  /** RA-03 "No lo sé": the citizen does not know which document → Fallback. */
+  documentUnsure?: boolean
+  /** RA-04 (EU only). */
+  euEid?: YesNoUnsure | null
+  /** RA-05. */
+  who?: Who
+  /** RA-06 (only when route B is possible). */
+  nfc?: YesNoUnsure | null
+  /** Legacy booleans, kept in sync by core (UI migration). */
   hasEuEid: boolean
-  /** Registering on someone else's phone, with their help. */
   assisted: boolean
-  /** A parent or guardian registers a minor in their care. */
   forMinor?: boolean
 }
 
-/**
- * The deterministic script the simulated engine reads. For each check, the result per attempt
- * (attempt 1 = first submission, attempt 2 = after a correction / resubmission).
- * If a check has no entry for an attempt, it passes.
- */
-export interface SimulationScript {
-  attempts: Array<Partial<Record<CheckId, Omit<CheckResult, 'id'>>>>
-}
-
+/** @deprecated UI migration: derived view of session.helper. */
 export interface Assisted {
   helperName: string
   relation: Bilingual
-  /** Whose phone it is. */
   deviceOwner: string
-  /** The applicant's own mobile, so the result reaches them and not the helper. */
   applicantPhone?: string
-  /** The applicant has no mobile of their own: the result goes by post. */
   noOwnPhone?: boolean
 }
 
+/** @deprecated UI migration: derived view of the guardian (the account holder) when registering a minor. */
 export interface Guardian {
   name: string
   relation: Bilingual
   document: IdentityDocument
-  /** Guardian signs in by this route (e.g. 'A' with their EU eID). */
   route: RouteId
 }
 
 export type CaseOrigin = 'library' | 'background' | 'signup'
 
-/** Failures the verification screen can simulate, so the hard cases can be shown with any account. */
+/** @deprecated UI migration: the "simulate a failure" control was removed; outcomes come from the rules. */
 export type SimFailure = 'chip_unreadable' | 'chip_signature' | 'liveness' | 'data_mismatch'
 
 export interface Case {
   id: string
-  /** 'library' = runnable persona from the case library; 'background' = filler for the officer queue. */
+  /** 'library' = preloaded demo account; 'signup' = created live; 'background' = queue filler. */
   origin: CaseOrigin
+  /** Display reference (GYC-02…); sign-ups get the lowest free GYC number. */
+  caseRef?: string
+  /** Officer-side label when the applicant is unknown (e.g. "Applicant X"). */
+  caseLabel?: string
+  /** What the account holder typed at sign-up. */
+  typed: TypedDocument
+  /** Derived display data (the applicant: the minor once setMinor ran). */
   persona: Persona
   document: IdentityDocument
-  /** Extra document the persona also holds (e.g. Giulia's Italian eID without PIN). */
-  otherDocuments?: IdentityDocument[]
-  /** The answers this persona gives in the route assistant (demo prefill; user can change them). */
+  /** Answers derived from the typed data (prefill for the assistant). */
   presetAnswers: AssistantAnswers
-  assisted?: Assisted
-  guardian?: Guardian
-  /** True for the red-card case: runs on a proposed rule change, not current rules. */
-  policyProposal?: boolean
-  /** One-line summary of the scenario, for the demo panel. */
   scenario: Bilingual
-  /** Which beat this case shows in the video/guide. */
   demoBeat: Bilingual
-  simulation: SimulationScript
-  /** Failure chosen in the verification screen's "Simulate a failure" control (prototype only). */
+  session: Session
+
+  /** @deprecated UI migration: derived from session.helper. */
+  assisted?: Assisted
+  /** @deprecated UI migration: derived from session.minor. */
+  guardian?: Guardian
+  /** True when the case runs on a proposed rule (B, C-assisted, X, F for foreigners). */
+  policyProposal?: boolean
+  /** @deprecated UI migration: no effect. */
   simulatedFailure?: SimFailure
+  /** @deprecated UI migration: kept for the old booking widget. */
+  videoCallSlot?: string
 
   /* ---------- live state (mutated only through core actions) ---------- */
-  /** null until the citizen starts. */
   answers: AssistantAnswers | null
   route: RouteId | null
   status: StatusId | 'draft'
   level: Level
   advanced: AdvancedState
   consentGiven: boolean
+  /** Number of submissions (1 after submit). */
   attempt: number
   checks: CheckResult[]
   risk: RiskLevel
   flags: Flag[]
+  /** Officer-facing one-sentence reason (EN/ES) from the rule that applied. */
+  aiReason?: Bilingual
+  discrepancies?: DiscrepancyRow[]
+  /** Hint for the officer, never preselected. */
+  suggestedReason?: RejId
+  /** Rule that decided the current state (e.g. 'A-OK', 'CHIP-TWICE'). */
+  ruleId?: string
+  /** MSG ids the citizen should see now, in order (e.g. ['STA-3', 'FALL-01']). */
+  citizenMsgs: string[]
   /** True while the case sits in the officer queue waiting for a person. */
   awaitingOfficer: boolean
   decisions: Decision[]
@@ -375,8 +518,6 @@ export interface Case {
   appeal?: Appeal
   /** True once a refusal on this case was later corrected and approved (dashboard indicator). */
   correctedAfterRefusal: boolean
-  /** ISO time of a video call the citizen booked with an officer (Fallback route or after a refusal). */
-  videoCallSlot?: string
   submittedAt?: string
   updatedAt: string
 }
@@ -387,6 +528,17 @@ export type AuditAction =
   | 'case_started'
   | 'route_selected'
   | 'consent_given'
+  | 'consent_declined'
+  | 'chip_read'
+  | 'face_attempt'
+  | 'video_attempt'
+  | 'upload_added'
+  | 'contact_confirmed'
+  | 'submitted'
+  | 'fallback_offered'
+  | 'video_call_joined'
+  | 'video_call_started'
+  | 'video_call_ended'
   | 'check_completed'
   | 'auto_approved_basic'
   | 'escalated_to_officer'
@@ -397,6 +549,7 @@ export type AuditAction =
   | 'officer_refused'
   | 'officer_revoked'
   | 'appeal_filed'
+  | 'appeal_decided'
   | 'correction_submitted'
   | 'video_call_booked'
   | 'account_created'
@@ -415,14 +568,22 @@ export interface AuditEvent {
   detail: string
   /** Which checks the decision rested on. */
   evidence?: CheckId[]
-  reasonId?: RejectionReasonId
+  reasonId?: RejId
+  /** Rule id that applied, when any. */
+  ruleId?: string
+  /** Tags such as 'Refusal corrected on review', 'Proposed rule', 'Assisted session'. */
+  tags?: string[]
 }
 
 /* -------------------------------------------------------- decision rules */
 
 export interface DecisionRule {
+  /** Rule id used in audit entries. */
+  id: string
+  /** Position in the ordered list (SPEC §4). */
+  order: number
   situation: Bilingual
-  route: RouteId
+  route: RouteId | null
   automaticOutcome: Bilingual
   toOfficerWhen: Bilingual
 }
@@ -431,7 +592,7 @@ export interface DecisionRule {
 export interface EngineThresholds {
   livenessMin: number
   faceMatchMin: number
-  /** Failed attempts after which the case goes to the Fallback route. */
+  /** Failed attempts after which the Fallback is offered. */
   maxAttemptsBeforeFallback: number
 }
 
@@ -460,14 +621,11 @@ export interface SimulatedIndicator {
 
 /* ------------------------------------------------------- citizen accounts */
 
-/**
- * A citizen's sign-in to the platform. One account = one application (case) in this prototype.
- * The 8 library personas have saved accounts (credentials only in the README, never in the UI).
- */
+/** A citizen's sign-in to the platform. One account = one application (case) in this prototype. */
 export interface CitizenAccount {
   /** Same id as the case it owns. */
   caseId: string
-  /** Sign-in identifier: the case's (fictional) document number. */
+  /** Sign-in identifier: the typed (fictional) document number. */
   documentNumber: string
   /** demoHash(password). Demo only, not a secure password store. */
   passwordHash: string
@@ -478,7 +636,7 @@ export interface CitizenAccount {
 export type NationalityGroup = AssistantAnswers['nationalityGroup']
 
 export interface SignUpCountry {
-  /** English short name, also used as the persona's nationality adjective source. */
+  /** English short name, also used as the typed nationality. */
   name: Bilingual
   /** Nationality adjective shown on the case, e.g. "Italian". */
   nationality: string
@@ -486,19 +644,35 @@ export interface SignUpCountry {
 }
 
 export interface SignUpInput {
-  fullName: string
+  givenNames?: string
+  surnames?: string
+  /** @deprecated UI migration: split into givenNames (first word) + surnames (rest) when the two fields are missing. */
+  fullName?: string
   /** ISO date (YYYY-MM-DD). */
   dateOfBirth: string
   /** Index into SIGNUP_COUNTRIES. */
   countryIndex: number
   documentType: DocumentType
+  /** Typed document number. When missing (old UI), a fictional one is generated. */
+  documentNumber?: string
+  /** YYYY-MM-DD as printed. When missing (old UI), today + 5 years. */
+  expiryDate?: string
   password: string
 }
 
 export type SignInResult = { ok: true; caseId: string } | { ok: false; reason: 'invalid_credentials' }
+export type SignUpFailure =
+  | 'underage'
+  | 'invalid_name'
+  | 'weak_password'
+  | 'invalid_document_for_country'
+  | 'invalid_document_number'
+  | 'real_document_number'
+  | 'duplicate_document'
+  | 'invalid_expiry'
 export type SignUpResult =
   | { ok: true; caseId: string; documentNumber: string }
-  | { ok: false; reason: 'underage' | 'invalid_name' | 'weak_password' | 'invalid_document_for_country' }
+  | { ok: false; reason: SignUpFailure }
 
 /* ------------------------------------------------------------ app state */
 

@@ -424,7 +424,7 @@ export function RoutesChart() {
   const total = ROUTE_ORDER.reduce((s, r) => s + D.byRoute[r], 0)
   const rows: HRow[] = ROUTE_ORDER.map(r => ({
     key: r,
-    label: `${r === 'FALLBACK' ? ROUTES[r].code : `${tr(COPY.route)} ${ROUTES[r].code}`} · ${tr(ROUTES[r].name)}`,
+    label: `${r === 'F' ? ROUTES[r].code : `${tr(COPY.route)} ${ROUTES[r].code}`} · ${tr(ROUTES[r].name)}`,
     value: D.byRoute[r],
     display: f.num(D.byRoute[r]),
   }))

@@ -1,5 +1,5 @@
 /**
- * CONTRACT — owned by the orchestrator. Subagents must NOT edit it.
+ * CONTRACT — store API, selectors, paths and UI-kit props.
  *
  * Interfaces between the five builder areas:
  *  - Store API     : implemented by Platform (src/core/store.ts), used by everyone.
@@ -17,23 +17,76 @@ import type {
   AssistantAnswers,
   AuditEvent,
   Bilingual,
+  CameraInput,
   Case,
+  DocumentType,
+  HelperRelation,
   Lang,
+  PersonData,
   RejectionReasonId,
   RouteId,
   SimFailure,
+  Who,
+  YesNoUnsure,
 } from './types'
 
 /* ================================================================ STORE API
  * import { useClave, actions, t } from '@/core/store'
  *
  *   const cases = useClave(s => s.cases)           // zustand-style selector hook over AppState
- *   actions.startCase('giulia', answers)
+ *   actions.setAnswers('kenji', { document: 'TIE', who: 'self', nfc: 'unsure' })
  *
  * Every action: updates state, appends AuditEvent(s), persists to localStorage, broadcasts to
  * other tabs (BroadcastChannel). Other tabs re-render within ~100 ms.
  * Actions that are not allowed in the current state throw ClaveRuleError (UI should prevent them).
+ *
+ * Outcomes are never scripted: they come from the typed data, the simulated world (contract/world.ts), the
+ * camera input of each attempt, the rules (core/engine.ts) and the officer's decisions.
  */
+
+/** Route-assistant answers (RA-02…RA-06). Missing fields fall back to the typed account data. */
+export interface RouteAnswersInput {
+  /** Country short name (EN), e.g. "Japan". Defaults to the typed nationality. */
+  nationality?: string
+  nationalityGroup?: AssistantAnswers['nationalityGroup']
+  /** 'UNSURE' = RA-03 "No lo sé" → Fallback. */
+  document: DocumentType | 'UNSURE'
+  euEid?: YesNoUnsure | null
+  who?: Who
+  nfc?: YesNoUnsure | null
+}
+
+export interface RouteRecommendation { route: RouteId; msg: string; policyProposal: boolean }
+
+/** A small image chosen by the citizen (data URL, image/*, ≤ 1.5 MB). */
+export interface UploadInput { name: string; dataUrl: string }
+
+/** What the outside world answered for one "Read chip" press. msg = the citizen message to show next. */
+export interface ChipReadResult {
+  read: 'ok' | 'failed'
+  attempt: number
+  signatureValid?: boolean
+  /** Printed fields that differ from the chip (never shown to the citizen as such). */
+  printedMismatch?: Array<keyof PersonData>
+  /** 'VER-01' (success: "Chip leído: válido") · 'VER-03' · 'VER-04' · 'VER-07' */
+  msg: 'VER-01' | 'VER-03' | 'VER-04' | 'VER-07'
+  /** What the rules decided after this read. */
+  outcome: 'continue' | 'fallback' | 'to_officer'
+}
+
+export interface AttemptResultOut {
+  result: 'pass' | 'retry' | 'fail'
+  attempt: number
+  /** Simulated scores (face check only). Always shown with "valores simulados". */
+  liveness?: number
+  faceMatch?: number
+  /** 'VER-02' (passed) · 'VER-05' (face retry) · 'VER-06' (DNI video retry) · 'FALL-01' (Fallback offered) */
+  msg: 'VER-02' | 'VER-05' | 'VER-06' | 'FALL-01'
+  outcome: 'continue' | 'fallback'
+}
+
+export interface SubmitResult { kind: 'auto_basic' | 'to_officer' | 'fallback' | 'continue'; ruleId: string | null }
+
 export interface ClaveActions {
   /* ---- session ---- */
   setLang(lang: Lang): void
@@ -41,91 +94,118 @@ export interface ClaveActions {
   officerSignOut(): void
   setActiveCitizenCase(caseId: string | null): void
 
-  /* ---- citizen flow (screens 2–5) ---- */
-  /** Screen 2: store answers + chosen route (normally recommendRoute(answers).route). Status stays 'draft'. */
-  startCase(caseId: string, answers: AssistantAnswers, route: RouteId): void
-  /** Screen 3: consent screen accepted. */
-  giveConsent(caseId: string): void
-  /**
-   * Screen 3: submit for verification. Sets status 'received', then the engine runs the checks
-   * asynchronously: status 'checking' after ~600 ms, each check result appears one by one
-   * (~500 ms apart, so the UI can animate), then the rules apply (auto-approve or officer queue).
-   * Returns a promise that resolves when the engine is done.
-   */
-  submitForVerification(caseId: string): Promise<void>
-  /** Status 3 'need_info': citizen answers the officer's request → back to 'checking', officer queue. */
-  respondToInfoRequest(caseId: string, text: string): void
-  /** Status 5: citizen appeals. Case goes back to the officer queue with an 'appeal_filed' flag. */
-  fileAppeal(caseId: string, text: string): void
-  /** Status 5: citizen says they corrected the cause (e.g. padrón). Runs attempt N+1 of the script. */
-  submitCorrection(caseId: string, note: string): Promise<void>
-  /** Assisted mode: who is helping and whose phone it is. Draft cases only. */
-  setAssistedHelper(caseId: string, helper: { helperName: string; relation: Bilingual; deviceOwner: string }): void
-  /** Assisted mode: the applicant's own mobile (or none), so the result never goes to the helper. */
-  setApplicantContact(caseId: string, contact: { phone?: string; noOwnPhone?: boolean }): void
-  /**
-   * "I am registering a minor in my care": the signed-in adult becomes the guardian and the application
-   * becomes the minor's. Draft cases only; age must be under 18.
-   */
-  setMinorApplicant(caseId: string, minor: { name: string; age: number }): void
-  /** Prototype control on the verification screen: make the next check run fail in a chosen way (null = normal run). Draft cases only. */
-  setSimulatedFailure(caseId: string, failure: SimFailure | null): void
-  /** Citizen books one of the simulated video-call slots; officers see it on the case. */
-  bookVideoCall(caseId: string, slotIso: string): void
+  /* ---- citizen journey (draft) ---- */
+  /** RA-02…06: stores the answers and the recommended route (RA-07A/B/C/F/X). Draft cases only. */
+  setAnswers(caseId: string, answers: RouteAnswersInput): RouteRecommendation
+  /** RA-05 only (re-runs the route recommendation). */
+  setWho(caseId: string, who: Who): RouteRecommendation
+  /** Assisted mode: the helper's name and relation (and their own mobile, which can never be the applicant's). */
+  setHelper(caseId: string, helper: { name: string; relation: HelperRelation; mobile?: string }): void
+  /** MSG-ASS-01: true = "Sí, quiero registrarme yo"; false = "No, parar". */
+  confirmApplicant(caseId: string, proceed: boolean): void
+  /** MIN-02: the minor's own data and document. The case becomes the minor's application (persona = minor). */
+  setMinor(caseId: string, minor: PersonData & { document: { type: DocumentType; number: string; expiry: string; nationality?: string } }): void
+  /** Guardian's own chip + face (one screen; does not register her). */
+  recordGuardianCheck(caseId: string, camera?: CameraInput): { chip: 'ok' | 'failed'; face: 'pass' | 'retry' | 'fail'; passed: boolean }
+  /** Route A: the mock national eID page returns the typed data. */
+  recordEidLogin(caseId: string): PersonData
+  /** CON-03 / CON-04 boxes. Required: face on B/X/C/minor, residence on A/B (not X). Status → 1 Received. */
+  giveConsents(caseId: string, consents: { face?: boolean; residence?: boolean }): void
+  /** "No acepto" → MSG-CON-06, Fallback offered (rule CONSENT-DECLINED). */
+  declineConsent(caseId: string): void
+  /** One "Read chip" press: the world answers for the subject document (route X: passport; minor: the minor's). */
+  recordChipRead(caseId: string): ChipReadResult
+  /** One face-check attempt with what the simulated camera sees. */
+  recordFaceAttempt(caseId: string, camera: CameraInput): AttemptResultOut
+  /** One DNI video attempt (route C). */
+  recordVideoAttempt(caseId: string, camera: CameraInput): AttemptResultOut
+  /** Route X: the passport whose chip is read (name and date of birth = the account's). */
+  setPassport(caseId: string, passport: { number: string; expiry: string }): void
+  uploadProof(caseId: string, file: UploadInput): void
+  uploadRedCard(caseId: string, file: UploadInput, card: { number: string; expiry: string }): void
+  uploadAppealDoc(caseId: string, file: UploadInput): void
+  /** Mobile (+ email). The helper's number and a number already linked to another Cl@ve are refused. Returns the demo code. */
+  setContact(caseId: string, contact: { mobile: string; email?: string }): { demoCode: string }
+  /** True when code === '123456'. */
+  confirmSms(caseId: string, code: string): boolean
+  /** MSG-AI-04 box. */
+  confirmReview(caseId: string): void
+  /** "Enviar mi solicitud": runs evaluate + decide; statuses 1 → 2 → outcome with small delays. */
+  submit(caseId: string): Promise<SubmitResult>
+  /** FALL-01 "Unirme a la videollamada": waiting room, case to the officer (tier P5 unless High risk). */
+  joinVideoCall(caseId: string): void
+  /** FALL-01 "Volver más tarde": the case waits for an officer (status 2). */
+  comeBackLater(caseId: string): void
 
-  /* ---- officer (screens 6–8). All require a signed-in officer. ---- */
-  /** Grants basic (if level 'none') or advanced (if advanced 'pending_review'). */
-  officerApprove(caseId: string, note?: string): void
-  officerRequestInfo(caseId: string, message: string): void
-  /** reasonId is REQUIRED; throws ClaveRuleError without it or without a signed-in officer. */
+  /* ---- citizen after a decision ---- */
+  /** Status 3 'need_info': MSG-COR-01 → reply (text and/or image) → MSG-COR-02, status 2. */
+  replyToInfoRequest(caseId: string, text: string, upload?: UploadInput): void
+  /** Status 5: MSG-COR-03 (≤ 500 chars + optional image) → COR-04/COR-05, Appeals list. */
+  requestReview(caseId: string, text: string, upload?: UploadInput): void
+
+  /* ---- officer. All require a signed-in officer. ---- */
+  officerStartVideoCall(caseId: string): void
+  officerEndVideoCall(caseId: string): void
+  officerApproveBasic(caseId: string, note?: string): void
+  officerApproveAdvanced(caseId: string, note?: string): void
+  /** Status 3 + MSG-COR-01; `message` fills {whatWeNeed}, `reason` fills {reason}. */
+  officerRequestInfo(caseId: string, message: string, reason?: string): void
+  /** reasonId REQUIRED (REJ-01…08); internal note never shown to the citizen. */
   officerRefuse(caseId: string, reasonId: RejectionReasonId, note?: string): void
   /** Revokes a granted level. Same rule: officer + reason. */
   officerRevoke(caseId: string, reasonId: RejectionReasonId, note?: string): void
-  /** Red-card / Fallback: officer completes the simulated video call (sets officer_video = pass). */
-  officerCompleteVideoCall(caseId: string): void
+  /** Appeals: must be an officer OTHER than the one who refused (throws ClaveRuleError otherwise). */
+  officerDecideAppeal(caseId: string, decision: 'approve' | 'uphold', reasonId?: RejectionReasonId, note?: string): void
 
-  /* ---- citizen accounts (branch feature/citizen-accounts) ---- */
+  /* ---- citizen accounts ---- */
   /** Sign in with document number (case/spaces ignored) + password. On success sets activeCitizenCaseId. */
   citizenSignIn(documentNumber: string, password: string): SignInResult
-  /**
-   * Create an account + a new draft application (origin 'signup'). Assigns a fictional document number (realistic shape; DNI/NIE-shaped ones use fictionalDniNie),
-   * generated initials/hue, presetAnswers from the country group, and an empty simulation script (every check
-   * passes by default). Signs the new citizen in. Audits 'account_created'.
-   */
+  /** Typed sign-up. Refuses a real DNI/NIE check letter and a duplicate document number. Signs the citizen in. */
   citizenSignUp(input: SignUpInput): SignUpResult
-  /** Ends the citizen session (activeCitizenCaseId = null). */
   citizenSignOut(): void
-  /* ---- staff access (branch feature/staff-console) ---- */
-  /**
-   * Simulated certificate sign-in. Wrong PIN → invalid_credentials (generic). Expired → not_authorised/expired.
-   * No officerId → not_authorised/not_staff.
-   * authorisedForClave false → not_authorised/not_authorised_for_clave. Officer with a saved profile →
-   * signed_in (sets officerId). Otherwise → needs_profile (does NOT sign in yet). Audits every attempt.
-   */
+  /* ---- staff access ---- */
   officerSignInWithCertificate(certificateId: string, pin: string): StaffSignInResult
-  /**
-   * Staff user + password (STAFF_ACCOUNTS). Wrong user or password → invalid_credentials (generic).
-   * Then the same authorisation rules and outcomes as the certificate method. Audits every attempt
-   * (never the password).
-   */
   officerSignInWithPassword(userId: string, password: string): StaffSignInResult
-  /**
-   * First sign-in: save the officer's job details and sign them in. Throws ClaveRuleError when the
-   * personnel number doesn't match PERSONNEL_NUMBER_PATTERN, the office doesn't belong to the authority,
-   * or the certificate doesn't belong to that officer.
-   */
   officerCompleteProfile(officerId: string, method: 'certificate' | 'password', certificateId: string | null, input: OfficerProfileInput): void
 
   /* ---- demo ---- */
   /** Reset everything to buildSeedState(new Date()). Broadcast to all tabs. */
   resetDemo(): void
-  /** Reset a single library case back to 'draft'. */
+  /** Reset one preloaded or sign-up case back to 'draft'. */
   resetCase(caseId: string): void
+
+  /* ---- @deprecated UI migration shims (delegate to the actions above) ---- */
+  /** @deprecated UI migration: use setAnswers. */
+  startCase(caseId: string, answers: AssistantAnswers, route: RouteId): void
+  /** @deprecated UI migration: use giveConsents. Ticks every box the route needs. */
+  giveConsent(caseId: string): void
+  /** @deprecated UI migration: fills the steps the old screens do not record (chip read, camera 'person', SMS) and calls submit. */
+  submitForVerification(caseId: string): Promise<void>
+  /** @deprecated UI migration: use replyToInfoRequest. */
+  respondToInfoRequest(caseId: string, text: string): void
+  /** @deprecated UI migration: use requestReview. */
+  fileAppeal(caseId: string, text: string): void
+  /** @deprecated UI migration: use requestReview. */
+  submitCorrection(caseId: string, note: string): Promise<void>
+  /** @deprecated UI migration: use setHelper. */
+  setAssistedHelper(caseId: string, helper: { helperName: string; relation: Bilingual; deviceOwner: string }): void
+  /** @deprecated UI migration: use setContact. */
+  setApplicantContact(caseId: string, contact: { phone?: string; noOwnPhone?: boolean }): void
+  /** @deprecated UI migration: use setMinor. */
+  setMinorApplicant(caseId: string, minor: { name: string; age: number }): void
+  /** @deprecated UI migration: no effect (the failure simulator was removed). */
+  setSimulatedFailure(caseId: string, failure: SimFailure | null): void
+  /** @deprecated UI migration: stores the slot only; use joinVideoCall / comeBackLater. */
+  bookVideoCall(caseId: string, slotIso: string): void
+  /** @deprecated UI migration: approves basic, advanced or an open appeal (second-officer rule applies). */
+  officerApprove(caseId: string, note?: string): void
+  /** @deprecated UI migration: starts (if needed) and ends the video call. */
+  officerCompleteVideoCall(caseId: string): void
 }
 
 /** Derived selectors exported from '@/core/selectors'. */
 export interface ClaveSelectors {
-  /** Cases waiting for an officer, sorted by priority tier (PRIORITY_TIERS); within a tier, cases waiting over 24 h first, then oldest first. */
+  /** Cases waiting for an officer, sorted by priority tier (PRIORITY_TIERS); within a tier, oldest first. */
   officerQueue(state: AppState): Case[]
   /** The tier a queued case sits in (with the PRIORITY_AGE_BUMP_HOURS bump applied). */
   priorityOf(c: Case, now?: Date): PriorityTier

@@ -263,7 +263,7 @@ export function StaffDashboardPage() {
               key: r,
               label: <><span className="shrink-0 rounded-md bg-ink px-1.5 py-0.5 text-[11px] font-bold text-white">{ROUTES[r].code}</span><span className="min-w-0 truncate" title={tr(ROUTES[r].name)}>{tr(ROUTES[r].name)}</span></>,
               value: routes[r],
-              bar: r === 'FALLBACK' ? 'bg-sim' : 'bg-ink/80',
+              bar: r === 'F' ? 'bg-sim' : 'bg-ink/80',
             }))}
           />
         </Card>

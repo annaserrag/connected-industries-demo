@@ -44,11 +44,11 @@ export function canApproveKind(c: Case): 'basic' | 'advanced' {
 export function needsVideoCall(c: Case): boolean {
   const v = c.checks.find(k => k.id === 'officer_video')
   if (v) return v.outcome !== 'pass'
-  return c.route === 'FALLBACK'
+  return c.route === 'F'
 }
 
 export function hasVideoCheck(c: Case): boolean {
-  return c.route === 'FALLBACK' || c.checks.some(k => k.id === 'officer_video')
+  return c.route === 'F' || c.checks.some(k => k.id === 'officer_video')
 }
 
 export function lastDecisionAt(c: Case): string | undefined {
@@ -87,23 +87,24 @@ export function formatDateTime(iso: string, lang: Lang): string {
 export function suggestedReasons(c: Case): Set<RejectionReasonId> {
   const s = new Set<RejectionReasonId>()
   for (const f of c.flags) {
-    if (f.code === 'low_liveness') s.add('liveness_failed')
-    if (f.code === 'low_face_match') s.add('face_mismatch')
-    if (f.code === 'chip_signature_failed') s.add('chip_invalid')
-    if (f.code === 'residence_not_found') s.add('residence_not_found')
-    if (f.code === 'eid_data_mismatch') s.add('data_mismatch')
-    if (f.code === 'document_invalid') s.add('document_expired')
-    if (f.code === 'chip_unreadable') s.add('chip_invalid')
+    if (f.code === 'low_liveness') s.add('REJ-03')
+    if (f.code === 'low_face_match') s.add('REJ-02')
+    if (f.code === 'chip_signature_failed') s.add('REJ-06')
+    if (f.code === 'residence_not_found') s.add('REJ-04')
+    if (f.code === 'residence_mismatch') s.add('REJ-05')
+    if (f.code === 'eid_data_mismatch') s.add('REJ-05')
+    if (f.code === 'document_invalid') s.add('REJ-01')
+    if (f.code === 'chip_unreadable') s.add('REJ-06')
   }
   for (const k of c.checks) {
     const o = effectiveOutcome(k)
     if (o !== 'fail') continue
-    if (k.id === 'liveness') { s.add('liveness_failed'); s.add('suspected_fraud') }
-    if (k.id === 'face_match') s.add('face_mismatch')
-    if (k.id === 'chip_signature') { s.add('chip_invalid'); s.add('suspected_fraud') }
-    if (k.id === 'document_validity') s.add('document_expired')
-    if (k.id === 'residence') s.add('residence_not_found')
-    if (k.id === 'eidas_login') s.add('data_mismatch')
+    if (k.id === 'liveness') { s.add('REJ-03'); s.add('REJ-07') }
+    if (k.id === 'face_match') s.add('REJ-02')
+    if (k.id === 'chip_signature') { s.add('REJ-06'); s.add('REJ-07') }
+    if (k.id === 'document_validity') s.add('REJ-01')
+    if (k.id === 'residence') s.add('REJ-04')
+    if (k.id === 'eidas_login') s.add('REJ-05')
   }
   return s
 }

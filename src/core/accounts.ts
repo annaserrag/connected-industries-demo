@@ -10,12 +10,13 @@
  * (deliberately wrong check letter), passports are 2 letters + 7 digits, EU eIDs 9 alphanumerics. Nothing leaves the browser.
  */
 import type {
-  Actor, AppState, AuditAction, AuditEvent, Case, CitizenAccount, DocumentType, IdentityDocument,
-  SignInResult, SignUpCountry, SignUpInput, SignUpResult,
+  Actor, AppState, AuditAction, AuditEvent, Case, CitizenAccount, DocumentType,
+  SignInResult, SignUpCountry, SignUpFailure, SignUpInput, SignUpResult, TypedDocument,
 } from '@/contract/types'
 import type { ClaveActions } from '@/contract/api'
 import {
-  DOCUMENTS, PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_DOCUMENTS, SIGNUP_MIN_AGE, demoHash, fictionalDniNie, normaliseDocNumber,
+  PASSWORD_MIN_LENGTH, SIGNUP_COUNTRIES, SIGNUP_DOCUMENTS, SIGNUP_MIN_AGE, demoHash, fictionalDniNie, hasDniNieShape, isFictionalDniNie,
+  newDraftCase, normaliseDocNumber,
 } from '@/contract/seed'
 
 /* ------------------------------------------------------------ validation */
@@ -64,15 +65,51 @@ export function documentsForCountry(countryIndex: number): DocumentType[] {
   return c ? SIGNUP_DOCUMENTS[c.group] : []
 }
 
-/** Same checks the action runs, in the same order. null when the input is valid. */
-export function validateSignUp(input: SignUpInput, today: Date = new Date()): Exclude<SignUpResult, { ok: true }>['reason'] | null {
-  if (!isValidName(input.fullName ?? '')) return 'invalid_name'
+/** One name part (given names or surnames): letters, spaces, hyphens, apostrophes, dots; 1–60 chars. */
+export function isValidNamePart(raw: string): boolean {
+  const v = cleanName(raw ?? '')
+  return v.length >= 1 && v.length <= 60 && /^[\p{L}\p{M}][\p{L}\p{M}' .’-]*$/u.test(v)
+}
+
+/** Given names + surnames from the input (old screens send fullName: first word + the rest). */
+export function namesOf(input: SignUpInput): { givenNames: string; surnames: string } {
+  if (input.givenNames !== undefined || input.surnames !== undefined) {
+    return { givenNames: cleanName(input.givenNames ?? ''), surnames: cleanName(input.surnames ?? '') }
+  }
+  const words = cleanName(input.fullName ?? '').split(' ').filter(Boolean)
+  return { givenNames: words[0] ?? '', surnames: words.slice(1).join(' ') }
+}
+
+/** Shape of a typed document number for its type. */
+export function documentNumberShapeOk(type: DocumentType, number: string): boolean {
+  const n = normaliseDocNumber(number)
+  switch (type) {
+    case 'DNI': return /^\d{8}[A-Z]$/.test(n)
+    case 'TIE':
+    case 'NIE_PAPER': return /^[XYZ]\d{7}[A-Z]$/.test(n)
+    case 'RED_CARD': return /^[XYZ]\d{7}[A-Z]$/.test(n) || /^[A-Z0-9]{5,12}$/.test(n)
+    case 'PASSPORT': return /^[A-Z0-9]{6,12}$/.test(n)
+    case 'EU_EID': return /^[A-Z0-9]{6,12}$/.test(n)
+  }
+}
+
+/** Same checks the action runs, in the same order (duplicates are checked against the state by the action). null when valid. */
+export function validateSignUp(input: SignUpInput, today: Date = new Date()): SignUpFailure | null {
+  const { givenNames, surnames } = namesOf(input)
+  if (!isValidNamePart(givenNames) || !isValidNamePart(surnames)) return 'invalid_name'
   const age = ageOn(input.dateOfBirth ?? '', today)
   if (age === null || age < SIGNUP_MIN_AGE || age > SIGNUP_MAX_AGE) return 'underage'
   if (!isStrongEnough(input.password)) return 'weak_password'
   if (!Number.isInteger(input.countryIndex) || !documentsForCountry(input.countryIndex).includes(input.documentType)) {
     return 'invalid_document_for_country'
   }
+  if (input.documentNumber !== undefined) {
+    const n = normaliseDocNumber(input.documentNumber)
+    // A DNI/NIE with a correct check letter could be a real person's number: always refused.
+    if (hasDniNieShape(n) && !isFictionalDniNie(n)) return 'real_document_number'
+    if (!documentNumberShapeOk(input.documentType, n)) return 'invalid_document_number'
+  }
+  if (input.expiryDate !== undefined && !parseIsoDate(input.expiryDate)) return 'invalid_expiry'
   return null
 }
 
@@ -102,10 +139,7 @@ export function fakeDocumentNumber(type: DocumentType, _country?: SignUpCountry,
 
 /** Document number not used by any account or case yet. */
 function uniqueDocumentNumber(s: AppState, type: DocumentType, country: SignUpCountry): string {
-  const taken = new Set<string>([
-    ...Object.values(s.accounts ?? {}).map(a => normaliseDocNumber(a.documentNumber)),
-    ...Object.values(s.cases).map(c => normaliseDocNumber(c.document.number)),
-  ])
+  const taken = takenNumbers(s)
   for (let i = 0; i < 200; i++) {
     const n = fakeDocumentNumber(type, country)
     if (!taken.has(normaliseDocNumber(n))) return n
@@ -141,66 +175,39 @@ function addYears(d: Date, years: number): string {
   return x.toISOString().slice(0, 10)
 }
 
-const ISSUED_IN_SPAIN: DocumentType[] = ['DNI', 'TIE', 'NIE_PAPER', 'RED_CARD']
-
-/** Builds the new draft application for a valid sign-up. */
-export function buildSignUpCase(id: string, input: SignUpInput, documentNumber: string, now: Date = new Date()): Case {
+/** The typed document of a valid sign-up. */
+export function typedFromSignUp(input: SignUpInput, documentNumber: string, now: Date = new Date()): TypedDocument {
   const country = SIGNUP_COUNTRIES[input.countryIndex]
-  const name = cleanName(input.fullName)
-  const doc = DOCUMENTS[input.documentType]
-  const document: IdentityDocument = {
+  const { givenNames, surnames } = namesOf(input)
+  return {
     type: input.documentType,
     number: documentNumber,
-    issuingCountry: ISSUED_IN_SPAIN.includes(input.documentType) ? 'Spain' : country.name.en,
-    expires: addYears(now, 5),
-  }
-  const at = now.toISOString()
-  return {
-    id,
-    origin: 'signup',
-    persona: {
-      name,
-      age: ageOn(input.dateOfBirth, now) ?? SIGNUP_MIN_AGE,
-      nationality: country.nationality,
-      initials: initialsOf(name),
-      hue: hueOf(name),
-      profile: {
-        en: `New applicant · ${country.name.en} · ${doc.label.en}`,
-        es: `Nueva solicitud · ${country.name.es} · ${doc.label.es}`,
-      },
-    },
-    document,
-    presetAnswers: {
-      nationalityGroup: country.group,
-      document: input.documentType,
-      hasEuEid: input.documentType === 'EU_EID',
-      assisted: false,
-    },
-    policyProposal: input.documentType === 'RED_CARD' || input.documentType === 'NIE_PAPER' ? true : undefined,
-    scenario: {
-      en: 'Created with the sign-up form on this device. Every check passes by default.',
-      es: 'Creada con el formulario de registro en este dispositivo. Todas las comprobaciones se superan por defecto.',
-    },
-    demoBeat: { en: 'New sign-up', es: 'Nuevo registro' },
-    simulation: { attempts: [] },
-    ...draftLiveState(at),
+    expiry: input.expiryDate ?? addYears(now, 5),
+    nationality: country.name.en,
+    data: { givenNames, surnames, dateOfBirth: input.dateOfBirth },
   }
 }
 
-/** The live-state fields of a fresh draft application. */
-function draftLiveState(at: string): Pick<Case,
-  'answers' | 'route' | 'status' | 'level' | 'advanced' | 'consentGiven' | 'attempt' | 'checks' | 'risk' | 'flags'
-  | 'awaitingOfficer' | 'decisions' | 'correctedAfterRefusal' | 'updatedAt' | 'infoRequest' | 'appeal' | 'videoCallSlot' | 'submittedAt'> {
-  return {
-    answers: null, route: null, status: 'draft', level: 'none', advanced: 'not_requested', consentGiven: false,
-    attempt: 0, checks: [], risk: 'low', flags: [], awaitingOfficer: false, decisions: [], correctedAfterRefusal: false,
-    infoRequest: undefined, appeal: undefined, videoCallSlot: undefined, submittedAt: undefined, updatedAt: at,
+/** Builds the new draft application for a valid sign-up. */
+export function buildSignUpCase(id: string, input: SignUpInput, documentNumber: string, now: Date = new Date(), caseRef?: string): Case {
+  return newDraftCase(id, 'signup', typedFromSignUp(input, documentNumber, now), now.toISOString(), { caseRef })
+}
+
+/** Lowest free GYC-NN reference (a live sign-up of Giulia gets GYC-01). */
+export function nextCaseRef(s: AppState): string {
+  const used = new Set(Object.values(s.cases).map(c => c.caseRef).filter(Boolean))
+  for (let n = 1; ; n++) {
+    const ref = `GYC-${String(n).padStart(2, '0')}`
+    if (!used.has(ref)) return ref
   }
 }
 
-/** resetCase for a sign-up application: same person and document, back to a fresh draft. */
-export function resetSignUpCase(c: Case, now: Date = new Date()): Case {
-  return { ...c, ...draftLiveState(now.toISOString()) }
+/** Every document number already used by an account or a case. */
+export function takenNumbers(s: AppState): Set<string> {
+  return new Set<string>([
+    ...Object.values(s.accounts ?? {}).map(a => normaliseDocNumber(a.documentNumber)),
+    ...Object.values(s.cases).map(c => normaliseDocNumber(c.typed?.number ?? c.document.number)),
+  ])
 }
 
 /* --------------------------------------------------------------- actions */
@@ -235,10 +242,16 @@ export function createAccountActions({ get, commit, audit }: AccountDeps): Accou
       if (invalid) return { ok: false, reason: invalid }
       const s = get()
       const country = SIGNUP_COUNTRIES[input.countryIndex]
+      let documentNumber: string
+      if (input.documentNumber !== undefined) {
+        documentNumber = normaliseDocNumber(input.documentNumber)
+        if (takenNumbers(s).has(documentNumber)) return { ok: false, reason: 'duplicate_document' }
+      } else {
+        documentNumber = uniqueDocumentNumber(s, input.documentType, country) // @deprecated UI migration: old form has no number field
+      }
       const id = newCaseId(s)
-      const documentNumber = uniqueDocumentNumber(s, input.documentType, country)
       const now = new Date()
-      const c = buildSignUpCase(id, input, documentNumber, now)
+      const c = buildSignUpCase(id, input, documentNumber, now, nextCaseRef(s))
       const account: CitizenAccount = {
         caseId: id,
         documentNumber,
@@ -249,7 +262,7 @@ export function createAccountActions({ get, commit, audit }: AccountDeps): Accou
       const actor: Actor = { kind: 'citizen', id, name: c.persona.name }
       // Never put the password (or its hash) in the audit trail.
       const ev = audit(id, actor, 'account_created',
-        `${c.persona.name} created a citizen account (${c.persona.nationality}, ${input.documentType}). Applicant number ${documentNumber} assigned.`)
+        `${c.persona.name} created a citizen account (${country.name.en}, ${input.documentType} ${documentNumber}, expires ${c.typed.expiry}). Reference ${c.caseRef}.`)
       commit({
         ...s,
         cases: { ...s.cases, [id]: c },
