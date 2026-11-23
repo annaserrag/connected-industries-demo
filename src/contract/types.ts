@@ -374,6 +374,8 @@ export interface Decision {
   note?: string
   /** Rule that applied (engine decisions) or the context ('APPEAL', 'INFO-REQUEST', 'VIDEO-CALL'). */
   ruleId?: string
+  /** 'advanced' when only the advanced level was refused (the basic level stays). */
+  scope?: 'advanced'
   at: string
 }
 
@@ -404,6 +406,8 @@ export interface Appeal {
   decidedAt?: string
   /** Reason kept when dismissed. */
   keptReasonId?: RejId
+  /** 'advanced' when the review is about an advanced-only refusal (the basic level stays). */
+  scope?: 'advanced'
 }
 
 export interface Persona {

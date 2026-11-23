@@ -732,7 +732,8 @@ export const actions: ClaveActions = {
     const last = c.decisions[c.decisions.length - 1]
     const lastIsRefusal = last?.outcome === 'refused' || last?.outcome === 'revoked'
     if (c.appeal?.state === 'open') fail('A review is already open. You do not need to send it again (MSG-COR-04).')
-    if (c.status !== 'not_approved' || !lastIsRefusal) fail('A review can be asked for after a refusal.')
+    const advancedOnly = lastIsRefusal && last.scope === 'advanced' && c.level === 'basic'
+    if (!lastIsRefusal || (c.status !== 'not_approved' && !advancedOnly)) fail('A review can be asked for after a refusal.')
     if (c.appeal?.state === 'dismissed') fail('This decision was already reviewed by a person and kept (MSG-COR-07).')
     const t = (text ?? '').trim()
     if (!t) fail('Tell us in a few words why the decision should change.')
@@ -743,10 +744,11 @@ export const actions: ClaveActions = {
     updateCase(caseId, cc => {
       const flags = [...cc.flags.filter(f => f.code !== 'appeal_filed' && f.severity !== 'high'), appealFlag]
       return {
-        status: 'checking',
+        // An advanced-only review keeps the basic level and status 4; a full refusal goes back to status 2.
+        status: advancedOnly ? 'approved' : 'checking',
         awaitingOfficer: true,
-        citizenMsgs: ['COR-04', 'COR-05'],
-        appeal: { text: t, at, state: 'open', upload: up, refusedBy: last.by.id, refusedReasonId: last.reasonId },
+        citizenMsgs: advancedOnly ? ['COR-04', 'COR-05', 'STA-4'] : ['COR-04', 'COR-05'],
+        appeal: { text: t, at, state: 'open', upload: up, refusedBy: last.by.id, refusedReasonId: last.reasonId, ...(advancedOnly ? { scope: 'advanced' as const } : {}) },
         flags, risk: riskOf(flags),
         session: patchSession(cc, { uploads: { ...cc.session.uploads, ...(up ? { appeal: up } : {}) } }),
       }
@@ -854,7 +856,7 @@ export const actions: ClaveActions = {
     const at = nowIso()
     const evidence = c.checks.filter(r => r.outcome === 'fail' || r.outcome === 'warn').map(r => r.id)
     const noteTxt = note ? ` Internal note: ${note}` : ''
-    const decision = { outcome: 'refused' as const, by, reasonId: reason, note, at, ruleId: c.ruleId }
+    const decision = { outcome: 'refused' as const, by, reasonId: reason, note, at, ruleId: c.ruleId, ...(c.level === 'basic' ? { scope: 'advanced' as const } : {}) }
     const label = REJECTION_REASONS[reason].officerLabel.en
     if (c.level === 'basic') {
       // Basic already granted: the refusal applies to the advanced level only; basic stays.
@@ -896,6 +898,30 @@ export const actions: ClaveActions = {
     if (c.appeal!.refusedBy === by.id) fail('A different officer must decide the review: you took the original decision (rule APPEAL-SECOND-OFFICER).')
     if (decision !== 'approve' && decision !== 'uphold') fail('Choose approve or uphold.')
     const at = nowIso()
+    if (c.appeal!.scope === 'advanced') {
+      // Review of an advanced-only refusal: the basic level was never taken away.
+      if (decision === 'approve') {
+        updateCase(caseId, cc => ({
+          status: 'approved', level: 'advanced', advanced: 'granted', awaitingOfficer: false,
+          appeal: { ...cc.appeal!, state: 'upheld', decidedBy: by, decidedAt: at },
+          flags: cc.flags.filter(f => f.code !== 'appeal_filed' && f.code !== 'advanced_level_review'), risk: 'low',
+          correctedAfterRefusal: true,
+          citizenMsgs: ['COR-06', 'STA-4C'],
+          decisions: [...cc.decisions, { outcome: 'approved_advanced', by, at, note, ruleId: 'APPEAL-SECOND-OFFICER' }],
+        }), cc => [audit(caseId, by, 'appeal_decided', `${by.name} reviewed the request (advanced-level refusal ${cc.appeal!.refusedReasonId}) and granted the advanced level.${note ? ` Note: ${note}` : ''}`,
+          { ruleId: 'APPEAL-SECOND-OFFICER', tags: tagsFor(cc, ['Refusal corrected on review']) })])
+        return
+      }
+      const keptAdv = requireReason(reasonId ?? c.appeal!.refusedReasonId)
+      updateCase(caseId, cc => ({
+        status: 'approved', level: 'basic', advanced: 'not_requested', awaitingOfficer: false,
+        appeal: { ...cc.appeal!, state: 'dismissed', decidedBy: by, decidedAt: at, keptReasonId: keptAdv },
+        flags: cc.flags.filter(f => f.code !== 'appeal_filed'),
+        citizenMsgs: ['COR-07', 'STA-4'],
+        decisions: [...cc.decisions, { outcome: 'refused', by, reasonId: keptAdv, note, at, ruleId: 'APPEAL-SECOND-OFFICER', scope: 'advanced' }],
+      }), [audit(caseId, by, 'appeal_decided', `${by.name} reviewed the request and kept the advanced-level refusal (${keptAdv}). Basic level kept.${note ? ` Internal note: ${note}` : ''}`, { reasonId: keptAdv, ruleId: 'APPEAL-SECOND-OFFICER' })])
+      return
+    }
     if (decision === 'approve') {
       const adv = advancedEligible(c)
       const statusMsg = statusMsgId('approved', adv ? 'pending_review' : 'not_requested')

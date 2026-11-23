@@ -214,11 +214,34 @@ function Approved({ c }: { c: Case }) {
         <BigButton variant="secondary" onClick={() => downloadReceipt(c, lang)} testId="download-receipt"><FileDown size={18} aria-hidden />{tr(id === 'STA-4C' ? MSG['STA-4C'].button : MSG['STA-4'].buttons[0])}</BigButton>
         {id !== 'STA-4C' && <BigButton onClick={() => setMovil(true)} testId="open-clave-movil"><Smartphone size={18} aria-hidden />{tr(MSG['STA-4'].buttons[1])}</BigButton>}
       </div>
+      <AdvancedRefusal c={c} />
       <Modal open={movil} onOpenChange={setMovil} title={tr(MSG['STA-4'].buttons[1])} closeLabel={tr(C.close)}>
         <p className="text-[16px] leading-relaxed text-ink">{tr(C.claveMovilBody)}</p>
         <div className="mt-4"><BigButton onClick={() => setMovil(false)}>{tr(C.gotIt)}</BigButton></div>
       </Modal>
     </div>
+  )
+}
+
+/** The advanced level alone was refused: the basic level stays, the reason is shown and a review can be asked for. */
+function AdvancedRefusal({ c }: { c: Case }) {
+  const { tr } = useTr()
+  const [form, setForm] = useState(false)
+  const d = lastRefusal(c)
+  if (!d || d.scope !== 'advanced' || c.level !== 'basic') return null
+  const dismissed = c.appeal?.state === 'dismissed' && c.appeal.scope === 'advanced'
+  const open = c.appeal?.state === 'open'
+  const reasonId = dismissed ? c.appeal?.keptReasonId ?? d.reasonId : d.reasonId
+  return (
+    <section className="space-y-3 rounded-card border border-danger/40 bg-surface p-4" data-testid="advanced-refused" data-reason={reasonId}>
+      <h3 className="font-display text-[18px] font-bold text-ink">{tr({ en: 'Advanced level not approved', es: 'Nivel avanzado no aprobado' })}</h3>
+      <p className="text-[15px] text-muted">{tr({ en: 'Your basic level stays active.', es: 'Tu nivel básico sigue activo.' })}</p>
+      {dismissed && reasonId && <MsgBlock id="COR-07" tone="danger" vars={{ reason: tr(REJ_REASONS[reasonId].officerLabel), legal: tr(MSG['COR-07'].legal) }} />}
+      {reasonId && <p className="text-[16px] leading-relaxed text-ink">{fillMsg(tr(MSG[reasonId]), { fields: '—' })}</p>}
+      {open && <MsgBlock id="COR-05" tone="info" />}
+      {form ? <ReviewRequest c={c} onClose={() => setForm(false)} />
+        : !open && !dismissed && <BigButton testId="ask-review" onClick={() => setForm(true)}><Scale size={18} aria-hidden />{tr(MSG['STA-5'].button)}</BigButton>}
+    </section>
   )
 }
 
