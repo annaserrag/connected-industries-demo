@@ -30,6 +30,7 @@ export function OfficerApp() {
               <Route path="case/:id" element={<CaseDetailPage />} />
               <Route path="appeals" element={<QueuePage key="appeals" preset="appeals" />} />
               <Route path="advanced" element={<QueuePage key="advanced" preset="advanced" />} />
+              <Route path="videocalls" element={<QueuePage key="videocalls" preset="videocalls" />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="dashboard" element={<StaffDashboardPage />} />
               <Route path="documents" element={<DocumentsPage />} />

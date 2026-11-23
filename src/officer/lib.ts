@@ -1,7 +1,9 @@
 /* Officer-area helpers: language, derived case facts, hotkeys, CSV. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AuditEvent, Bilingual, Case, CheckId, CheckResult, Lang, RejectionReasonId, RiskLevel } from '@/contract/types'
-import { CHECKS, ENGINE, REJECTION_REASONS } from '@/contract/seed'
+import { CHECKS, ENGINE, OFFICERS, REJECTION_REASONS } from '@/contract/seed'
+import { fillMsg } from '@/contract/messages'
+import { fieldLabel } from '@/core/engine'
 import { useClave } from '@/core/store'
 import { AUDIT_ACTION_LABEL } from './copy'
 
@@ -30,25 +32,29 @@ export function useTick(ms = 30_000) {
 
 export const RISK_RANK: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2 }
 
-export type ReviewKind = 'advanced' | 'decision'
+export type ReviewKind = 'advanced' | 'appeal' | 'decision'
 
-/** Advanced-level review = basic already granted, advanced pending, nothing else to decide. */
+/** What the officer is asked to decide: an open review request, an advanced-level review, or a first decision. */
 export function reviewKind(c: Case): ReviewKind {
-  return c.level === 'basic' && c.advanced === 'pending_review' && !c.appeal ? 'advanced' : 'decision'
+  if (c.appeal?.state === 'open') return 'appeal'
+  return c.level === 'basic' && c.advanced === 'pending_review' ? 'advanced' : 'decision'
 }
 
-export function canApproveKind(c: Case): 'basic' | 'advanced' {
-  return c.level === 'none' ? 'basic' : 'advanced'
+/** Officer-side title: "Applicant X" when the applicant is unknown, else the applicant's name. */
+export function caseTitle(c: Case): string {
+  return c.caseLabel ?? c.persona.name
 }
 
-export function needsVideoCall(c: Case): boolean {
-  const v = c.checks.find(k => k.id === 'officer_video')
-  if (v) return v.outcome !== 'pass'
+/** On the Fallback the officer must see the document and the face live before approving (core rule). */
+export function onFallback(c: Case): boolean {
   return c.route === 'F'
 }
 
-export function hasVideoCheck(c: Case): boolean {
-  return c.route === 'F' || c.checks.some(k => k.id === 'officer_video')
+/** A video call is useful (or required) whenever a person still has a first decision to take. */
+export function videoCallState(c: Case): 'none' | 'waiting' | 'live' | 'ended' {
+  const v = c.session?.videoCall?.state
+  if (v === 'live' || v === 'ended' || v === 'waiting') return v
+  return c.session?.fallback?.joined ? 'waiting' : 'none'
 }
 
 export function lastDecisionAt(c: Case): string | undefined {
@@ -71,6 +77,13 @@ export function isExpired(iso: string, now = new Date()): boolean {
   return new Date(iso).getTime() < now.getTime()
 }
 
+/** Whole days from today to an ISO date (negative when past). */
+export function daysUntil(iso: string, now = new Date()): number {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`).getTime()
+  const t = new Date(`${now.toISOString().slice(0, 10)}T00:00:00Z`).getTime()
+  return Math.round((d - t) / 86_400_000)
+}
+
 export function formatDate(iso: string, lang: Lang): string {
   return new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
 }
@@ -83,30 +96,31 @@ export function formatDateTime(iso: string, lang: Lang): string {
   return new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }
 
-/** Rejection reasons that line up with what the engine flagged (a hint, never preselected). */
-export function suggestedReasons(c: Case): Set<RejectionReasonId> {
-  const s = new Set<RejectionReasonId>()
-  for (const f of c.flags) {
-    if (f.code === 'low_liveness') s.add('REJ-03')
-    if (f.code === 'low_face_match') s.add('REJ-02')
-    if (f.code === 'chip_signature_failed') s.add('REJ-06')
-    if (f.code === 'residence_not_found') s.add('REJ-04')
-    if (f.code === 'residence_mismatch') s.add('REJ-05')
-    if (f.code === 'eid_data_mismatch') s.add('REJ-05')
-    if (f.code === 'document_invalid') s.add('REJ-01')
-    if (f.code === 'chip_unreadable') s.add('REJ-06')
-  }
-  for (const k of c.checks) {
-    const o = effectiveOutcome(k)
-    if (o !== 'fail') continue
-    if (k.id === 'liveness') { s.add('REJ-03'); s.add('REJ-07') }
-    if (k.id === 'face_match') s.add('REJ-02')
-    if (k.id === 'chip_signature') { s.add('REJ-06'); s.add('REJ-07') }
-    if (k.id === 'document_validity') s.add('REJ-01')
-    if (k.id === 'residence') s.add('REJ-04')
-    if (k.id === 'eidas_login') s.add('REJ-05')
-  }
-  return s
+/** Name of an officer by id (falls back to the id). */
+export function officerName(id: string | undefined | null): string {
+  return OFFICERS.find(o => o.id === id)?.name ?? id ?? ''
+}
+
+/** The citizen text of MSG-REJ-0x, with {fields} filled from the case's discrepancy table (REJ-05). */
+export function rejCitizenText(c: Case, id: RejectionReasonId, lang: Lang): string {
+  const rows = c.discrepancies ?? []
+  const fields = rows.length
+    ? rows.map(r => `${fieldLabel(r.field)[lang]}: ${r.document} / ${r.records}`).join('; ')
+    : lang === 'es' ? 'los datos que no coinciden' : 'the data that does not match'
+  return fillMsg(REJECTION_REASONS[id].citizenMessage[lang], { fields })
+}
+
+/** Core rule errors (English, technical) in plain words for the officer, in both languages. */
+export function plainRuleError(msg: string): Bilingual {
+  const m = msg.toLowerCase()
+  if (m.includes('different officer')) return { en: 'Another officer must decide this review: you took the first decision. Sign in as a different officer.', es: 'Esta revisión la decide otra persona: tú tomaste la primera decisión. Entra con otro usuario.' }
+  if (m.includes('start the video call')) return { en: 'Start the video call first: on this route you must see the original document and the face live before approving.', es: 'Inicia primero la videollamada: en esta vía tienes que ver el documento original y la cara en directo antes de aprobar.' }
+  if (m.includes('waiting for the citizen')) return { en: 'You already asked the citizen for something. Wait for the reply.', es: 'Ya pediste algo a la persona. Espera su respuesta.' }
+  if (m.includes('closed list')) return { en: 'Pick a reason from the list to refuse.', es: 'Elige un motivo de la lista para denegar.' }
+  if (m.includes('signed-in officer')) return { en: 'Your session has ended. Sign in again.', es: 'Tu sesión ha terminado. Vuelve a entrar.' }
+  if (m.includes('already live')) return { en: 'The video call is already live.', es: 'La videollamada ya está en curso.' }
+  if (m.includes('nothing') || m.includes('already granted')) return { en: 'This application has nothing left to decide.', es: 'Esta solicitud ya no tiene nada pendiente de decidir.' }
+  return { en: msg, es: msg }
 }
 
 /* --------------------------------------------------------------- hotkeys */
@@ -152,7 +166,7 @@ function csvCell(v: string): string {
 }
 
 export function auditToCsv(events: AuditEvent[], cases: Record<string, Case>, lang: Lang): string {
-  const head = ['time', 'actor_kind', 'actor_id', 'actor_name', 'action', 'action_label', 'case_id', 'applicant', 'detail', 'evidence', 'reason_id', 'reason_label']
+  const head = ['time', 'actor_kind', 'actor_id', 'actor_name', 'action', 'action_label', 'case_id', 'applicant', 'detail', 'evidence', 'reason_id', 'reason_label', 'rule_id', 'tags']
   const rows = events.map(e => [
     e.at,
     e.actor.kind,
@@ -161,11 +175,13 @@ export function auditToCsv(events: AuditEvent[], cases: Record<string, Case>, la
     e.action,
     AUDIT_ACTION_LABEL[e.action]?.[lang] ?? e.action,
     e.caseId ?? '',
-    e.caseId ? cases[e.caseId]?.persona.name ?? '' : '',
+    e.caseId && cases[e.caseId] ? caseTitle(cases[e.caseId]) : '',
     e.detail,
     (e.evidence ?? []).map(id => CHECKS[id].label[lang]).join(' | '),
     e.reasonId ?? '',
     e.reasonId ? REJECTION_REASONS[e.reasonId].officerLabel[lang] : '',
+    e.ruleId ?? '',
+    (e.tags ?? []).join(' | '),
   ])
   return [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n')
 }

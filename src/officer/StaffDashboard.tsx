@@ -1,22 +1,38 @@
-/* Staff console · Dashboard: live KPIs from the shared store (demo data) + the simulated 12-week trends. */
-import { memo, useMemo, type ReactNode } from 'react'
+/* Staff console · Dashboard: live counters from the shared store (dashboardCounters) + the published reference figures. */
+import { useMemo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Ban, Bot, CalendarDays, ChevronRight, Cpu, Gavel, Hourglass, RotateCcw, ShieldCheck, Timer, UserCheck, UserRound,
+  Ban, Bot, CalendarDays, ChevronRight, Cpu, Gavel, Hourglass, RotateCcw, Scale, ShieldCheck, Timer, UserCheck, UserRound,
 } from 'lucide-react'
 import type { ActorKind, PriorityTier } from '@/contract/types'
-import { DOCUMENTS, PRIORITY_TIERS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { DOCUMENTS, PRIORITY_TIERS, REJECTION_REASONS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
+import { REJ_ORDER } from '@/contract/messages'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
-import { relativeTime } from '@/core/selectors'
+import { dashboardCounters, relativeTime } from '@/core/selectors'
 import { countsByDocument, countsByRoute, countsByTier, DOCUMENT_ORDER, liveKpis, recentActivity } from '@/core/console'
-import { AppealsChart, CorrectedChart, OfficeShareChart, RoutesChart, TimeToAdvancedChart } from '@/dashboard/charts'
+import { PublishedFigures } from '@/dashboard/PublishedFigures'
 import { Avatar, cn } from '@/ui'
 import { AUDIT_ACTION_LABEL, C, S } from './copy'
-import { fill, useFlash, useLang, useTick, useTr, actorName } from './lib'
+import { caseTitle, fill, useFlash, useLang, useTick, useTr, actorName } from './lib'
 import { LiveDot } from './components/ui'
 import { TIER_BAR, TierTag } from './Queue'
+
+const D = {
+  applications: { en: 'Applications', es: 'Solicitudes' },
+  applicationsSub: { en: 'sent or decided (not drafts)', es: 'enviadas o decididas (sin borradores)' },
+  auto: { en: 'Automatic approvals', es: 'Aprobaciones automáticas' },
+  autoSub: { en: 'basic level by the rules, no person involved', es: 'nivel básico por las reglas, sin intervención de una persona' },
+  neededOfficer: { en: 'Needed an officer', es: 'Necesitaron a una persona' },
+  neededOfficerSub: { en: '{p}% of applications', es: '{p} % de las solicitudes' },
+  corrected: { en: 'Refusals corrected on review', es: 'Denegaciones corregidas en revisión' },
+  correctedSub: { en: 'approved by a second officer', es: 'aprobadas por una segunda persona' },
+  proposed: { en: 'Decided under proposed rules', es: 'Decididas con normas propuestas' },
+  proposedSub: { en: 'route B, C assisted, X, Fallback for foreigners', es: 'vía B, C asistida, X, alternativa para extranjeros' },
+  byReason: { en: 'Refusals by reason', es: 'Denegaciones por motivo' },
+  byReasonHint: { en: 'Closed list REJ-01…08. Only an officer refuses, always with one of these.', es: 'Lista cerrada REJ-01…08. Solo una persona deniega, siempre con uno de estos motivos.' },
+}
 
 export function LiveBadge() {
   const tr = useTr()
@@ -172,7 +188,7 @@ function Activity() {
                 <p className="truncate text-sm"><span className="font-semibold text-ink">{tr(AUDIT_ACTION_LABEL[e.action])}</span><span className="text-muted"> · {actorName(e.actor)}</span></p>
                 {c ? (
                   <Link to={PATHS.officerCase(c.id)} className="inline-flex items-center gap-1.5 rounded text-[12.5px] text-muted outline-none hover:text-ink hover:underline focus-visible:ring-2 focus-visible:ring-brand">
-                    <Avatar initials={c.persona.initials} hue={c.persona.hue} size={16} />{c.persona.name}
+                    <Avatar initials={c.persona.initials} hue={c.persona.hue} size={16} />{caseTitle(c)}
                   </Link>
                 ) : <p className="truncate text-[12.5px] text-muted">{e.detail}</p>}
               </div>
@@ -185,32 +201,14 @@ function Activity() {
   )
 }
 
-/** The projected 12-week charts don't depend on the store: memoised so live updates never re-render Recharts. */
-const Trends = memo(function Trends() {
-  const tr = useTr()
-  return (
-    <section aria-labelledby="trends-title" className="mt-10" data-testid="simulated-trends">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 id="trends-title" className="font-display text-xl font-bold text-ink">{tr(S.trendsTitle)}</h2>
-      </div>
-      <p className="mt-1 max-w-3xl text-sm text-muted">{tr(S.trendsBody)}</p>
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <TimeToAdvancedChart />
-        <OfficeShareChart />
-        <CorrectedChart />
-        <AppealsChart />
-        <RoutesChart />
-      </div>
-    </section>
-  )
-})
-
 export function StaffDashboardPage() {
   const tr = useTr()
   useTick(15_000)
   const state = useClave(s => s)
   const now = new Date()
   const k = useMemo(() => liveKpis(state, now), [state]) // eslint-disable-line react-hooks/exhaustive-deps
+  const dc = useMemo(() => dashboardCounters(state), [state])
+  const officerShare = dc.applications ? Math.round((dc.neededOfficer / dc.applications) * 100) : 0
   const tiers = useMemo(() => countsByTier(state, now), [state]) // eslint-disable-line react-hooks/exhaustive-deps
   const docs = useMemo(() => countsByDocument(state), [state])
   const routes = useMemo(() => countsByRoute(state), [state])
@@ -229,16 +227,31 @@ export function StaffDashboardPage() {
         </div>
       </div>
 
-      <ul className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4" aria-label={tr(S.demoLive)}>
-        <Kpi id="today" icon={<CalendarDays className="size-4" />} label={tr(S.kToday)} value={k.applicationsToday} sub={fill(tr(S.kTodaySub), { n: k.applicationsTotal })} tone="brand" />
+      <ul className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4" aria-label={tr(S.demoLive)} data-testid="live-counters">
+        <Kpi id="applications" icon={<CalendarDays className="size-4" />} label={tr(D.applications)} value={dc.applications} sub={tr(D.applicationsSub)} tone="brand" />
+        <Kpi id="auto" icon={<Bot className="size-4" />} label={tr(D.auto)} value={dc.autoApprovals} sub={tr(D.autoSub)} tone="sim" />
+        <Kpi id="needed-officer" icon={<UserCheck className="size-4" />} label={tr(D.neededOfficer)} value={dc.neededOfficer} sub={fill(tr(D.neededOfficerSub), { p: officerShare })} tone="success" />
         <Kpi id="awaiting" icon={<Hourglass className="size-4" />} label={tr(S.kAwaiting)} value={k.awaitingDecision} sub={tr(S.kAwaitingSub)} tone="warning" />
-        <Kpi id="auto" icon={<Bot className="size-4" />} label={tr(S.kAuto)} value={k.autoApproved} sub={tr(S.kAutoSub)} tone="sim" />
-        <Kpi id="officer" icon={<UserCheck className="size-4" />} label={tr(S.kOfficer)} value={k.officerDecided} sub={tr(S.kOfficerSub)} tone="success" />
-        <Kpi id="refusals" icon={<Ban className="size-4" />} label={tr(S.kRefusals)} value={k.refusals} sub={tr(S.kRefusalsSub)} tone="danger" />
-        <Kpi id="corrections" icon={<RotateCcw className="size-4" />} label={tr(S.kCorrections)} value={k.corrections} sub={fill(tr(S.kCorrectionsSub), { n: k.correctedApproved })} />
-        <Kpi id="appeals" icon={<Gavel className="size-4" />} label={tr(S.kAppeals)} value={k.appealsOpen} sub={tr(S.kAppealsSub)} tone="warning" />
-        <Kpi id="median" icon={<Timer className="size-4" />} label={tr(S.kMedian)} value={minutes === null ? null : Math.round(minutes * 10) / 10} display={minutesText} sub={fill(tr(S.kMedianSub), { n: k.decisionsMeasured })} tone="brand" />
+        <Kpi id="refusals" icon={<Ban className="size-4" />} label={tr(S.kRefusals)} value={Object.values(dc.refusalsByReason).reduce((a, b) => a + b, 0)} sub={tr(S.kRefusalsSub)} tone="danger" />
+        <Kpi id="corrected" icon={<RotateCcw className="size-4" />} label={tr(D.corrected)} value={dc.correctedOnReview} sub={tr(D.correctedSub)} tone="success" />
+        <Kpi id="proposed" icon={<Scale className="size-4" />} label={tr(D.proposed)} value={dc.decidedUnderProposedRule} sub={tr(D.proposedSub)} tone="warning" />
+        <Kpi id="appeals" icon={<Gavel className="size-4" />} label={tr(S.kAppeals)} value={dc.appealsOpen} sub={tr(S.kAppealsSub)} tone="warning" />
       </ul>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted"><Timer className="size-3.5" aria-hidden />{tr(S.kMedian)}: <b className="text-ink">{minutesText}</b> · {fill(tr(S.kMedianSub), { n: k.decisionsMeasured })}</p>
+
+      <div className="mt-4">
+        <Card id="refusals-by-reason" title={tr(D.byReason)} hint={tr(D.byReasonHint)}>
+          <BarList
+            testid="rej-bar"
+            rows={REJ_ORDER.map(r => ({
+              key: r,
+              label: <><code className="shrink-0 font-mono text-[11px] font-bold text-muted">{r}</code><span className="min-w-0 truncate">{tr(REJECTION_REASONS[r].officerLabel)}</span></>,
+              value: dc.refusalsByReason[r],
+              bar: 'bg-danger',
+            }))}
+          />
+        </Card>
+      </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card id="priority-mix" title={tr(S.priorityMix)} hint={tr(S.priorityMixHint)} action={<Link to={PATHS.officer} className="inline-flex items-center text-xs font-semibold text-brand hover:underline">{tr({ en: 'Open queue', es: 'Abrir cola' })}<ChevronRight className="size-3.5" aria-hidden /></Link>}>
@@ -275,7 +288,9 @@ export function StaffDashboardPage() {
         </Card>
       </div>
 
-      <Trends />
+      <div className="mt-10">
+        <PublishedFigures />
+      </div>
     </div>
   )
 }

@@ -269,9 +269,17 @@ function DemoAccess({ certId, compact }: { certId?: string; compact?: boolean })
       {certId && cert && pin ? (
         <p className="mt-1.5">{tr({ en: 'PIN for', es: 'PIN de' })} {cert.holderName}: <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono text-[15px] font-bold" data-testid="demo-pin">{pin}</code></p>
       ) : (
-        <ul className="mt-1.5 grid gap-1 sm:grid-cols-2">
-          <li>{tr({ en: 'Electronic certificate: Lucía Vega · PIN', es: 'Certificado electrónico: Lucía Vega · PIN' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold" data-testid="demo-pin">{STAFF_DEMO_SECRETS.pins['cert-vega']}</code></li>
-          <li>{tr({ en: 'User and password:', es: 'Usuario y contraseña:' })} <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">lvega</code> · <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{STAFF_DEMO_SECRETS.passwords.lvega}</code></li>
+        <ul className="mt-2 grid gap-3 sm:grid-cols-2" data-testid="demo-accounts">
+          {([['cert-vega', 'lvega', { en: 'first decisions', es: 'primeras decisiones' }], ['cert-ortiz', 'aortiz', { en: 'reviews (second officer)', es: 'revisiones (segunda persona)' }]] as const).map(([cid, user, role]) => {
+            const ct = STAFF_CERTIFICATES.find(x => x.id === cid)!
+            return (
+              <li key={cid} className="rounded-[2px] bg-surface/70 p-2.5" data-testid={`demo-account-${user}`}>
+                <p className="font-bold">{ct.holderName} <span className="font-normal text-muted">· {tr(role)}</span></p>
+                <p className="mt-1">{tr({ en: 'Certificate PIN', es: 'PIN del certificado' })}: <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold" data-testid="demo-pin">{STAFF_DEMO_SECRETS.pins[cid]}</code></p>
+                <p className="mt-1">{tr({ en: 'User and password', es: 'Usuario y contraseña' })}: <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{user}</code> · <code className="rounded-[2px] bg-surface px-1.5 py-0.5 font-mono font-bold">{STAFF_DEMO_SECRETS.passwords[user]}</code></p>
+              </li>
+            )
+          })}
         </ul>
       )}
     </aside>

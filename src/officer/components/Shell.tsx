@@ -8,14 +8,14 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import * as RDialog from '@radix-ui/react-dialog'
-import { FileStack, History, Inbox, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Rows3, Scale, ShieldCheck, UserRound, X } from 'lucide-react'
+import { FileStack, History, Inbox, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Rows3, Scale, ShieldCheck, UserRound, Video, X } from 'lucide-react'
 import type { Bilingual } from '@/contract/types'
 import { OFFICERS, STAFF_OFFICES } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { actions, useClave } from '@/core/store'
 import { officerQueue } from '@/core/selectors'
 import { Avatar, GovHeader, cn } from '@/ui'
-import { C, S } from '../copy'
+import { C, K, S } from '../copy'
 import { postLabel } from '../ProfileForm'
 import { useLang, useTr } from '../lib'
 import { Kbd, LiveDot, Tip } from './ui'
@@ -51,12 +51,16 @@ export function useMedia(query: string): boolean {
 
 /* ------------------------------------------------------------ nav items */
 
+/** Fallback cases waiting for a video call (not in the PATHS contract; local to the console). */
+export const OFFICER_VIDEOCALLS = '/officer/videocalls'
+
 interface Item { to: string; icon: ComponentType<{ className?: string }>; label: Bilingual; testId: string; match?: (p: string) => boolean }
 
 const ITEMS: Item[] = [
   { to: PATHS.officer, icon: Inbox, label: C.navQueue, testId: 'nav-queue', match: p => p === PATHS.officer || p === `${PATHS.officer}/` || p.startsWith(`${PATHS.officer}/case/`) },
   { to: PATHS.officerAppeals, icon: Scale, label: C.navAppeals, testId: 'nav-appeals' },
   { to: PATHS.officerAdvanced, icon: ShieldCheck, label: C.navAdvanced, testId: 'nav-advanced' },
+  { to: OFFICER_VIDEOCALLS, icon: Video, label: K.navVideo, testId: 'nav-videocalls' },
   { to: PATHS.officerDashboard, icon: LayoutDashboard, label: C.navStaffDashboard, testId: 'nav-dashboard' },
   { to: PATHS.officerDocuments, icon: FileStack, label: C.navDocuments, testId: 'nav-documents' },
   { to: PATHS.officerAll, icon: Rows3, label: C.navAll, testId: 'nav-applications' },

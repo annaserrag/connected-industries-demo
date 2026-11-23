@@ -23,22 +23,13 @@ test('no Simulated banner or badges: the About page discloses the data instead',
   await expect(page.getByTestId('about-page')).toContainText('Service statistics page')
 })
 
-test('every chart has a text alternative; four KPI tiles', async ({ page }) => {
-  const charts = page.getByTestId('chart-card')
-  await expect(charts).toHaveCount(5)
-  for (const card of await charts.all()) {
-    await expect(card.getByRole('img')).toHaveAttribute('aria-label', /.+/)
-    await expect(card.locator('table')).toHaveCount(1)
+test('live counters from the store (no invented projections); refusals by reason REJ-01…08', async ({ page }) => {
+  await expect(page.getByTestId('chart-card')).toHaveCount(0)
+  await expect(page.getByTestId('kpi-tile')).toHaveCount(0)
+  for (const id of ['applications', 'auto', 'needed-officer', 'awaiting', 'refusals', 'corrected', 'proposed']) {
+    await expect(page.getByTestId(`live-${id}`)).toBeVisible()
   }
-  await expect(page.getByTestId('kpi-tile')).toHaveCount(4)
-})
-
-test('data table toggles open', async ({ page }) => {
-  const card = page.getByTestId('chart-card').first()
-  const btn = card.getByRole('button', { name: 'Show data table' })
-  await btn.click()
-  await expect(card.getByRole('button', { name: 'Hide data table' })).toHaveAttribute('aria-expanded', 'true')
-  await expect(card.getByRole('table')).toBeVisible()
+  for (const r of ['REJ-01', 'REJ-05', 'REJ-08']) await expect(page.getByTestId(`live-rej-${r}`)).toBeVisible()
 })
 
 test('each published figure appears verbatim with its year and source', async ({ page }) => {
@@ -65,7 +56,7 @@ test('Spanish labels switch with the toggle', async ({ page }) => {
 
 test('embed mode hides the page header', async ({ page }) => {
   await page.goto('/#/dashboard?embed=1')
-  await expect(page.getByTestId('kpi-tile').first()).toBeVisible()
+  await expect(page.getByTestId('live-session')).toBeVisible()
   await expect(page.getByTestId('gov-header')).toHaveCount(0)
 })
 
@@ -82,8 +73,8 @@ test('live counts update from another tab', async ({ page, context }) => {
     const sel = await import('/src/core/selectors.ts')
     const { OFFICERS } = await import('/src/contract/seed.ts')
     store.actions.officerSignIn(OFFICERS[0].id)
-    const c = sel.officerQueue(store.useClave.getState()).find(x => x.status !== 'need_info')!
-    store.actions.officerApprove(c.id, 'dashboard test')
+    const c = sel.officerQueue(store.useClave.getState()).find(x => x.level === 'none' && x.appeal?.state !== 'open')!
+    store.actions.officerRefuse(c.id, 'REJ-04', 'dashboard test')
   })
   await expect(awaitingTile.locator('p').first()).toHaveText(String(before - 1), { timeout: 5000 })
 })

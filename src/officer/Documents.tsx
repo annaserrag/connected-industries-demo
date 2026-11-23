@@ -12,7 +12,7 @@ import { priorityOf, relativeTime } from '@/core/selectors'
 import { casesByDocument, DOCUMENT_ORDER } from '@/core/console'
 import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, S } from './copy'
-import { useLang, useTick, useTr } from './lib'
+import { useLang, useTick, useTr, caseTitle } from './lib'
 import { RiskTag } from './components/ui'
 import { TierTag } from './Queue'
 import { LiveBadge } from './StaffDashboard'
@@ -124,7 +124,7 @@ export function DocumentsPage() {
                               <div className="flex items-center gap-3">
                                 <Avatar initials={c.persona.initials} hue={c.persona.hue} size={32} />
                                 <div className="min-w-0">
-                                  <Link to={PATHS.officerCase(c.id)} onClick={e => e.stopPropagation()} className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand">{c.persona.name}</Link>
+                                  <Link to={PATHS.officerCase(c.id)} onClick={e => e.stopPropagation()} className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand">{caseTitle(c)}</Link>
                                   <p className="truncate font-mono text-[11px] text-muted">{c.document.number}</p>
                                 </div>
                               </div>

@@ -10,7 +10,7 @@ import { priorityOf, relativeTime } from '@/core/selectors'
 import { documentOf, DOCUMENT_ORDER } from '@/core/console'
 import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
 import { C, S } from './copy'
-import { useLang, useTick, useTr } from './lib'
+import { useLang, useTick, useTr, caseTitle } from './lib'
 import { TierTag } from './Queue'
 import { LiveBadge } from './StaffDashboard'
 
@@ -33,7 +33,7 @@ export function ApplicationsPage() {
     Number(a.status === 'draft') - Number(b.status === 'draft') || (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')), [cases])
   const needle = q.trim().toLowerCase()
   const rows = all.filter(c =>
-    (!needle || [c.persona.name, c.id, c.document.number, c.persona.nationality].some(v => v.toLowerCase().includes(needle))) &&
+    (!needle || [c.persona.name, caseTitle(c), c.caseRef ?? '', c.id, c.document.number, c.persona.nationality].some(v => v.toLowerCase().includes(needle))) &&
     (status === 'all' || c.status === status) &&
     (route === 'all' || c.route === route) &&
     (doc === 'all' || documentOf(c) === doc) &&
@@ -133,7 +133,7 @@ export function ApplicationsPage() {
                         <div className="flex items-center gap-3">
                           <Avatar initials={c.persona.initials} hue={c.persona.hue} size={30} />
                           <div className="min-w-0">
-                            <Link to={PATHS.officerCase(c.id)} onClick={e => e.stopPropagation()} className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand">{c.persona.name}</Link>
+                            <Link to={PATHS.officerCase(c.id)} onClick={e => e.stopPropagation()} className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand">{caseTitle(c)}</Link>
                             <p className="truncate text-[11px] text-muted"><span className="font-mono">{c.id}</span> · {c.persona.nationality}</p>
                           </div>
                         </div>

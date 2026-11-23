@@ -10,8 +10,8 @@ import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { relativeTime } from '@/core/selectors'
 import { Avatar, cn } from '@/ui'
-import { ACTOR_LABEL, AUDIT_ACTION_LABEL, C } from './copy'
-import { auditToCsv, downloadText, formatDateTime, formatTime, useLang, useTick, useTr, actorName } from './lib'
+import { ACTOR_LABEL, AUDIT_ACTION_LABEL, C, K, tagLabel } from './copy'
+import { auditToCsv, caseTitle, downloadText, formatDateTime, formatTime, useLang, useTick, useTr, actorName } from './lib'
 import { TOASTER_ID } from './live'
 import { Btn } from './components/ui'
 
@@ -58,6 +58,20 @@ function EvidenceChips({ e }: { e: AuditEvent }) {
   )
 }
 
+/** Rule id and tags the core writes on each event (e.g. APPEAL-SECOND-OFFICER, "Refusal corrected on review"). */
+export function RuleTags({ e }: { e: AuditEvent }) {
+  const tr = useTr()
+  if (!e.ruleId && !e.tags?.length) return null
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1" data-testid="audit-rule-tags">
+      {e.ruleId && <code title={tr(K.rule)} className="rounded-[2px] bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink">{e.ruleId}</code>}
+      {e.tags?.map(t => (
+        <span key={t} className={cn('rounded-full px-1.5 py-0.5 text-[11px] font-semibold', t === 'Refusal corrected on review' ? 'bg-success-soft text-success' : t.includes('roposed') ? 'bg-warning-soft text-warning' : 'bg-info-soft text-info')}>{tr(tagLabel(t))}</span>
+      ))}
+    </span>
+  )
+}
+
 /** Compact vertical timeline used inside the case detail page (oldest first). */
 export function AuditTimeline({ events, compact }: { events: AuditEvent[]; compact?: boolean }) {
   const tr = useTr()
@@ -78,7 +92,8 @@ export function AuditTimeline({ events, compact }: { events: AuditEvent[]; compa
                   <span className="text-xs text-muted">{actorName(e.actor)} · <time dateTime={e.at}>{formatTime(e.at, lang)}</time></span>
                 </p>
                 <p className="text-[13px] text-muted">{e.detail}</p>
-                {e.reasonId && <p className="text-[12px] font-medium text-danger">{tr(C.reason)}: {tr(REJECTION_REASONS[e.reasonId].officerLabel)}</p>}
+                {e.reasonId && <p className="text-[12px] font-medium text-danger">{tr(C.reason)}: {e.reasonId} · {tr(REJECTION_REASONS[e.reasonId].officerLabel)}</p>}
+                <RuleTags e={e} />
                 {e.evidence?.length ? <div className="mt-1"><EvidenceChips e={e} /></div> : null}
               </div>
             </motion.li>
@@ -107,7 +122,7 @@ export function AuditPage() {
 
   const caseIds = useMemo(() => {
     const ids = new Set(audit.map(e => e.caseId).filter((x): x is string => !!x))
-    return [...ids].sort((a, b) => (cases[a]?.persona.name ?? a).localeCompare(cases[b]?.persona.name ?? b))
+    return [...ids].sort((a, b) => (cases[a] ? caseTitle(cases[a]) : a).localeCompare(cases[b] ? caseTitle(cases[b]) : b))
   }, [audit, cases])
 
   const rows = useMemo(
@@ -139,8 +154,8 @@ export function AuditPage() {
           <span>{tr(C.filterCase)}</span>
           <select value={caseF} onChange={e => setF('case', e.target.value)} className="h-9 rounded-[2px] border border-line bg-surface px-2.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <option value="all">{tr(C.allCases)}</option>
-            {caseIds.map(id => <option key={id} value={id}>{cases[id]?.persona.name ?? id}</option>)}
-            {caseF !== 'all' && !caseIds.includes(caseF) && <option value={caseF}>{cases[caseF]?.persona.name ?? caseF}</option>}
+            {caseIds.map(id => <option key={id} value={id}>{cases[id] ? `${cases[id].caseRef ? `${cases[id].caseRef} · ` : ''}${caseTitle(cases[id])}` : id}</option>)}
+            {caseF !== 'all' && !caseIds.includes(caseF) && <option value={caseF}>{cases[caseF] ? caseTitle(cases[caseF]) : caseF}</option>}
           </select>
         </label>
         <div role="group" aria-label={tr(C.filterActor)} className="inline-flex max-w-full flex-wrap rounded-[2px] border border-line bg-surface p-1">
@@ -205,14 +220,14 @@ export function AuditPage() {
                           {c ? (
                             <Link to={PATHS.officerCase(c.id)} className="inline-flex items-center gap-2 rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand">
                               <Avatar initials={c.persona.initials} hue={c.persona.hue} size={22} />
-                              <span className="text-[13px] font-medium">{c.persona.name}</span>
+                              <span className="text-[13px] font-medium">{caseTitle(c)}</span>
                             </Link>
                           ) : <span className="text-muted">—</span>}
                         </td>
-                        <td className="px-3 py-3 text-[13px] text-ink/85">{e.detail}</td>
+                        <td className="px-3 py-3 text-[13px] text-ink/85">{e.detail}<RuleTags e={e} /></td>
                         <td className="px-3 py-3"><EvidenceChips e={e} /></td>
                         <td className="py-3 pr-5 pl-3">
-                          {e.reasonId ? <span className="inline-flex rounded-md bg-danger-soft px-1.5 py-0.5 text-[12px] font-semibold text-danger">{tr(REJECTION_REASONS[e.reasonId].officerLabel)}</span> : <span className="text-muted">—</span>}
+                          {e.reasonId ? <span className="inline-flex rounded-md bg-danger-soft px-1.5 py-0.5 text-[12px] font-semibold text-danger">{e.reasonId} · {tr(REJECTION_REASONS[e.reasonId].officerLabel)}</span> : <span className="text-muted">—</span>}
                         </td>
                       </motion.tr>
                     )

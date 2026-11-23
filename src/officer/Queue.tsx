@@ -2,21 +2,39 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUp, Ban, CircleCheck, Clock, Cpu, FilterX, Hourglass, Inbox, Info, Layers, ListOrdered, ShieldAlert, ShieldCheck, ShieldQuestion, Sparkles, Undo2 } from 'lucide-react'
+import { ArrowUp, Ban, CircleCheck, Clock, Cpu, FilterX, Hourglass, Inbox, Info, Layers, ListOrdered, Scale, ShieldAlert, ShieldCheck, ShieldQuestion, Sparkles, Undo2 } from 'lucide-react'
 import type { AppState, Case, PriorityTier, RiskLevel, RouteId } from '@/contract/types'
 import { CHECKS, DOCUMENTS, PRIORITY_AGE_BUMP_HOURS, PRIORITY_TIERS, ROUTES, ROUTE_ORDER } from '@/contract/seed'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
-import { baseTierOf, isAgeBumped, officerQueue, priorityOf, relativeTime, waitingSince } from '@/core/selectors'
+import { advancedQueue, appealsQueue, baseTierOf, isAgeBumped, officerQueue, priorityOf, relativeTime, videoCallQueue, waitingSince } from '@/core/selectors'
 import { Avatar, RouteBadge, StatusPill, cn } from '@/ui'
-import { C, DECISION_LABEL, OUTCOME_LABEL, RISK_LABEL, S } from './copy'
-import { effectiveOutcome, fill, lastDecisionAt, RISK_RANK, reviewKind, useHotkeys, useLang, useTick, useTr } from './lib'
+import { PROPOSED_RULE_TAG } from '@/contract/messages'
+import { C, DECISION_LABEL, K, OUTCOME_LABEL, RISK_LABEL, S } from './copy'
+import { caseTitle, effectiveOutcome, fill, lastDecisionAt, RISK_RANK, reviewKind, useHotkeys, useLang, useTick, useTr } from './lib'
 import { useLive } from './live'
 import { CheckIcon, Kbd, LiveDot, RiskTag , Tip } from './components/ui'
 
-type View = 'all' | 'decision' | 'advanced' | 'appeals'
+type View = 'all' | 'decision' | 'advanced' | 'appeals' | 'videocalls'
+export type QueuePreset = 'appeals' | 'advanced' | 'videocalls'
 
 export const shortDoc = (c: Case, lang: 'en' | 'es') => DOCUMENTS[c.document.type].label[lang].split(' (')[0]
+
+/** Small tags under the applicant: proposed rule, assisted session, minor, review requested. */
+export function CaseTags({ c }: { c: Case }) {
+  const tr = useTr()
+  const assisted = c.session?.who === 'helping'
+  const minor = c.session?.who === 'child'
+  if (!c.policyProposal && !assisted && !minor && c.appeal?.state !== 'open') return null
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {c.policyProposal && <span data-testid="proposed-rule" title={tr(PROPOSED_RULE_TAG)} className="inline-flex items-center gap-1 rounded-[2px] border border-dashed border-warning/60 bg-warning-soft px-1.5 text-[10.5px] font-bold text-warning"><Scale className="size-3" aria-hidden />{tr(K.proposedRule)}</span>}
+      {assisted && <span data-testid="assisted-badge" className="inline-flex items-center rounded-[2px] bg-info-soft px-1.5 text-[10.5px] font-bold text-info ring-1 ring-inset ring-info/30">{tr(K.assisted)}</span>}
+      {minor && <span className="inline-flex items-center rounded-[2px] bg-warning-soft px-1.5 text-[10.5px] font-bold text-warning ring-1 ring-inset ring-warning/30">{tr(K.minor)}</span>}
+      {c.appeal?.state === 'open' && <span className="inline-flex items-center rounded-[2px] bg-warning-soft px-1.5 text-[10.5px] font-bold text-warning ring-1 ring-inset ring-warning/30">{tr(K.appealTag)}</span>}
+    </span>
+  )
+}
 
 export const TIER_TONE: Record<PriorityTier, string> = {
   p1_high_risk: 'bg-danger-soft text-danger ring-danger/25',
@@ -103,7 +121,7 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                         <td className="relative py-3 pr-3 pl-5">
                           <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1 rounded-r', c.risk === 'high' ? 'bg-danger' : c.risk === 'medium' ? 'bg-warning' : 'bg-success/60', isSel && 'w-1.5')} />
                           <div className="flex items-center gap-3">
-                            <Avatar initials={c.persona.initials} hue={c.persona.hue} size={36} />
+                            <Avatar initials={c.caseLabel ? 'AX' : c.persona.initials} hue={c.persona.hue} size={36} />
                             <div className="min-w-0">
                               <Link
                                 to={PATHS.officerCase(c.id)}
@@ -111,9 +129,10 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                                 onFocus={() => onSelect(i)}
                                 className="block truncate font-semibold text-ink outline-none hover:underline focus-visible:rounded focus-visible:ring-2 focus-visible:ring-brand"
                               >
-                                {c.persona.name}
+                                {caseTitle(c)}
                               </Link>
-                              <p className="truncate text-xs text-muted">{c.persona.nationality} · {shortDoc(c, lang)} · {c.persona.age}<span className="sr-only"> · {tr(S.priority)}: {tr(tierDef(tier).label)}</span></p>
+                              <p className="truncate text-xs text-muted">{c.caseRef && <span className="font-mono font-semibold text-ink/70">{c.caseRef} · </span>}{c.persona.nationality} · {shortDoc(c, lang)} · {c.persona.age}<span className="sr-only"> · {tr(S.priority)}: {tr(tierDef(tier).label)}</span></p>
+                              <CaseTags c={c} />
                             </div>
                             {isNew && <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">{tr(C.newCase)}</span>}
                           </div>
@@ -122,15 +141,15 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
                         <td className="px-3 py-3"><RiskTag risk={c.risk} /></td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col items-start gap-1">
-                            <StatusPill status={c.status} advanced={c.advanced} />
+                            <StatusPill status={c.status} advanced={c.advanced} className="h-auto max-w-full py-0.5 text-left leading-tight whitespace-normal" />
                             {reviewKind(c) === 'advanced' && <span className="text-[11px] font-medium text-brand">{tr(C.advancedReviews)}</span>}
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          {f ? (
-                            <p className="flex items-start gap-1.5 text-[13px] leading-snug text-ink">
-                              <span aria-hidden className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', f.severity === 'high' ? 'bg-danger' : f.severity === 'medium' ? 'bg-warning' : 'bg-muted')} />
-                              <span className="line-clamp-2">{tr(f.reason)}{c.flags.length > 1 && <span className="ml-1 text-xs font-semibold text-muted">+{c.flags.length - 1}</span>}</span>
+                          {c.aiReason || f ? (
+                            <p data-testid="queue-ai-reason" className="flex items-start gap-1.5 text-[13px] leading-snug text-ink">
+                              <span aria-hidden className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', c.risk === 'high' ? 'bg-danger' : c.risk === 'medium' ? 'bg-warning' : 'bg-muted')} />
+                              <span className="line-clamp-3">{tr(c.aiReason ?? f!.reason)}</span>
                             </p>
                           ) : <span className="text-xs text-muted">{tr(C.noFlags)}</span>}
                         </td>
@@ -171,14 +190,17 @@ const QueueRow = memo(function QueueRow({ c, i, tier, bumped, isSel, isNew, flas
   a.c.id === b.c.id && a.c.updatedAt === b.c.updatedAt && a.i === b.i && a.tier === b.tier && a.bumped === b.bumped &&
   a.minute === b.minute && a.isSel === b.isSel && a.isNew === b.isNew && a.flashed === b.flashed && a.onSelect === b.onSelect && a.registerRow === b.registerRow)
 
-export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) {
+export function QueuePage({ preset }: { preset?: QueuePreset } = {}) {
   const tr = useTr()
   const lang = useLang()
   useTick()
   const navigate = useNavigate()
   const { arrived, flashed } = useLive()
   const all = useClave(s => s.cases)
-  const queue = useMemo(() => officerQueue({ cases: all } as AppState), [all])
+  const queue = useMemo(() => {
+    const st = { cases: all } as AppState
+    return preset === 'appeals' ? appealsQueue(st) : preset === 'advanced' ? advancedQueue(st) : preset === 'videocalls' ? videoCallQueue(st) : officerQueue(st)
+  }, [all, preset])
   const registerRow = useCallback((id: string, el: HTMLTableRowElement | null) => { rowRefs.current[id] = el }, [])
 
   const [view, setView] = useState<View>(preset ?? 'all')
@@ -188,7 +210,7 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
 
   const filtered = queue.filter(c =>
-    (view === 'all' || (view === 'appeals' ? c.appeal?.state === 'open' : reviewKind(c) === view)) &&
+    (view === 'all' || preset === view || (view === 'appeals' ? reviewKind(c) === 'appeal' : reviewKind(c) === view)) &&
     (risk === 'all' || c.risk === risk) &&
     (route === 'all' || c.route === route),
   )
@@ -198,6 +220,7 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
     low: queue.filter(c => c.risk === 'low').length,
     advanced: queue.filter(c => reviewKind(c) === 'advanced').length,
     decision: queue.filter(c => reviewKind(c) === 'decision').length,
+    appeals: queue.filter(c => reviewKind(c) === 'appeal').length,
   }
   const now = new Date()
   const tierOf = new Map(filtered.map(c => [c.id, priorityOf(c, now)] as const))
@@ -233,11 +256,11 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-[28px] font-bold text-ink">{tr(preset === 'appeals' ? C.navAppeals : preset === 'advanced' ? C.navAdvanced : C.queueTitle)}</h1>
+            <h1 className="font-display text-[28px] font-bold text-ink">{tr(preset === 'appeals' ? C.navAppeals : preset === 'advanced' ? C.navAdvanced : preset === 'videocalls' ? K.navVideo : C.queueTitle)}</h1>
             <span className="rounded-full bg-ink px-2.5 py-0.5 text-sm font-semibold tabular-nums text-white">{preset ? filtered.length : queue.length}</span>
             <LiveDot label={tr(C.live)} />
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(preset === 'appeals' ? C.appealsSubtitle : preset === 'advanced' ? C.advancedSubtitle : C.queueSubtitle)}</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted">{tr(preset === 'appeals' ? C.appealsSubtitle : preset === 'advanced' ? C.advancedSubtitle : preset === 'videocalls' ? K.videoSubtitle : C.queueSubtitle)}</p>
           <p data-testid="priority-legend" className="mt-1.5 flex max-w-3xl items-start gap-1.5 text-[13px] font-medium text-ink">
             <ListOrdered className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
             {fill(tr(S.legend), { h: PRIORITY_AGE_BUMP_HOURS })}
@@ -308,7 +331,7 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
                   <li key={c.id}>
                     <Link to={PATHS.officerCase(c.id)} className="flex items-center gap-2 rounded-[2px] bg-surface px-2.5 py-1.5 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-brand">
                       <Avatar initials={c.persona.initials} hue={c.persona.hue} size={22} />
-                      <span className="font-medium">{c.persona.name}</span>
+                      <span className="font-medium">{caseTitle(c)}</span>
                       <span className="flex gap-0.5">
                         {(c.route ? ROUTES[c.route].checks : []).map(id => {
                           const r = c.checks.find(k => k.id === id)
@@ -331,6 +354,7 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
             ['all', tr(C.all), queue.length],
             ['decision', tr(C.needsDecision), counts.decision],
             ['advanced', tr(C.advancedReviews), counts.advanced],
+            ['appeals', tr(C.navAppeals), counts.appeals],
           ] as const).map(([v, label, n]) => (
             <button
               key={v}
@@ -382,13 +406,13 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
           <div className="relative overflow-x-auto">
             <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-sm">
               <colgroup>
-                <col className="w-[25%]" />
-                <col className="w-[7%]" />
-                <col className="w-[11%]" />
-                <col className="w-[12%]" />
-                <col />
-                <col className="w-[15%]" />
+                <col className="w-[23%]" />
+                <col className="w-[8%]" />
                 <col className="w-[10%]" />
+                <col className="w-[14%]" />
+                <col />
+                <col className="w-[14%]" />
+                <col className="w-[9%]" />
               </colgroup>
               <caption className="sr-only">{tr(C.queueTitle)}</caption>
               <thead>
@@ -458,7 +482,7 @@ export function QueuePage({ preset }: { preset?: 'appeals' | 'advanced' } = {}) 
                     <Link to={PATHS.officerCase(c.id)} className={cn('flex items-center gap-3 rounded-[4px] border border-line bg-surface px-4 py-3 outline-none transition hover:shadow-sm focus-visible:ring-2 focus-visible:ring-brand', flashed.has(c.id) && 'ofc-flash')}>
                       <Avatar initials={c.persona.initials} hue={c.persona.hue} size={32} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{c.persona.name}</p>
+                        <p className="truncate text-sm font-semibold">{caseTitle(c)}</p>
                         <p className="truncate text-xs text-muted">
                           {waiting ? tr(C.waitingOnCitizen) : d ? `${tr(DECISION_LABEL[d.outcome])} · ${tr(C.by)} ${d.by.kind === 'system' ? tr({ en: 'engine', es: 'motor' }) : d.by.name}` : ''}
                         </p>

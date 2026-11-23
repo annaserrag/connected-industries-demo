@@ -1,24 +1,29 @@
-/* Screen 7 decision panel: approve, request info, refuse / revoke (closed reason list), video call. */
-import { useEffect, useRef, useState } from 'react'
+/* Screen 7 decision panel (SPEC §6): actions by context.
+ *  - first decision: Iniciar videollamada · Aprobar nivel básico · Pedir más información · Rechazar con motivo
+ *  - advanced review: Aprobar nivel avanzado · Pedir más información · Rechazar con motivo (advanced only)
+ *  - open review request: Aprobar · Pedir más información · Mantener la denegación — or, for the officer who
+ *    refused, a notice that another person decides (the core enforces it too).
+ * Only an officer refuses, always with a reason from the closed list REJ-01…08. */
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as RadioGroup from '@radix-ui/react-radio-group'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import {
-  Ban, BadgeCheck, CircleCheck, Gavel, Info, Lock, MessageSquareText, PhoneOff, Scale, Sparkles, Undo2, Video,
-} from 'lucide-react'
-import type { Case, RejectionReasonId } from '@/contract/types'
+import { Ban, BadgeCheck, Gavel, Lock, LogOut, MessageSquareText, PhoneOff, Scale, Sparkles, Undo2, UserRoundX, Video } from 'lucide-react'
+import type { Case, Lang, RejectionReasonId } from '@/contract/types'
 import { KEY_RULE, OFFICERS, REJECTION_REASONS } from '@/contract/seed'
+import { MSG, REJ_ORDER, fillMsg } from '@/contract/messages'
 import { PATHS } from '@/contract/api'
 import { actions, ClaveRuleError, useClave } from '@/core/store'
 import { Avatar, cn } from '@/ui'
-import { C, INFO_TEMPLATES } from './copy'
-import { canApproveKind, hasVideoCheck, needsVideoCall, reviewKind, suggestedReasons, useHotkeys, useLang, useTr } from './lib'
+import { C, K } from './copy'
+import { caseTitle, fill, onFallback, officerName, plainRuleError, rejCitizenText, reviewKind, useHotkeys, useLang, useTr } from './lib'
 import { TOASTER_ID } from './live'
-import { Btn, Dialog, Kbd } from './components/ui'
-import { FaceArt } from './components/FaceArt'
+import { Btn, Dialog } from './components/ui'
 
-function run(fn: () => void, onError: (msg: string) => void): boolean {
+type Fail = (msg: string) => void
+
+function run(fn: () => void, onError: Fail): boolean {
   try {
     fn()
     return true
@@ -31,77 +36,111 @@ function run(fn: () => void, onError: (msg: string) => void): boolean {
 export function DecisionPanel({ c }: { c: Case }) {
   const tr = useTr()
   const navigate = useNavigate()
-  const [dialog, setDialog] = useState<null | 'info' | 'refuse' | 'revoke' | 'video'>(null)
+  const me = useClave(s => s.officerId)
+  const [dialog, setDialog] = useState<null | 'info' | 'refuse' | 'uphold' | 'revoke'>(null)
+  const [docShown, setDocShown] = useState(false)
+  const [faceOk, setFaceOk] = useState(false)
+  useEffect(() => { setDocShown(false); setFaceOk(false) }, [c.id])
 
+  const kind = reviewKind(c)
   const awaiting = c.awaitingOfficer
-  const videoNeeded = needsVideoCall(c)
-  const approveKind = canApproveKind(c)
-  const canRevoke = c.level !== 'none'
-  const approveLabel = approveKind === 'basic' ? tr(C.grantBasic) : tr(C.grantAdvanced)
+  const call = c.session?.videoCall?.state
+  const fallback = onFallback(c)
+  const ownRefusal = kind === 'appeal' && c.appeal?.refusedBy === me
+  const firstDecision = awaiting && kind === 'decision'
+  const callLive = call === 'live'
+  const approveBlocked = firstDecision && ((fallback && call !== 'live' && call !== 'ended') || (callLive && !(docShown && faceOk)))
 
-  const whyDisabled = !awaiting
-    ? c.status === 'draft' ? tr(C.notAwaitingDraft)
-      : c.status === 'need_info' ? tr(C.notAwaitingNeedInfo)
-        : c.status === 'received' || c.status === 'checking' ? tr(C.notAwaitingChecking)
-          : tr(C.notAwaitingDone)
-    : null
-
-  const fail = (msg: string) => toast.error(tr(C.ruleError), { toasterId: TOASTER_ID, description: msg })
-  const done = (title: string, desc?: string) => {
-    toast.success(`${title}: ${c.persona.name}`, { toasterId: TOASTER_ID, description: desc ?? tr(C.citizenNotified) })
+  const fail: Fail = msg => toast.error(tr(C.ruleError), { toasterId: TOASTER_ID, description: tr(plainRuleError(msg)) })
+  const done = (title: string) => {
+    toast.success(`${title}: ${caseTitle(c)}`, { toasterId: TOASTER_ID, description: tr(K.approvedSent) })
     navigate(PATHS.officer)
   }
 
   const approve = () => {
-    if (!awaiting || videoNeeded) return
-    if (run(() => actions.officerApprove(c.id), fail)) done(`${tr(C.approvedToast)} · ${approveLabel}`)
+    if (!awaiting || ownRefusal || approveBlocked) return
+    const note = callLive || call === 'ended' ? (docShown && faceOk ? K.callNote.en : undefined) : undefined
+    const ok = run(() => {
+      if (kind === 'appeal') actions.officerDecideAppeal(c.id, 'approve')
+      else if (kind === 'advanced') actions.officerApproveAdvanced(c.id)
+      else actions.officerApproveBasic(c.id, note)
+    }, fail)
+    if (ok) done(kind === 'advanced' ? tr(C.grantAdvanced) : kind === 'appeal' ? tr(K.approveAppeal) : tr(C.grantBasic))
   }
+  const startCall = () => run(() => actions.officerStartVideoCall(c.id), fail)
+  const endCall = () => run(() => actions.officerEndVideoCall(c.id), fail)
 
   useHotkeys({
     a: approve,
-    i: () => awaiting && setDialog('info'),
-    r: () => awaiting && setDialog('refuse'),
+    i: () => awaiting && !ownRefusal && setDialog('info'),
+    r: () => awaiting && !ownRefusal && setDialog(kind === 'appeal' ? 'uphold' : 'refuse'),
   })
 
+  const whyDisabled = c.status === 'draft' ? tr(C.notAwaitingDraft)
+    : c.status === 'need_info' ? tr(C.notAwaitingNeedInfo)
+      : c.status === 'received' || c.status === 'checking' ? tr(C.notAwaitingChecking)
+        : tr(C.notAwaitingDone)
+
+  const approveLabel = kind === 'appeal' ? tr(K.approveAppeal) : kind === 'advanced' ? tr(C.grantAdvanced) : tr(C.grantBasic)
+  const other = OFFICERS.find(o => o.id !== c.appeal?.refusedBy && (o.id === 'OF-DEMO-07' || o.id === 'OF-DEMO-12'))
+
   return (
-    <aside aria-labelledby="decision-title" className="rounded-[4px] border border-line bg-surface shadow-[0_8px_30px_-12px_rgba(16,16,20,0.18)]">
+    <aside aria-labelledby="decision-title" data-testid="decision-panel" className="rounded-[4px] border border-line bg-surface shadow-[0_8px_30px_-12px_rgba(16,16,20,0.18)]">
       <div className="border-b border-line px-5 pt-4 pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 id="decision-title" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight"><Gavel className="size-4 text-muted" aria-hidden />{tr(C.decision)}</h2>
           {awaiting
             ? <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand"><span className="size-1.5 rounded-full bg-brand" aria-hidden />{tr(C.awaitingYou)}</span>
             : <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted"><Lock className="size-3" aria-hidden />{tr(C.notAwaiting)}</span>}
         </div>
         <p className="mt-2 text-sm text-muted" aria-live="polite">
-          {awaiting ? (reviewKind(c) === 'advanced' ? tr(C.advancedReviewKind) : tr(C.decisionKind)) : whyDisabled}
+          {!awaiting ? whyDisabled : kind === 'appeal' ? tr(K.decideAppeal) : kind === 'advanced' ? tr(K.decideAdvanced) : tr(K.decideFirst)}
         </p>
       </div>
 
       <div className="space-y-3 px-5 py-4">
-        {/* Fallback: video call first */}
-        {awaiting && hasVideoCheck(c) && (
-          videoNeeded ? (
-            <div className="rounded-[2px] border border-sim/25 bg-sim-soft/60 p-3">
-              <p className="flex items-start gap-2 text-sm text-ink"><Video className="mt-0.5 size-4 shrink-0 text-sim" aria-hidden />{tr(C.videoFirst)}</p>
-              <Btn variant="primary" className="mt-3 w-full bg-sim" onClick={() => setDialog('video')}>
-                <Video className="size-4" aria-hidden />{tr(C.startVideo)}
+        {awaiting && ownRefusal ? (
+          <div role="alert" data-testid="second-officer-notice" className="rounded-[2px] border-2 border-warning/50 bg-warning-soft p-4">
+            <p className="flex items-center gap-2 text-[15px] font-bold text-ink"><UserRoundX className="size-5 text-warning" aria-hidden />{tr(K.ownRefusalTitle)}</p>
+            <p className="mt-1.5 text-sm text-ink">{fill(tr(K.ownRefusalBody), { reason: c.appeal?.refusedReasonId ? `${c.appeal.refusedReasonId} · ${tr(REJECTION_REASONS[c.appeal.refusedReasonId].officerLabel)}` : '' })}</p>
+            <p className="mt-2 text-sm font-bold text-ink">{fill(tr(K.ownRefusalCta), { name: other?.name ?? 'Andrés Ortiz' })}</p>
+            <Btn variant="secondary" className="mt-3 w-full" onClick={() => { actions.officerSignOut(); navigate(PATHS.officer) }}>
+              <LogOut className="size-4" aria-hidden />{tr(K.switchUser)}
+            </Btn>
+          </div>
+        ) : awaiting ? (
+          <>
+            {firstDecision && (
+              <VideoCallBox
+                c={c}
+                required={fallback}
+                docShown={docShown}
+                faceOk={faceOk}
+                setDocShown={setDocShown}
+                setFaceOk={setFaceOk}
+                onStart={startCall}
+                onEnd={endCall}
+              />
+            )}
+            <Btn variant="success" size="lg" className="w-full" disabled={approveBlocked} onClick={approve} kbd="A" aria-keyshortcuts="A" data-testid="btn-approve">
+              <BadgeCheck className="size-[18px]" aria-hidden />{approveLabel}
+            </Btn>
+            {approveBlocked && callLive && <p className="text-center text-xs text-muted">{tr(K.callTickBoth)}</p>}
+            <Btn variant="secondary" size="lg" className="w-full" onClick={() => setDialog('info')} kbd="I" aria-keyshortcuts="I" data-testid="btn-info">
+              <MessageSquareText className="size-[18px]" aria-hidden />{tr(C.requestInfo)}
+            </Btn>
+            {kind === 'appeal' ? (
+              <Btn variant="dangerOutline" size="lg" className="w-full" onClick={() => setDialog('uphold')} kbd="R" aria-keyshortcuts="R" data-testid="btn-uphold">
+                <Scale className="size-[18px]" aria-hidden />{tr(K.uphold)}
               </Btn>
-            </div>
-          ) : (
-            <p className="flex items-start gap-2 rounded-[2px] bg-success-soft p-3 text-sm text-success"><CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />{tr(C.videoDone)}</p>
-          )
-        )}
-
-        <Btn variant="success" size="lg" className="w-full" disabled={!awaiting || videoNeeded} onClick={approve} kbd="A" aria-keyshortcuts="A">
-          <BadgeCheck className="size-[18px]" aria-hidden />{approveLabel}
-        </Btn>
-        <Btn variant="secondary" size="lg" className="w-full" disabled={!awaiting} onClick={() => setDialog('info')} kbd="I" aria-keyshortcuts="I">
-          <MessageSquareText className="size-[18px]" aria-hidden />{tr(C.requestInfo)}
-        </Btn>
-        <Btn variant="dangerOutline" size="lg" className="w-full" disabled={!awaiting} onClick={() => setDialog('refuse')} kbd="R" aria-keyshortcuts="R">
-          <Ban className="size-[18px]" aria-hidden />{tr(C.refuse)}
-        </Btn>
-        {canRevoke && (
+            ) : (
+              <Btn variant="dangerOutline" size="lg" className="w-full" onClick={() => setDialog('refuse')} kbd="R" aria-keyshortcuts="R" data-testid="btn-refuse">
+                <Ban className="size-[18px]" aria-hidden />{tr(C.refuse)}
+              </Btn>
+            )}
+          </>
+        ) : null}
+        {c.level !== 'none' && !(awaiting && kind === 'appeal') && (
           <div className="pt-1">
             <Btn variant="ghost" size="md" className="w-full text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setDialog('revoke')}>
               <Undo2 className="size-4" aria-hidden />{tr(C.revoke)}
@@ -111,258 +150,229 @@ export function DecisionPanel({ c }: { c: Case }) {
         )}
       </div>
 
-      <div className="rounded-b-2xl border-t border-line bg-canvas/70 px-5 py-4">
+      <div className="rounded-b-[4px] border-t border-line bg-canvas/70 px-5 py-4">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] text-muted uppercase"><Scale className="size-3.5" aria-hidden />{tr(C.keyRule)}</p>
         <p className="mt-1.5 text-[13px] leading-snug text-ink">{tr(KEY_RULE)}</p>
       </div>
 
       <InfoDialog c={c} open={dialog === 'info'} onOpenChange={o => setDialog(o ? 'info' : null)} onDone={() => done(tr(C.infoToast))} onFail={fail} />
       <ReasonDialog c={c} mode="refuse" open={dialog === 'refuse'} onOpenChange={o => setDialog(o ? 'refuse' : null)} onDone={() => done(tr(C.refusedToast))} onFail={fail} />
+      <ReasonDialog c={c} mode="uphold" open={dialog === 'uphold'} onOpenChange={o => setDialog(o ? 'uphold' : null)} onDone={() => done(tr(K.uphold))} onFail={fail} />
       <ReasonDialog c={c} mode="revoke" open={dialog === 'revoke'} onOpenChange={o => setDialog(o ? 'revoke' : null)} onDone={() => done(tr(C.revokedToast))} onFail={fail} />
-      <VideoCallDialog c={c} open={dialog === 'video'} onOpenChange={o => setDialog(o ? 'video' : null)} onFail={fail} />
     </aside>
   )
 }
 
-/* ---------------------------------------------------------- info request */
-function InfoDialog({ c, open, onOpenChange, onDone, onFail }: { c: Case; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void; onFail: (m: string) => void }) {
+/* ------------------------------------------------------------ video call */
+function VideoCallBox({ c, required, docShown, faceOk, setDocShown, setFaceOk, onStart, onEnd }: {
+  c: Case; required: boolean; docShown: boolean; faceOk: boolean
+  setDocShown: (v: boolean) => void; setFaceOk: (v: boolean) => void; onStart: () => void; onEnd: () => void
+}) {
   const tr = useTr()
-  const [text, setText] = useState('')
-  useEffect(() => { if (open) setText('') }, [open])
-  const ok = text.trim().length >= 10
+  const me = useClave(s => s.officerId)
+  const v = c.session?.videoCall
+  const state = v?.state
+  const myName = officerName(me)
+  const [secs, setSecs] = useState(0)
+  useEffect(() => {
+    if (state !== 'live') return
+    const start = v?.startedAt ? new Date(v.startedAt).getTime() : Date.now()
+    const tick = () => setSecs(Math.max(0, Math.round((Date.now() - start) / 1000)))
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [state, v?.startedAt])
+  const mmss = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
+
+  if (state === 'live') {
+    return (
+      <section data-testid="officer-call-panel" aria-label={tr(K.callLive)} className="overflow-hidden rounded-[2px] bg-[#0f1117] text-white">
+        <div className="relative aspect-[4/3]">
+          {/* Placeholder citizen tile: a neutral silhouette, never a real face. */}
+          <svg viewBox="0 0 160 120" className="absolute inset-0 h-full w-full" role="img" aria-label={tr(K.callCitizenTile)}>
+            <rect width="160" height="120" fill="#1d2130" />
+            <circle cx="80" cy="48" r="20" fill="#3a4157" />
+            <path d="M40 120c4-26 20-40 40-40s36 14 40 40z" fill="#3a4157" />
+          </svg>
+          <span className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold">
+            <span className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />{tr(K.callLive)} · <span className="tabular-nums">{mmss}</span>
+          </span>
+          <span className="absolute bottom-2 left-2 rounded bg-black/55 px-1.5 py-0.5 text-[11px]">{caseTitle(c)}</span>
+          <div className="absolute right-2 bottom-2 grid h-14 w-20 place-items-center rounded-[2px] bg-[#2a3044] ring-1 ring-white/20">
+            <Avatar initials={myName.split(' ').map(p => p[0]).join('') || 'EP'} hue={226} size={28} />
+            <span className="absolute bottom-0.5 left-1 text-[9px] text-white/75">{tr(C.you)}</span>
+          </div>
+        </div>
+        <div className="space-y-2 p-3 text-sm">
+          {([[docShown, setDocShown, K.callDocShown, 'call-doc'], [faceOk, setFaceOk, K.callFaceMatches, 'call-face']] as const).map(([val, set, label, id]) => (
+            <label key={id} className="flex cursor-pointer items-center gap-2.5">
+              <input type="checkbox" data-testid={id} checked={val} onChange={e => set(e.target.checked)} className="size-4 accent-[#12b76a]" />
+              {tr(label)}
+            </label>
+          ))}
+          <Btn variant="danger" className="mt-1 w-full" onClick={onEnd} data-testid="btn-end-call"><PhoneOff className="size-4" aria-hidden />{tr(K.callEnd)}</Btn>
+        </div>
+      </section>
+    )
+  }
+  if (state === 'ended') {
+    return (
+      <p className="flex items-start gap-2 rounded-[2px] bg-success-soft p-3 text-sm text-success" data-testid="call-ended">
+        <Video className="mt-0.5 size-4 shrink-0" aria-hidden />{tr(K.callEnded)}{v?.officerName ? ` · ${v.officerName}` : ''}
+      </p>
+    )
+  }
+  return (
+    <div className={cn('rounded-[2px] border p-3', required ? 'border-sim/40 bg-sim-soft/60' : 'border-line bg-canvas/60')}>
+      <p className="flex items-start gap-2 text-sm text-ink">
+        <Video className={cn('mt-0.5 size-4 shrink-0', required ? 'text-sim' : 'text-muted')} aria-hidden />
+        <span>{tr(required ? K.callRequired : K.callOptional)}{state === 'waiting' && <><br /><b>{tr(K.callWaiting)}</b></>}</span>
+      </p>
+      <Btn variant={required ? 'primary' : 'secondary'} className={cn('mt-3 w-full', required && 'bg-sim')} onClick={onStart} data-testid="btn-start-call">
+        <Video className="size-4" aria-hidden />{tr(K.startCall)}
+      </Btn>
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------- info request */
+function InfoDialog({ c, open, onOpenChange, onDone, onFail }: { c: Case; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void; onFail: Fail }) {
+  const tr = useTr()
+  const lang = useLang()
+  const [what, setWhat] = useState('')
+  const [why, setWhy] = useState('')
+  useEffect(() => { if (open) { setWhat(''); setWhy('') } }, [open])
+  const ok = what.trim().length >= 5
   const submit = () => {
     if (!ok) return
-    if (run(() => actions.officerRequestInfo(c.id, text.trim()), onFail)) { onOpenChange(false); onDone() }
+    if (run(() => actions.officerRequestInfo(c.id, what.trim(), why.trim() || undefined), onFail)) { onOpenChange(false); onDone() }
   }
+  const msg = MSG['COR-01']
+  const preview = (l: Lang) => fillMsg(msg[l], {
+    whatWeNeed: what.trim() || (l === 'es' ? '[lo que necesitamos]' : '[what we need]'),
+    reason: why.trim() || (l === 'es' ? '[motivo]' : '[reason]'),
+  })
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={tr(C.infoDialogTitle)}
-      description={tr(C.infoDialogBody)}
+      wide
+      title={<span className="flex items-center gap-2"><MessageSquareText className="size-5 text-brand" aria-hidden />{tr(K.infoTitle)} · {caseTitle(c)}</span>}
+      description={tr(K.infoBody)}
       footer={<>
-        <Btn variant="ghost" onClick={() => onOpenChange(false)}>{tr(C.cancel)}</Btn>
-        <Btn variant="primary" disabled={!ok} onClick={submit}><MessageSquareText className="size-4" aria-hidden />{tr(C.send)}</Btn>
+        <Btn variant="ghost" onClick={() => onOpenChange(false)}>{tr(K.cancel)}</Btn>
+        <Btn variant="primary" disabled={!ok} onClick={submit} data-testid="info-send"><MessageSquareText className="size-4" aria-hidden />{tr(K.send)}</Btn>
       </>}
     >
-      <p className="text-xs font-semibold text-muted">{tr(C.quickTemplates)}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {INFO_TEMPLATES.map(t => (
-          <button
-            key={t.label.en}
-            type="button"
-            onClick={() => setText(tr(t.text))}
-            className="rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium outline-none hover:border-brand hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            {tr(t.label)}
-          </button>
-        ))}
+      <div className="grid gap-6 md:grid-cols-2">
+        <div>
+          <label htmlFor="info-what" className="block text-sm font-semibold">{tr(K.infoWhat)} <span className="text-danger" aria-hidden>*</span></label>
+          <textarea id="info-what" value={what} onChange={e => setWhat(e.target.value)} rows={3} placeholder={tr(K.infoWhatPh)}
+            className="mt-1.5 w-full resize-y rounded-[2px] border border-line bg-surface p-3 text-sm outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30" />
+          <label htmlFor="info-why" className="mt-3 block text-sm font-semibold">{tr(K.infoWhy)}</label>
+          <textarea id="info-why" value={why} onChange={e => setWhy(e.target.value)} rows={2} placeholder={tr(K.infoWhyPh)}
+            className="mt-1.5 w-full resize-y rounded-[2px] border border-line bg-surface p-3 text-sm outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30" />
+          <p className="mt-2 text-xs text-muted">{tr(msg.example as { en: string; es: string })}</p>
+        </div>
+        <div aria-live="polite" data-testid="info-preview">
+          <p className="text-sm font-semibold">{tr(K.preview)}</p>
+          <div className="mt-2 rounded-[2px] border border-line bg-canvas p-4" lang={lang}>
+            <p className="text-[15px] font-bold text-ink">{tr(msg.title!)}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-ink">{preview(lang)}</p>
+            <span className="mt-3 inline-flex rounded-[2px] bg-brand px-3 py-1.5 text-xs font-bold text-brand-ink">{tr(msg.button!)}</span>
+          </div>
+        </div>
       </div>
-      <label htmlFor="info-msg" className="mt-4 block text-sm font-semibold">{tr(C.message)}</label>
-      <textarea
-        id="info-msg"
-        value={text}
-        onChange={e => setText(e.target.value)}
-        rows={5}
-        aria-describedby="info-hint"
-        className="mt-1.5 w-full resize-y rounded-[2px] border border-line bg-surface p-3 text-sm outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30"
-        placeholder={tr(INFO_TEMPLATES[0].text)}
-      />
-      <p id="info-hint" className="mt-1 text-xs text-muted">{ok ? `${text.trim().length}` : tr(C.minChars)}</p>
     </Dialog>
   )
 }
 
-/* ------------------------------------------------- refuse / revoke dialog */
+/* ------------------------------------------------ refuse / uphold / revoke */
 function ReasonDialog({ c, mode, open, onOpenChange, onDone, onFail }: {
-  c: Case; mode: 'refuse' | 'revoke'; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void; onFail: (m: string) => void
+  c: Case; mode: 'refuse' | 'uphold' | 'revoke'; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void; onFail: Fail
 }) {
   const tr = useTr()
-  const [reason, setReason] = useState<RejectionReasonId | ''>('')
+  const lang = useLang()
+  const preselect: RejectionReasonId | '' = mode === 'uphold' ? (c.appeal?.refusedReasonId ?? '') : mode === 'refuse' ? (c.suggestedReason ?? '') : ''
+  const [reason, setReason] = useState<RejectionReasonId | ''>(preselect)
   const [note, setNote] = useState('')
-  useEffect(() => { if (open) { setReason(''); setNote('') } }, [open])
-  const hints = suggestedReasons(c)
-  const r = reason ? REJECTION_REASONS[reason] : null
+  useEffect(() => { if (open) { setReason(preselect); setNote('') } }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const confirm = () => {
     if (!reason) return
     const n = note.trim() || undefined
-    const ok = run(() => (mode === 'refuse' ? actions.officerRefuse(c.id, reason, n) : actions.officerRevoke(c.id, reason, n)), onFail)
+    const ok = run(() => {
+      if (mode === 'refuse') actions.officerRefuse(c.id, reason, n)
+      else if (mode === 'uphold') actions.officerDecideAppeal(c.id, 'uphold', reason, n)
+      else actions.officerRevoke(c.id, reason, n)
+    }, onFail)
     if (ok) { onOpenChange(false); onDone() }
   }
-  const partial = mode === 'refuse' && c.level === 'basic'
+  const advancedOnly = mode === 'refuse' && c.level === 'basic'
+  const title = mode === 'uphold' ? tr(K.upholdTitle) : mode === 'revoke' ? tr(C.revokeTitle) : tr(K.refuseTitle)
+  const Icon = mode === 'revoke' ? Undo2 : mode === 'uphold' ? Scale : Ban
+  const head = MSG[mode === 'uphold' ? 'COR-07' : 'STA-5'] as unknown as { en: string; es: string; title?: { en: string; es: string } }
 
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
       wide
-      title={<span className="flex items-center gap-2">{mode === 'refuse' ? <Ban className="size-5 text-danger" aria-hidden /> : <Undo2 className="size-5 text-danger" aria-hidden />}{mode === 'refuse' ? tr(C.refuseTitle) : tr(C.revokeTitle)} · {c.persona.name}</span>}
-      description={tr(C.refuseBody)}
+      title={<span className="flex items-center gap-2"><Icon className="size-5 text-danger" aria-hidden />{title} · {caseTitle(c)}</span>}
+      description={tr(mode === 'uphold' ? K.upholdBody : K.refuseBody)}
       footer={<>
         {!reason && <span id="reason-needed" className="mr-auto text-sm text-muted">{tr(C.pickReason)}</span>}
-        <Btn variant="ghost" onClick={() => onOpenChange(false)}>{tr(C.cancel)}</Btn>
-        <Btn variant="danger" disabled={!reason} aria-describedby={!reason ? 'reason-needed' : undefined} onClick={confirm}>
-          {mode === 'refuse' ? <Ban className="size-4" aria-hidden /> : <Undo2 className="size-4" aria-hidden />}
-          {mode === 'refuse' ? tr(C.confirmRefuse) : tr(C.confirmRevoke)}
+        <Btn variant="ghost" onClick={() => onOpenChange(false)}>{tr(K.cancel)}</Btn>
+        <Btn variant="danger" disabled={!reason} aria-describedby={!reason ? 'reason-needed' : undefined} onClick={confirm} data-testid="reason-confirm">
+          <Icon className="size-4" aria-hidden />
+          {mode === 'uphold' ? tr(K.confirmUphold) : mode === 'revoke' ? tr(C.confirmRevoke) : tr(K.confirmRefuse)}
         </Btn>
       </>}
     >
-      {partial && (
-        <p className="mb-4 flex items-start gap-2 rounded-[2px] bg-info-soft p-3 text-sm text-info">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {tr({ en: 'The basic level stays granted: this refuses only the advanced level.', es: 'El nivel básico se mantiene: esto deniega solo el nivel avanzado.' })}
-        </p>
-      )}
+      {advancedOnly && <p className="mb-4 rounded-[2px] bg-info-soft p-3 text-sm text-info">{tr(K.advancedOnly)}</p>}
       <div className="grid gap-6 md:grid-cols-[1fr_1.1fr]">
         <div>
           <p id="reason-label" className="text-sm font-semibold">{tr(C.reasonRequired)} <span className="text-danger" aria-hidden>*</span></p>
-          <RadioGroup.Root
-            value={reason}
-            onValueChange={v => setReason(v as RejectionReasonId)}
-            aria-labelledby="reason-label"
-            aria-required
-            className="mt-2 space-y-1.5"
-          >
-            {Object.values(REJECTION_REASONS).map(rr => (
-              <RadioGroup.Item
-                key={rr.id}
-                value={rr.id}
-                className={cn(
-                  'group flex w-full items-center gap-3 rounded-[2px] border px-3 py-2.5 text-left text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-brand',
-                  reason === rr.id ? 'border-danger bg-danger-soft/60' : 'border-line hover:bg-canvas',
-                )}
-              >
-                <span className={cn('grid size-4 shrink-0 place-items-center rounded-full border-2', reason === rr.id ? 'border-danger' : 'border-muted/50')}>
-                  <RadioGroup.Indicator className="size-2 rounded-full bg-danger" />
-                </span>
-                <span className="flex-1 font-medium">{tr(rr.officerLabel)}</span>
-                {hints.has(rr.id) && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-sim-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-sim"><Sparkles className="size-3" aria-hidden />{tr(C.suggested)}</span>
-                )}
-              </RadioGroup.Item>
-            ))}
+          <RadioGroup.Root value={reason} onValueChange={v => setReason(v as RejectionReasonId)} aria-labelledby="reason-label" aria-required className="mt-2 space-y-1.5">
+            {REJ_ORDER.map(id => {
+              const rr = REJECTION_REASONS[id]
+              const sel = reason === id
+              return (
+                <RadioGroup.Item key={id} value={id} data-testid={`reason-${id}`}
+                  className={cn('group flex w-full items-start gap-3 rounded-[2px] border px-3 py-2 text-left text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-brand', sel ? 'border-danger bg-danger-soft/60' : 'border-line hover:bg-canvas')}>
+                  <span className={cn('mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border-2', sel ? 'border-danger' : 'border-muted/50')}>
+                    <RadioGroup.Indicator className="size-2 rounded-full bg-danger" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-mono text-[11px] font-bold text-muted">{id}</span>{' '}
+                    <span className="font-medium">{tr(rr.officerLabel)}</span>
+                    <span className="block text-[11.5px] leading-snug text-muted">{tr(rr.when)}</span>
+                  </span>
+                  {c.suggestedReason === id && mode !== 'revoke' && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sim-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-sim"><Sparkles className="size-3" aria-hidden />{tr(K.suggestedByEngine)}</span>
+                  )}
+                </RadioGroup.Item>
+              )
+            })}
           </RadioGroup.Root>
-          <label htmlFor="ref-note" className="mt-4 block text-xs font-semibold text-muted">{tr(C.internalNote)}</label>
+          <label htmlFor="ref-note" className="mt-4 block text-xs font-semibold text-muted">{tr(K.noteLabel)}</label>
           <textarea id="ref-note" value={note} onChange={e => setNote(e.target.value)} rows={2} className="mt-1 w-full resize-y rounded-[2px] border border-line p-2.5 text-sm outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30" />
         </div>
-
-        <div aria-live="polite">
-          <p className="text-sm font-semibold">{tr(C.citizenWillSee)}</p>
-          {r ? (
-            <motion.div key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-2 space-y-2.5">
-              {(['en', 'es'] as const).map(l => (
-                <div key={l} lang={l} className="rounded-[2px] border border-line bg-canvas p-3.5">
-                  <p className="text-[10.5px] font-bold tracking-[0.08em] text-muted uppercase">{l === 'en' ? tr(C.englishVersion) : tr(C.spanishVersion)}</p>
-                  <p className="mt-1.5 text-sm font-semibold text-ink">{r.citizenMessage[l]}</p>
-                  <p className="mt-1 text-[13px] text-muted"><span className="font-semibold text-ink/80">{l === 'en' ? 'How to fix it' : 'Cómo corregirlo'}:</span> {r.howToFix[l]}</p>
-                </div>
-              ))}
-              <div className="flex items-center gap-3 rounded-[2px] border border-dashed border-line p-3 text-[13px] text-muted">
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-[2px] bg-ink px-2.5 py-1 text-xs font-semibold text-white"><Scale className="size-3" aria-hidden />{tr({ en: 'Appeal', es: 'Recurrir' })}</span>
-                {tr(C.appealButtonNote)}
-              </div>
+        <div aria-live="polite" data-testid="citizen-preview">
+          <p className="text-sm font-semibold">{fill(tr(mode === 'uphold' ? K.citizenSeesUphold : K.citizenSees), { id: reason || 'REJ-0x' })}</p>
+          {reason ? (
+            <motion.div key={reason} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-2 rounded-[2px] border border-line bg-canvas p-4" lang={lang}>
+              {advancedOnly ? null : <>
+                {head.title && <p className="text-[15px] font-bold text-ink">{tr(head.title)}</p>}
+                <p className="mt-1 text-[13px] text-muted">{fillMsg(head[lang], { reason: REJECTION_REASONS[reason].officerLabel[lang], legal: mode === 'uphold' ? (MSG['COR-07'].legal as { en: string; es: string })[lang] : '' })}</p>
+              </>}
+              <p className="mt-2 text-sm leading-relaxed text-ink">{rejCitizenText(c, reason, lang)}</p>
+              <span className="mt-3 inline-flex rounded-[2px] bg-ink px-2.5 py-1 text-xs font-semibold text-white">{tr({ en: 'Ask for a review', es: 'Pedir una revisión' })}</span>
             </motion.div>
           ) : (
-            <div className="mt-2 grid h-[calc(100%-1.75rem)] min-h-48 place-items-center rounded-[2px] border border-dashed border-line p-6 text-center text-sm text-muted">{tr(C.pickReason)}</div>
+            <div className="mt-2 grid min-h-48 place-items-center rounded-[2px] border border-dashed border-line p-6 text-center text-sm text-muted">{tr(C.pickReason)}</div>
           )}
         </div>
       </div>
-    </Dialog>
-  )
-}
-
-/* ------------------------------------------------------ video call (sim) */
-function VideoCallDialog({ c, open, onOpenChange, onFail }: { c: Case; open: boolean; onOpenChange: (o: boolean) => void; onFail: (m: string) => void }) {
-  const tr = useTr()
-  const lang = useLang()
-  const [phase, setPhase] = useState<'connecting' | 'verifying' | 'done'>('connecting')
-  const [secs, setSecs] = useState(0)
-  const timers = useRef<number[]>([])
-
-  useEffect(() => {
-    const clear = () => { timers.current.forEach(id => window.clearTimeout(id)); timers.current = [] }
-    if (!open) { clear(); return }
-    setPhase('connecting'); setSecs(0)
-    timers.current.push(window.setTimeout(() => setPhase('verifying'), 1100))
-    timers.current.push(window.setTimeout(() => {
-      if (run(() => actions.officerCompleteVideoCall(c.id), onFail)) setPhase('done')
-      else onOpenChange(false)
-    }, 1100 + 3000))
-    const tick = window.setInterval(() => setSecs(s => s + 1), 1000)
-    return () => { clear(); window.clearInterval(tick) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, c.id])
-
-  const mmss = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
-  const officerId = useClave(s => s.officerId)
-  const officerName = OFFICERS.find(o => o.id === officerId)?.name ?? ''
-  const officerInitials = officerName.split(' ').map(p => p[0]).join('') || 'OF'
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      wide
-      dark
-      title={<span className="flex items-center gap-2"><Video className="size-5 text-white/70" aria-hidden />{tr(C.callTitle)} · {c.persona.name}</span>}
-      description={tr(C.callNote)}
-      footer={phase === 'done'
-        ? <Btn variant="success" onClick={() => onOpenChange(false)} autoFocus><CircleCheck className="size-4" aria-hidden />{tr(C.callBack)}</Btn>
-        : <Btn variant="danger" onClick={() => onOpenChange(false)}><PhoneOff className="size-4" aria-hidden />{tr(C.callEnd)}</Btn>}
-    >
-      <div className="relative overflow-hidden rounded-[4px] bg-black/60 ring-1 ring-white/10">
-        <div className="relative mx-auto aspect-video max-h-[46vh]">
-          <FaceArt hue={c.persona.hue} initials={c.persona.initials} variant={phase === 'connecting' ? 'empty' : 'live'} label={c.persona.name} className="absolute inset-0 h-full w-full object-cover text-white/40 [&]:h-full" />
-          {/* document held to camera */}
-          {phase !== 'connecting' && (
-            <motion.div
-              initial={{ opacity: 0, y: 30, rotate: -6 }}
-              animate={{ opacity: 1, y: 0, rotate: -4 }}
-              className="absolute bottom-6 left-6 w-44 overflow-hidden rounded-[2px] bg-gradient-to-br from-[#f3efe6] to-[#d9d2c2] p-2.5 text-[9px] text-[#3b372f] shadow-xl"
-              aria-hidden
-            >
-              <div className="flex gap-2">
-                <div className="h-12 w-9 rounded bg-[#bdb6a8]" />
-                <div className="flex-1 space-y-1 pt-0.5">
-                  <div className="h-1.5 w-full rounded bg-[#a39d90]" />
-                  <div className="h-1.5 w-3/4 rounded bg-[#a39d90]" />
-                  <p className="font-mono text-[8px]">{c.document.number}</p>
-                </div>
-              </div>
-              {phase === 'verifying' && <motion.div className="absolute inset-x-0 h-0.5 bg-[#12b76a] shadow-[0_0_12px_#12b76a]" initial={{ top: '0%' }} animate={{ top: ['0%', '100%', '0%'] }} transition={{ duration: 1.6, repeat: Infinity }} />}
-            </motion.div>
-          )}
-          {/* officer PIP */}
-          <div className="absolute top-4 right-4 grid h-24 w-32 place-items-center rounded-[2px] bg-[#1d2130] ring-1 ring-white/15">
-            <Avatar initials={officerInitials} hue={226} size={44} />
-            <span className="absolute bottom-1.5 left-2 text-[10px] font-medium text-white/70">{tr(C.you)} · {officerName}</span>
-          </div>
-          <div className="absolute top-4 left-4 flex items-center gap-2 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
-            <span className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />
-            <span className="tabular-nums">{mmss}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-[2px] bg-white/5 p-4 ring-1 ring-white/10" role="status" aria-live="polite">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          {phase === 'done'
-            ? <CircleCheck className="size-4 text-[#12b76a]" aria-hidden />
-            : <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden />}
-          {phase === 'connecting' ? tr(C.callConnecting) : phase === 'verifying' ? tr(C.callVerifying) : tr(C.callDone)}
-        </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <motion.div
-            className={cn('h-full rounded-full', phase === 'done' ? 'bg-[#12b76a]' : 'bg-white/80')}
-            initial={{ width: '0%' }}
-            animate={{ width: phase === 'connecting' ? '15%' : '100%' }}
-            transition={{ duration: phase === 'verifying' ? 3 : 0.8, ease: 'linear' }}
-          />
-        </div>
-        {phase === 'done' && <p className="mt-2 text-sm text-white/70">{tr(C.callDoneBody)}</p>}
-        {phase !== 'done' && <p className="mt-2 font-mono text-[11px] text-white/45">{c.document.number} · {c.document.issuingCountry} · {new Date(c.document.expires).toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-GB')}</p>}
-      </div>
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/45"><Kbd className="border-white/15 bg-white/10 text-white/70">Esc</Kbd>{tr(C.callEnd)}</p>
     </Dialog>
   )
 }

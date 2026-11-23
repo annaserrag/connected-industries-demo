@@ -7,7 +7,7 @@ import type { Case } from '@/contract/types'
 import { PATHS } from '@/contract/api'
 import { useClave } from '@/core/store'
 import { C } from './copy'
-import { useTr } from './lib'
+import { caseTitle, useTr } from './lib'
 
 interface LiveState {
   arrived: Set<string>
@@ -52,15 +52,15 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       for (const id of newIds) {
         const c = cases[id]
         const kind = c.appeal?.state === 'open'
-          ? { en: 'Appeal filed', es: 'Recurso presentado' }
+          ? { en: 'Review requested', es: 'Revisión solicitada' }
           : c.infoRequest?.response
             ? { en: 'Citizen answered', es: 'La persona respondió' }
             : C.newCase
-        const msg = `${tr(kind)}: ${c.persona.name}`
+        const msg = `${tr(kind)}: ${caseTitle(c)}`
         setAnnounce(msg)
         toast(msg, {
           toasterId: TOASTER_ID,
-          description: c.flags[0] ? tr(c.flags[0].reason) : undefined,
+          description: c.aiReason ? tr(c.aiReason) : c.flags[0] ? tr(c.flags[0].reason) : undefined,
           action: { label: tr(C.open), onClick: () => navigate(PATHS.officerCase(id)) },
           duration: 6000,
         })
@@ -70,7 +70,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       setFlashed(s => new Set([...s, ...changedIds]))
       window.setTimeout(() => setFlashed(s => { const n = new Set(s); changedIds.forEach(i => n.delete(i)); return n }), 1800)
       const c = cases[changedIds[0]]
-      if (c.awaitingOfficer || c.status === 'checking' || c.status === 'received') setAnnounce(`${tr(C.caseUpdated)}: ${c.persona.name}`)
+      if (c.awaitingOfficer || c.status === 'checking' || c.status === 'received') setAnnounce(`${tr(C.caseUpdated)}: ${caseTitle(c)}`)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cases])
