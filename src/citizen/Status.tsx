@@ -11,7 +11,9 @@ import { actions } from '@/core/store'
 import { fieldLabel } from '@/core/engine'
 import { LiveIndicator, useRecentRemote } from '@/core/LiveIndicator'
 import type { Case, Decision, StatusId } from '@/contract/types'
-import { GLOSSARY, MSG, REJ_REASONS, fillMsg, type MsgId } from '@/contract/messages'
+import { GLOSSARY, MSG, fillMsg, type MsgId } from '@/contract/messages'
+import { citizenReasonShort, offersVideoAfterRefusal } from '@/core/refuseRules'
+import type { RejId } from '@/contract/types'
 import { ROUTES, STATUSES, STATUS_ORDER, citizenStatus, fullName, statusMsgId } from '@/contract/seed'
 import { C, fill } from './copy'
 import { BigButton, LiveToast, Modal } from './components/basics'
@@ -287,7 +289,7 @@ function SmsMockup({ c }: { c: Case }) {
 
 /** The advanced level alone was refused: the basic level stays, the reason is shown and a review can be asked for. */
 function AdvancedRefusal({ c }: { c: Case }) {
-  const { tr } = useTr()
+  const { tr, lang } = useTr()
   const [form, setForm] = useState(false)
   const d = lastRefusal(c)
   if (!d || d.scope !== 'advanced' || c.level !== 'basic') return null
@@ -298,7 +300,7 @@ function AdvancedRefusal({ c }: { c: Case }) {
     <section className="space-y-3 rounded-card border border-danger/40 bg-surface p-4" data-testid="advanced-refused" data-reason={reasonId}>
       <h3 className="font-display text-[18px] font-bold text-ink">{tr({ en: 'Advanced level not approved', es: 'Nivel avanzado no aprobado' })}</h3>
       <p className="text-[15px] text-muted">{tr({ en: 'Your basic level stays active.', es: 'Tu nivel básico sigue activo.' })}</p>
-      {dismissed && reasonId && <MsgBlock id="COR-07" tone="danger" vars={{ reason: tr(REJ_REASONS[reasonId].officerLabel), legal: tr(MSG['COR-07'].legal) }} />}
+      {dismissed && reasonId && <MsgBlock id="COR-07" tone="danger" vars={{ reason: citizenReasonShort(reasonId as RejId, lang), legal: tr(MSG['COR-07'].legal) }} />}
       {reasonId && <p className="text-[16px] leading-relaxed text-ink">{fillMsg(tr(MSG[reasonId]), { fields: discrepancyText(c, reasonId, tr) })}</p>}
       {open && <MsgBlock id="COR-05" tone="info" />}
       {form ? <ReviewRequest c={c} onClose={() => setForm(false)} />
@@ -321,7 +323,7 @@ export function discrepancyText(c: Case, reasonId: string | undefined, tr: (b: {
 }
 
 function Refused({ c }: { c: Case }) {
-  const { tr } = useTr()
+  const { tr, lang } = useTr()
   const d = lastRefusal(c)
   const [form, setForm] = useState(false)
   const [call, setCall] = useState(false)
@@ -329,11 +331,11 @@ function Refused({ c }: { c: Case }) {
   const vars = { fields: discrepancyText(c, reasonId, tr) }
   const dismissed = c.appeal?.state === 'dismissed'
   const canAsk = !dismissed && c.appeal?.state !== 'open'
-  const offerCall = reasonId === 'REJ-06' || reasonId === 'REJ-07'
+  const offerCall = offersVideoAfterRefusal(reasonId as RejId | undefined)
   return (
     <div className="space-y-4" data-testid="result-refused" data-reason={reasonId}>
       {dismissed && reasonId && (
-        <MsgBlock id="COR-07" tone="danger" vars={{ reason: tr(REJ_REASONS[reasonId].officerLabel), legal: tr(MSG['COR-07'].legal) }} />
+        <MsgBlock id="COR-07" tone="danger" vars={{ reason: citizenReasonShort(reasonId as RejId, lang), legal: tr(MSG['COR-07'].legal) }} />
       )}
       <MsgBlock id="STA-5" as="h2" tone="danger" />
       {reasonId && (
@@ -344,10 +346,10 @@ function Refused({ c }: { c: Case }) {
       {form ? <ReviewRequest c={c} onClose={() => setForm(false)} /> : (
         <div className="grid gap-3">
           {canAsk && <BigButton testId="ask-review" onClick={() => setForm(true)}><Scale size={18} aria-hidden />{tr(MSG['STA-5'].button)}</BigButton>}
-          {(offerCall || dismissed) && <BigButton variant="secondary" testId="book-video-call" onClick={() => setCall(true)}><Video size={18} aria-hidden />{tr(C.bookVideoCall)}</BigButton>}
+          {offerCall && <BigButton variant="secondary" testId="book-video-call" onClick={() => setCall(true)}><Video size={18} aria-hidden />{tr(C.bookVideoCall)}</BigButton>}
         </div>
       )}
-      {(offerCall || dismissed) && <OfficeOption />}
+      {offerCall && <OfficeOption />}
       <Modal open={call} onOpenChange={setCall} title={tr(MSG['FALL-01'].title)} closeLabel={tr(C.close)}>
         <p className="text-[16px] leading-relaxed text-ink">{tr(MSG['FALL-01'])}</p>
         <p className="mt-3 text-[15px] leading-relaxed text-muted">{tr(C.afterRefusalCall)}</p>

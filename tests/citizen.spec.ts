@@ -125,7 +125,7 @@ test.describe('citizen journey (phone, ES)', () => {
 
     await assistant(page, { doc: es(MSG['RA-03'].options[1]), euEid: 'Sí', who: es(MSG['RA-05'].options[0]) })
     await expect(page.getByTestId('msg-RA-07A')).toBeVisible()
-    await expect(page.getByTestId('recommended-route').getByTestId('proposed-rule')).toHaveCount(0)
+    await expect(page.getByTestId('recommended-route').getByTestId('proposed-rule')).toBeVisible()
     await shot(page, 'giulia-02-route-A')
     await page.getByTestId('ra-confirm').click()
 

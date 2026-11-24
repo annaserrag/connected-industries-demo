@@ -50,7 +50,7 @@ import { demoHash, fictionalDniNie, isFictionalDniNie, normaliseDocNumber } from
 export { demoHash, normaliseDocNumber, hasDniNieShape, hasValidDniNieLetter, isFictionalDniNie, fictionalDniNie, normaliseName } from './ids'
 
 export const SERVICE_NAME = 'Get your Cl@ve'
-export const STATE_VERSION = 6
+export const STATE_VERSION = 7
 
 /* ------------------------------------------------------------- key rule */
 
@@ -151,7 +151,7 @@ export const PROPOSED_RULE: Bilingual = PROPOSED_RULE_TAG
 /** True when the route or mode only exists under a proposed rule change. */
 export function isProposedRule(route: RouteId | null | undefined, answers?: Pick<AssistantAnswers, 'assisted' | 'document' | 'nationalityGroup'> & { who?: AssistantAnswers['who'] } | null): boolean {
   const helping = answers?.who ? answers.who === 'helping' : Boolean(answers?.assisted)
-  if (route === 'B' || route === 'X') return true
+  if (route === 'A' || route === 'B' || route === 'X') return true
   if (route === 'C') return helping
   if (route === 'F') return answers?.nationalityGroup !== 'spanish'
   if (answers?.document === 'RED_CARD' || answers?.document === 'NIE_PAPER') return true
@@ -380,8 +380,8 @@ export const POLICY_PROPOSALS: Bilingual[] = [
 
 /** Facts the plan says NOT to claim until confirmed. UI must label these as assumptions. */
 export const PENDING_FACT_CHECKS: Bilingual[] = [
-  { en: 'Assumption: the TIE chip can be read by a phone (pending confirmation).', es: 'Supuesto: el chip de la TIE puede leerse con un móvil (pendiente de confirmar).' },
-  { en: 'Assumption: MiDNI allows online login (pending confirmation).', es: 'Supuesto: MiDNI permite el acceso en línea (pendiente de confirmar).' },
+  { en: 'Assumption: the TIE chip can be read by a phone with the printed CAN (pending confirmation).', es: 'Supuesto: el chip de la TIE puede leerse con un móvil usando el CAN impreso (pendiente de confirmar).' },
+  { en: 'Assumption: a national electronic ID from another EU country can be used to log in online (pending confirmation).', es: 'Supuesto: una identidad electrónica nacional de otro país de la UE puede usarse para iniciar sesión en línea (pendiente de confirmar).' },
 ]
 
 /* ---------------------------------------------------- reference figures */
@@ -647,7 +647,11 @@ export const DEMO_ACCOUNT_PASSWORDS: Record<string, string> = Object.fromEntries
 
 export function typedFromDemo(p: (typeof DEMO_PEOPLE)[number]): TypedDocument {
   const a = p.account
-  return { type: a.documentType, number: a.documentNumber, expiry: a.expiryDate, nationality: a.country, data: { givenNames: a.givenNames, surnames: a.surnames, dateOfBirth: a.dateOfBirth } }
+  return {
+    type: a.documentType, number: a.documentNumber, expiry: a.expiryDate, nationality: a.country,
+    data: { givenNames: a.givenNames, surnames: a.surnames, dateOfBirth: a.dateOfBirth },
+    ...(a.can ? { can: a.can } : {}),
+  }
 }
 
 /** @deprecated UI migration: the old persona library is gone. Preloaded accounts, as draft cases. */

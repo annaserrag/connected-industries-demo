@@ -270,11 +270,11 @@ export const MSG = {
   /* ------------------------------------------------------ 3.3 the five statuses */
   'STA-1': {
     title: b('Received', 'Recibida'),
-    ...b('We have received your request. We will tell you here, and by the contact details you gave us, as soon as something changes.', 'Hemos recibido tu solicitud. Te avisaremos aquí, y con los datos de contacto que nos has dado, en cuanto haya novedades.'),
+    ...b('We have received your request. We will tell you here, and by the contact details you gave us, when something changes.', 'Hemos recibido tu solicitud. Te avisaremos aquí, y con los datos de contacto que nos has dado, cuando haya novedades.'),
   },
   'STA-2': {
     title: b('Checking', 'En comprobación'),
-    ...b('We are checking your document and your data. You do not need to do anything. We will tell you here when we have a result.', 'Estamos comprobando tu documento y tus datos. No tienes que hacer nada. Te diremos aquí cuando tengamos un resultado.'),
+    ...b('We are checking your document and your data. You do not need to do anything. We will tell you the result here.', 'Estamos comprobando tu documento y tus datos. No tienes que hacer nada. Te diremos el resultado aquí.'),
     /** Add when a person is reviewing the case. */
     personReviewing: b('A person from the administration is looking at your case.', 'Una persona de la Administración está revisando tu caso.'),
   },
@@ -347,7 +347,7 @@ export const MSG = {
   },
   'COR-02': {
     title: b('Information received', 'Información recibida'),
-    ...b('Thank you. We have received what you sent. A person will look at it, and we will tell you here as soon as there is a result.', 'Gracias. Hemos recibido lo que nos has enviado. Una persona lo revisará y te diremos aquí en cuanto haya un resultado.'),
+    ...b('Thank you. We have received what you sent. A person will look at it, and we will tell you the result here.', 'Gracias. Hemos recibido lo que nos has enviado. Una persona lo revisará y te diremos el resultado aquí.'),
   },
   'COR-03': {
     title: b('Ask for a review', 'Pedir una revisión'),
@@ -369,7 +369,7 @@ export const MSG = {
   },
   'COR-07': {
     title: b('Decision kept', 'Decisión mantenida'),
-    ...b('After a review by a person, we have kept the original decision. The reason is: {reason}. You can still talk to a person on a video call with your original documents, or ask for an appointment at an office as a last option. {legal}', 'Tras la revisión de una persona, mantenemos la decisión original. El motivo es: {reason}. Todavía puedes hablar con una persona por videollamada con tus documentos originales, o pedir cita en una oficina como última opción. {legal}'),
+    ...b('After a review by a person, we have kept the original decision. The reason is: {reason}. {legal}', 'Tras la revisión de una persona, mantenemos la decisión original. El motivo es: {reason}. {legal}'),
     legal: b('[Legal wording on further ways to challenge the decision: to be supplied by Roberto.]', '[Texto legal sobre otras vías para recurrir la decisión: lo facilita Roberto.]'),
   },
   'COR-08': {
@@ -378,10 +378,10 @@ export const MSG = {
   },
   'FALL-01': {
     title: b('Video call with an officer', 'Videollamada con una persona de la Administración'),
-    ...b('You can talk to a person on a video call. Have your original document and your phone ready. If nobody is available right now, we will tell you when you can try again.', 'Puedes hablar con una persona por videollamada. Ten a mano tu documento original y tu móvil. Si ahora no hay nadie disponible, te diremos cuándo puedes volver a intentarlo.'),
+    ...b('You can talk to a person on a video call. Have your original document and your phone ready. If nobody is available right now, you can try again later.', 'Puedes hablar con una persona por videollamada. Ten a mano tu documento original y tu móvil. Si ahora no hay nadie disponible, puedes intentarlo más tarde.'),
     button: b('Join video call', 'Unirme a la videollamada'),
     buttons: [b('Join video call with an officer', 'Unirme a la videollamada'), b('Come back later', 'Volver más tarde')],
-    waitingRoom: b('An officer will join shortly', 'Una persona de la Administración se unirá en breve'),
+    waitingRoom: b('Waiting for an officer to join', 'Esperando a que se una una persona de la Administración'),
   },
   'FALL-02': {
     title: b('Office, last option', 'Oficina, última opción'),

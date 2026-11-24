@@ -17,6 +17,7 @@ import { PATHS } from '@/contract/api'
 import { actions, ClaveRuleError, useClave } from '@/core/store'
 import { Avatar, cn } from '@/ui'
 import { C, K } from './copy'
+import { citizenReasonShort, isDeepfakeCase, refusePrerequisiteError } from '@/core/refuseRules'
 import { caseTitle, fill, onFallback, officerName, plainRuleError, rejCitizenText, reviewKind, useHotkeys, useLang, useTr } from './lib'
 import { TOASTER_ID } from './live'
 import { Btn, Dialog } from './components/ui'
@@ -46,10 +47,16 @@ export function DecisionPanel({ c }: { c: Case }) {
   const awaiting = c.awaitingOfficer
   const call = c.session?.videoCall?.state
   const fallback = onFallback(c)
+  const deepfake = isDeepfakeCase(c)
   const ownRefusal = kind === 'appeal' && c.appeal?.refusedBy === me
   const firstDecision = awaiting && kind === 'decision'
+  const onAppeal = awaiting && kind === 'appeal'
   const callLive = call === 'live'
-  const approveBlocked = firstDecision && ((fallback && call !== 'live' && call !== 'ended') || (callLive && !(docShown && faceOk)))
+  const needLiveCheck = (firstDecision && fallback) || (onAppeal && deepfake)
+  const approveBlocked = Boolean(
+    (needLiveCheck && call !== 'live' && call !== 'ended')
+    || (callLive && needLiveCheck && !(docShown && faceOk)),
+  )
 
   const fail: Fail = msg => toast.error(tr(C.ruleError), { toasterId: TOASTER_ID, description: tr(plainRuleError(msg)) })
   const done = (title: string) => {
@@ -110,10 +117,10 @@ export function DecisionPanel({ c }: { c: Case }) {
           </div>
         ) : awaiting ? (
           <>
-            {firstDecision && (
+            {(firstDecision || (onAppeal && deepfake)) && (
               <VideoCallBox
                 c={c}
-                required={fallback}
+                required={needLiveCheck}
                 docShown={docShown}
                 faceOk={faceOk}
                 setDocShown={setDocShown}
@@ -125,6 +132,9 @@ export function DecisionPanel({ c }: { c: Case }) {
             <Btn variant="success" size="lg" className="w-full" disabled={approveBlocked} onClick={approve} kbd="A" aria-keyshortcuts="A" data-testid="btn-approve">
               <BadgeCheck className="size-[18px]" aria-hidden />{approveLabel}
             </Btn>
+            {approveBlocked && onAppeal && deepfake && call !== 'live' && call !== 'ended' && (
+              <p className="text-center text-xs text-muted" data-testid="deepfake-approve-blocked">{tr(K.deepfakeNeedCall)}</p>
+            )}
             {approveBlocked && callLive && <p className="text-center text-xs text-muted">{tr(K.callTickBoth)}</p>}
             <Btn variant="secondary" size="lg" className="w-full" onClick={() => setDialog('info')} kbd="I" aria-keyshortcuts="I" data-testid="btn-info">
               <MessageSquareText className="size-[18px]" aria-hidden />{tr(C.requestInfo)}
@@ -308,6 +318,7 @@ function ReasonDialog({ c, mode, open, onOpenChange, onDone, onFail }: {
     if (ok) { onOpenChange(false); onDone() }
   }
   const advancedOnly = mode === 'refuse' && c.level === 'basic'
+  const refuseBlock = reason && mode !== 'revoke' ? refusePrerequisiteError(c, reason) : null
   const title = mode === 'uphold' ? tr(K.upholdTitle) : mode === 'revoke' ? tr(C.revokeTitle) : tr(K.refuseTitle)
   const Icon = mode === 'revoke' ? Undo2 : mode === 'uphold' ? Scale : Ban
   const head = MSG[mode === 'uphold' ? 'COR-07' : 'STA-5'] as unknown as { en: string; es: string; title?: { en: string; es: string } }
@@ -322,13 +333,14 @@ function ReasonDialog({ c, mode, open, onOpenChange, onDone, onFail }: {
       footer={<>
         {!reason && <span id="reason-needed" className="mr-auto text-sm text-muted">{tr(C.pickReason)}</span>}
         <Btn variant="ghost" onClick={() => onOpenChange(false)}>{tr(K.cancel)}</Btn>
-        <Btn variant="danger" disabled={!reason} aria-describedby={!reason ? 'reason-needed' : undefined} onClick={confirm} data-testid="reason-confirm">
+        <Btn variant="danger" disabled={!reason || Boolean(refuseBlock)} aria-describedby={!reason ? 'reason-needed' : refuseBlock ? 'reason-blocked' : undefined} onClick={confirm} data-testid="reason-confirm">
           <Icon className="size-4" aria-hidden />
           {mode === 'uphold' ? tr(K.confirmUphold) : mode === 'revoke' ? tr(C.confirmRevoke) : tr(K.confirmRefuse)}
         </Btn>
       </>}
     >
       {advancedOnly && <p className="mb-4 rounded-[2px] bg-info-soft p-3 text-sm text-info">{tr(K.advancedOnly)}</p>}
+      {refuseBlock && <p id="reason-blocked" role="alert" data-testid="refuse-prerequisite" className="mb-4 rounded-[2px] bg-warning-soft p-3 text-sm text-ink">{tr(plainRuleError(refuseBlock))}</p>}
       <div className="grid gap-6 md:grid-cols-[1fr_1.1fr]">
         <div>
           <p id="reason-label" className="text-sm font-semibold">{tr(C.reasonRequired)} <span className="text-danger" aria-hidden>*</span></p>
@@ -363,7 +375,7 @@ function ReasonDialog({ c, mode, open, onOpenChange, onDone, onFail }: {
             <motion.div key={reason} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-2 rounded-[2px] border border-line bg-canvas p-4" lang={lang}>
               {advancedOnly ? null : <>
                 {head.title && <p className="text-[15px] font-bold text-ink">{tr(head.title)}</p>}
-                <p className="mt-1 text-[13px] text-muted">{fillMsg(head[lang], { reason: REJECTION_REASONS[reason].officerLabel[lang], legal: mode === 'uphold' ? (MSG['COR-07'].legal as { en: string; es: string })[lang] : '' })}</p>
+                <p className="mt-1 text-[13px] text-muted">{fillMsg(head[lang], { reason: citizenReasonShort(reason, lang), legal: mode === 'uphold' ? (MSG['COR-07'].legal as { en: string; es: string })[lang] : '' })}</p>
               </>}
               <p className="mt-2 text-sm leading-relaxed text-ink">{rejCitizenText(c, reason, lang)}</p>
               <span className="mt-3 inline-flex rounded-[2px] bg-ink px-2.5 py-1 text-xs font-semibold text-white">{tr({ en: 'Ask for a review', es: 'Pedir una revisión' })}</span>

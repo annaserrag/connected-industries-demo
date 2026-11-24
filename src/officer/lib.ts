@@ -117,7 +117,11 @@ export function rejCitizenText(c: Case, id: RejectionReasonId, lang: Lang): stri
 export function plainRuleError(msg: string): Bilingual {
   const m = msg.toLowerCase()
   if (m.includes('different officer')) return { en: 'Another officer must decide this review: you took the first decision. Sign in as a different officer.', es: 'Esta revisión la decide otra persona: tú tomaste la primera decisión. Entra con otro usuario.' }
+  if (m.includes('synthetic-video')) return { en: 'Start the video call first: this case has a synthetic-video signal that must be checked live before you approve.', es: 'Inicia primero la videollamada: este caso tiene una señal de vídeo sintético que hay que comprobar en directo antes de aprobar.' }
   if (m.includes('start the video call')) return { en: 'Start the video call first: on this route you must see the original document and the face live before approving.', es: 'Inicia primero la videollamada: en esta vía tienes que ver el documento original y la cara en directo antes de aprobar.' }
+  if (m.includes('ask for more information first')) return { en: 'Ask for more information first. The citizen must answer before you can refuse with this reason.', es: 'Pide primero más información. La persona tiene que responder antes de que puedas denegar con este motivo.' }
+  if (m.includes('offer a video call first')) return { en: 'Offer a video call first before refusing with this reason.', es: 'Ofrece primero una videollamada antes de denegar con este motivo.' }
+  if (m.includes('two independent signals')) return { en: 'REJ-07 needs two independent signals (for example liveness and face match). One is not enough.', es: 'REJ-07 necesita dos señales independientes (por ejemplo prueba de vida y coincidencia facial). Una sola no basta.' }
   if (m.includes('waiting for the citizen')) return { en: 'You already asked the citizen for something. Wait for the reply.', es: 'Ya pediste algo a la persona. Espera su respuesta.' }
   if (m.includes('closed list')) return { en: 'Pick a reason from the list to refuse.', es: 'Elige un motivo de la lista para denegar.' }
   if (m.includes('signed-in officer')) return { en: 'Your session has ended. Sign in again.', es: 'Tu sesión ha terminado. Vuelve a entrar.' }

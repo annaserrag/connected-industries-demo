@@ -200,8 +200,8 @@ function SignInForm({ onSwitch }: { onSwitch: () => void }) {
 
 /* ------------------------------------------------------- create account */
 
-type SignUpField = 'given' | 'surnames' | 'dob' | 'country' | 'doc' | 'number' | 'expiry' | 'pwd' | 'pwd2'
-const FIELD_ORDER: SignUpField[] = ['given', 'surnames', 'dob', 'country', 'doc', 'number', 'expiry', 'pwd', 'pwd2']
+type SignUpField = 'given' | 'surnames' | 'dob' | 'country' | 'doc' | 'number' | 'can' | 'expiry' | 'pwd' | 'pwd2'
+const FIELD_ORDER: SignUpField[] = ['given', 'surnames', 'dob', 'country', 'doc', 'number', 'can', 'expiry', 'pwd', 'pwd2']
 
 const todayIso = () => {
   const d = new Date()
@@ -222,6 +222,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
   const [doc, setDoc] = useState<DocumentType | ''>('')
   const [docCleared, setDocCleared] = useState(false)
   const [number, setNumber] = useState('')
+  const [can, setCan] = useState('')
   const [expiry, setExpiry] = useState('')
   const [pwd, setPwd] = useState('')
   const [pwd2, setPwd2] = useState('')
@@ -251,11 +252,12 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
     if (!n) e.number = tr(C.errDocNumber)
     else if (hasDniNieShape(n) && !isFictionalDniNie(n)) e.number = tr(C.errRealNumber)
     else if (doc && !documentNumberShapeOk(doc, n)) e.number = tr(C.errDocShape)
+    if (doc === 'TIE' && !/^\d{6}$/.test(can.replace(/\s/g, ''))) e.can = tr(C.errCan)
     if (!expiry || !parseIsoDate(expiry)) e.expiry = tr(C.errExpiry)
     if (pwd.length < PASSWORD_MIN_LENGTH) e.pwd = fill(tr(C.errWeakPassword), { n: PASSWORD_MIN_LENGTH })
     if (!pwd2 || pwd2 !== pwd) e.pwd2 = tr(C.errMismatch)
     return e
-  }, [given, surnames, dob, countryIndex, doc, docCleared, allowedDocs, number, expiry, pwd, pwd2, tr])
+  }, [given, surnames, dob, countryIndex, doc, docCleared, allowedDocs, number, can, expiry, pwd, pwd2, tr])
 
   const show = (f: SignUpField) => ((submitted || touched[f]) ? errors[f] : undefined)
   const blur = (f: SignUpField) => () => setTouched(t => ({ ...t, [f]: true }))
@@ -287,6 +289,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
       res = actions.citizenSignUp({
         givenNames: given, surnames, dateOfBirth: dob, countryIndex, documentType: doc as DocumentType,
         documentNumber: number, expiryDate: expiry, password: pwd,
+        ...(doc === 'TIE' ? { can: can.replace(/\s/g, '') } : {}),
       })
     } catch (err) {
       console.warn('[citizen] sign-up', err)
@@ -296,6 +299,7 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
       const map: Record<typeof res.reason, Bilingual> = {
         invalid_name: C.errName, underage: C.errUnderage, weak_password: C.errWeakPassword, invalid_document_for_country: C.errDocForCountry,
         invalid_document_number: C.errDocShape, real_document_number: C.errRealNumber, duplicate_document: C.errDuplicate, invalid_expiry: C.errExpiry,
+        invalid_can: C.errCan,
       }
       setFormError(fill(tr(map[res.reason]), { n: res.reason === 'underage' ? SIGNUP_MIN_AGE : PASSWORD_MIN_LENGTH }))
       return
@@ -391,6 +395,14 @@ function SignUpForm({ onSwitch }: { onSwitch: () => void }) {
         name="document-number" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} maxLength={20}
         value={number} onChange={e => setNumber(e.target.value)} onBlur={blur('number')} data-testid="signup-number"
       />
+      {doc === 'TIE' && (
+        <TextField
+          inputRef={el => { refs.current.can = el }}
+          label={tr(C.canLabel)} hint={tr(C.canHint)} error={show('can')}
+          name="document-can" autoComplete="off" inputMode="numeric" autoCorrect="off" spellCheck={false} maxLength={6}
+          value={can} onChange={e => setCan(e.target.value.replace(/\D/g, '').slice(0, 6))} onBlur={blur('can')} data-testid="signup-can"
+        />
+      )}
       <TextField
         inputRef={el => { refs.current.expiry = el }}
         label={tr(C.expiryDate)} error={show('expiry')} type="date" name="document-expiry" min="1990-01-01"

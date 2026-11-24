@@ -427,6 +427,12 @@ function ChipStep({ c, hold, release }: { c: Case; hold: () => void; release: ()
       ) : (
         <>
           <MsgBlock id="VER-01" as="h1" className="mb-4" />
+          {doc === 'TIE' && (c.session.who === 'child' ? c.session.minor?.document.can : c.typed.can) && (
+            <p className="mb-3 rounded-card border border-line bg-surface p-3 text-[15px] text-ink" data-testid="chip-can">
+              {tr(C.canLabel)}: <span className="font-mono font-bold">{c.session.who === 'child' ? c.session.minor?.document.can : c.typed.can}</span>
+              <span className="mt-1 block text-[13px] text-muted">{tr(C.canHint)}</span>
+            </p>
+          )}
           <ChipReadAnimation progress={ok ? 1 : run.running ? run.progress : 0} done={ok} docLabel={tr(DOCUMENTS[doc].label)} />
           <div className="mt-3 min-h-6 text-center text-[16px] font-bold text-ink" aria-live="polite">
             {ok ? <span data-testid="chip-ok" className="inline-flex items-center gap-2 text-success"><CheckCircle2 size={20} aria-hidden />{tr(msg('VER-01').success as { en: string; es: string })}</span> : run.running ? tr(C.chipReading) : ''}

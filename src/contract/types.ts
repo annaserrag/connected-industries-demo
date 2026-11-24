@@ -95,6 +95,11 @@ export interface TypedDocument {
   nationality: string
   /** Name and date of birth as printed on the document. */
   data: PersonData
+  /**
+   * Card Access Number printed on a TIE. The phone needs it to open the chip over NFC.
+   * Six digits, as on the physical card.
+   */
+  can?: string
 }
 
 /* ------------------------------------------------------- simulated inputs */
@@ -666,6 +671,8 @@ export interface SignUpInput {
   documentNumber?: string
   /** YYYY-MM-DD as printed. When missing (old UI), today + 5 years. */
   expiryDate?: string
+  /** Six-digit Card Access Number printed on a TIE (required when documentType is TIE). */
+  can?: string
   password: string
 }
 
@@ -679,6 +686,7 @@ export type SignUpFailure =
   | 'real_document_number'
   | 'duplicate_document'
   | 'invalid_expiry'
+  | 'invalid_can'
 export type SignUpResult =
   | { ok: true; caseId: string; documentNumber: string }
   | { ok: false; reason: SignUpFailure }

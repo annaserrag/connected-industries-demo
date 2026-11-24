@@ -73,7 +73,7 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     const real = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 0, documentType: 'DNI', documentNumber: '12345678Z', expiryDate: '2030-01-01', password: 'password-1' })
     expect(real).toEqual({ ok: false, reason: 'real_document_number' })
     const kenjiNo = await page.evaluate(() => window.__clave!.DEMO_PEOPLE[1].account.documentNumber)
-    const dup = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 9, documentType: 'TIE', documentNumber: kenjiNo, expiryDate: '2030-01-01', password: 'password-1' })
+    const dup = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 9, documentType: 'TIE', documentNumber: kenjiNo, expiryDate: '2030-01-01', can: '123456', password: 'password-1' })
     expect(dup).toEqual({ ok: false, reason: 'duplicate_document' })
     // Only the plan's demo people carry GYC refs: any other new account gets a neutral SOL- reference.
     const other = await ok(page, 'citizenSignUp', { givenNames: 'Test', surnames: 'Person', dateOfBirth: '1990-01-01', countryIndex: 1, documentType: 'PASSPORT', documentNumber: 'ZZ1234567', expiryDate: '2030-01-01', password: 'password-1' })
@@ -91,7 +91,7 @@ test.describe('the 8 plan cases emerge from the rules', () => {
     expect(await ok(page, 'citizenSignIn', g.account.documentNumber, 'giulia-demo')).toEqual({ ok: true, caseId: id })
 
     const rec = await ok(page, 'setAnswers', id, { document: 'EU_EID', euEid: 'yes', who: 'self' })
-    expect(rec).toMatchObject({ route: 'A', msg: 'RA-07A', policyProposal: false })
+    expect(rec).toMatchObject({ route: 'A', msg: 'RA-07A', policyProposal: true })
     await ok(page, 'recordEidLogin', id)
     await ok(page, 'giveConsents', id, { residence: true })
     expect((await getCase(page, id)).status).toBe('received')

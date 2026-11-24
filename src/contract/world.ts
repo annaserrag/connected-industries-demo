@@ -155,6 +155,8 @@ export interface DemoPerson {
     documentType: DocumentType
     documentNumber: string
     expiryDate: string
+    /** Six-digit CAN printed on a TIE (NFC chip access). */
+    can?: string
     password: string
   }
   /** Route assistant answers the plan uses. */
@@ -179,7 +181,7 @@ export const DEMO_PEOPLE: DemoPerson[] = [
   },
   {
     caseId: 'kenji', caseRef: 'GYC-02',
-    account: { givenNames: 'Kenji', surnames: 'Mori', dateOfBirth: '2000-05-14', country: 'Japan', documentType: 'TIE', documentNumber: DEMO_NUMBERS.kenji, expiryDate: '2028-03-31', password: 'kenji-demo' },
+    account: { givenNames: 'Kenji', surnames: 'Mori', dateOfBirth: '2000-05-14', country: 'Japan', documentType: 'TIE', documentNumber: DEMO_NUMBERS.kenji, expiryDate: '2028-03-31', can: '482913', password: 'kenji-demo' },
     answers: { document: 'TIE', euEid: null, who: 'self', nfc: 'unsure' },
     contact: { mobile: '+34 600 000 003', email: 'kenji.mori@example.org' },
     facts: { en: 'TIE chip not readable (damaged or blocked).', es: 'El chip de la TIE no se puede leer (dañado o bloqueado).' },
@@ -194,12 +196,12 @@ export const DEMO_PEOPLE: DemoPerson[] = [
   },
   {
     caseId: 'laura', caseRef: 'GYC-04',
-    account: { givenNames: 'Laura', surnames: 'Ruiz', dateOfBirth: '1982-07-09', country: 'Argentina', documentType: 'TIE', documentNumber: DEMO_NUMBERS.laura, expiryDate: '2029-01-31', password: 'laura-demo' },
+    account: { givenNames: 'Laura', surnames: 'Ruiz', dateOfBirth: '1982-07-09', country: 'Argentina', documentType: 'TIE', documentNumber: DEMO_NUMBERS.laura, expiryDate: '2029-01-31', can: '719204', password: 'laura-demo' },
     answers: { document: 'TIE', euEid: null, who: 'child', nfc: 'yes' },
     contact: { mobile: '+34 600 000 004', email: 'laura.ruiz@example.org' },
     minor: {
       givenNames: 'Mateo', surnames: 'Ruiz', dateOfBirth: '2010-03-22', email: 'laura.ruiz@example.org',
-      document: { type: 'TIE', number: DEMO_NUMBERS.mateo, expiry: '2029-01-31', nationality: 'Argentina', data: { givenNames: 'Mateo', surnames: 'Ruiz', dateOfBirth: '2010-03-22' } },
+      document: { type: 'TIE', number: DEMO_NUMBERS.mateo, expiry: '2029-01-31', nationality: 'Argentina', can: '719255', data: { givenNames: 'Mateo', surnames: 'Ruiz', dateOfBirth: '2010-03-22' } },
     },
     facts: { en: 'TIE each (mother and son), normal.', es: 'TIE cada uno (madre e hijo), normal.' },
   },
@@ -221,14 +223,14 @@ export const DEMO_PEOPLE: DemoPerson[] = [
   },
   {
     caseId: 'rafael', caseRef: 'GYC-07',
-    account: { givenNames: 'Rafael', surnames: 'Duarte', dateOfBirth: '1988-04-13', country: 'Brazil', documentType: 'TIE', documentNumber: DEMO_NUMBERS.rafael, expiryDate: '2030-11-30', password: 'rafael-demo' },
+    account: { givenNames: 'Rafael', surnames: 'Duarte', dateOfBirth: '1988-04-13', country: 'Brazil', documentType: 'TIE', documentNumber: DEMO_NUMBERS.rafael, expiryDate: '2030-11-30', can: '305871', password: 'rafael-demo' },
     answers: { document: 'TIE', euEid: null, who: 'self', nfc: 'yes' },
     contact: { mobile: '+34 600 000 007', email: 'rafael.duarte@example.org' },
     facts: { en: 'Chip readable, signature invalid; chip says DUARTE SOUZA, RAFAEL 1988-03-14, printed DUARTE, RAFAEL 1988-04-13.', es: 'Chip legible, firma no válida; el chip dice DUARTE SOUZA, RAFAEL 1988-03-14 y lo impreso DUARTE, RAFAEL 1988-04-13.' },
   },
   {
     caseId: 'valentina', caseRef: 'GYC-08',
-    account: { givenNames: 'Valentina', surnames: 'Rojas Gómez', dateOfBirth: '1999-08-30', country: 'Colombia', documentType: 'TIE', documentNumber: DEMO_NUMBERS.valentina, expiryDate: '2030-02-28', password: 'valentina-demo' },
+    account: { givenNames: 'Valentina', surnames: 'Rojas Gómez', dateOfBirth: '1999-08-30', country: 'Colombia', documentType: 'TIE', documentNumber: DEMO_NUMBERS.valentina, expiryDate: '2030-02-28', can: '664128', password: 'valentina-demo' },
     answers: { document: 'TIE', euEid: null, who: 'self', nfc: 'yes' },
     contact: { mobile: '+34 600 000 008', email: 'valentina.rojas@example.org' },
     facts: { en: 'Residence record has only the first surname (ROJAS).', es: 'El registro de residencia solo tiene el primer apellido (ROJAS).' },

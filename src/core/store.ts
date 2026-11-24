@@ -27,6 +27,7 @@ import { chipPhotoOf, decide, evaluate, readFace, readVideo, riskOf, subjectDocu
 import { seedHistory } from './history'
 import { createAccountActions } from './accounts'
 import { createStaffActions } from './staff'
+import { isDeepfakeCase, refusePrerequisiteError } from './refuseRules'
 
 export class ClaveRuleError extends Error {
   constructor(message: string) {
@@ -205,6 +206,19 @@ function requireReason(reasonId: RejId | undefined | null): RejId {
     throw new ClaveRuleError('A reason from the closed list (REJ-01…REJ-08) is required to refuse or revoke.')
   }
   return reasonId
+}
+
+function requireRefuseAllowed(c: Case, reason: RejId) {
+  const err = refusePrerequisiteError(c, reason)
+  if (err) fail(err)
+}
+
+function requireVideoBeforeDeepfakeApprove(c: Case) {
+  if (!isDeepfakeCase(c)) return
+  const call = c.session.videoCall?.state
+  if (call !== 'live' && call !== 'ended') {
+    fail('Start the video call before approving: this case has a synthetic-video signal that must be checked live.')
+  }
 }
 
 /** True while the citizen is still doing the checks (nothing decided, nobody in charge yet). */
@@ -867,6 +881,7 @@ export const actions: ClaveActions = {
     if (c.status === 'draft' && !c.session.fallback) fail('The application has not been sent yet.')
     const openDecision = c.level === 'none' || c.advanced === 'pending_review'
     if (c.level === 'advanced' || !openDecision || c.status === 'not_approved') fail('Nothing open to refuse. Use Revoke, with a reason, to take back a granted level.')
+    requireRefuseAllowed(c, reason)
     const at = nowIso()
     const evidence = c.checks.filter(r => r.outcome === 'fail' || r.outcome === 'warn').map(r => r.id)
     const noteTxt = note ? ` Internal note: ${note}` : ''
@@ -911,6 +926,11 @@ export const actions: ClaveActions = {
     if (c.appeal?.state !== 'open') fail('There is no open review request on this application.')
     if (c.appeal!.refusedBy === by.id) fail('A different officer must decide the review: you took the original decision (rule APPEAL-SECOND-OFFICER).')
     if (decision !== 'approve' && decision !== 'uphold') fail('Choose approve or uphold.')
+    if (decision === 'approve') requireVideoBeforeDeepfakeApprove(c)
+    if (decision === 'uphold') {
+      const keptReason = requireReason(reasonId ?? c.appeal!.refusedReasonId)
+      requireRefuseAllowed(c, keptReason)
+    }
     const at = nowIso()
     if (c.appeal!.scope === 'advanced') {
       // Review of an advanced-only refusal: the basic level was never taken away.

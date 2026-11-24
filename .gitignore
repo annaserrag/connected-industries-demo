@@ -28,6 +28,17 @@ test-results/
 playwright-report/
 blob-report/
 
-# Secrets (none are used; never commit any)
+# Secrets (never commit)
 .env
 .env.*
+!.env.example
+
+# macOS Finder duplicates ("foo 2.ts", "deploy-hf 2.sh", …)
+* 2.*
+* 3.*
+* 4.*
+* copy.*
+* Copy.*
+
+# Local HF deploy scratch (if created by hand)
+.hf-deploy/

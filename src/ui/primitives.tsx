@@ -162,7 +162,7 @@ export const StatusPill = ({ status, advanced, className, size }: { status: Stat
   )
 }
 
-/** "Proposed rule, not yet in force": on route B, Fallback for foreigners, red card and assisted mode. */
+/** "Proposed rule, not yet in force": on route A (EU eID), B, Fallback for foreigners, red card and assisted mode. */
 export const ProposedRuleTag = ({ className }: { className?: string }) => {
   const tr = useTr()
   return (

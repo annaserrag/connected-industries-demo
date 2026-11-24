@@ -111,6 +111,10 @@ export function validateSignUp(input: SignUpInput, today: Date = new Date()): Si
     if (!documentNumberShapeOk(input.documentType, n)) return 'invalid_document_number'
   }
   if (input.expiryDate !== undefined && !parseIsoDate(input.expiryDate)) return 'invalid_expiry'
+  if (input.documentType === 'TIE') {
+    const can = (input.can ?? '').replace(/\s/g, '')
+    if (!/^\d{6}$/.test(can)) return 'invalid_can'
+  }
   return null
 }
 
@@ -180,12 +184,14 @@ function addYears(d: Date, years: number): string {
 export function typedFromSignUp(input: SignUpInput, documentNumber: string, now: Date = new Date()): TypedDocument {
   const country = SIGNUP_COUNTRIES[input.countryIndex]
   const { givenNames, surnames } = namesOf(input)
+  const can = input.documentType === 'TIE' ? (input.can ?? '').replace(/\s/g, '') : undefined
   return {
     type: input.documentType,
     number: documentNumber,
     expiry: input.expiryDate ?? addYears(now, 5),
     nationality: country.name.en,
     data: { givenNames, surnames, dateOfBirth: input.dateOfBirth },
+    ...(can ? { can } : {}),
   }
 }
 

@@ -679,6 +679,7 @@ export const K = {
   callDocShown: b('Original document shown', 'Documento original mostrado'),
   callFaceMatches: b('The face matches', 'La cara coincide'),
   callTickBoth: b('Tick both boxes to approve during the call.', 'Marca las dos casillas para aprobar durante la llamada.'),
+  deepfakeNeedCall: b('This case has a synthetic-video signal. Start the video call and check the person live before approving the review.', 'Este caso tiene una señal de vídeo sintético. Inicia la videollamada y comprueba a la persona en directo antes de aprobar la revisión.'),
   callEnd: b('End call', 'Finalizar llamada'),
   callEnded: b('Video call held', 'Videollamada realizada'),
   callNote: b('On the call: original document shown; the face matches.', 'En la llamada: documento original mostrado; la cara coincide.'),

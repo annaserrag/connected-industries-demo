@@ -74,7 +74,7 @@ test('live counts update from another tab', async ({ page, context }) => {
     const { OFFICERS } = await import('/src/contract/seed.ts')
     store.actions.officerSignIn(OFFICERS[0].id)
     const c = sel.officerQueue(store.useClave.getState()).find(x => x.level === 'none' && x.appeal?.state !== 'open')!
-    store.actions.officerRefuse(c.id, 'REJ-04', 'dashboard test')
+    store.actions.officerRefuse(c.id, 'REJ-01', 'dashboard test')
   })
   await expect(awaitingTile.locator('p').first()).toHaveText(String(before - 1), { timeout: 5000 })
 })
