@@ -2,7 +2,8 @@
  * Store — implements ClaveActions from contract/api.ts.
  *
  * - zustand hook `useClave` over AppState
- * - every action: new state → localStorage → BroadcastChannel (other tabs replace their state)
+ * - every action: new state → localStorage → BroadcastChannel (other tabs) → optional Supabase cloud
+ *   (phone + laptop share cases/accounts when VITE_SUPABASE_* is set)
  * - the citizen actions record INPUTS only (answers, consents, chip presses, camera inputs, uploads, contact);
  *   results come from the world (contract/world.ts) and the rules (core/engine.ts)
  * - KEY RULE: only officerRefuse / officerRevoke / officerDecideAppeal('uphold') can set 'not_approved' or add a
@@ -28,6 +29,9 @@ import { seedHistory } from './history'
 import { createAccountActions } from './accounts'
 import { createStaffActions } from './staff'
 import { isDeepfakeCase, refusePrerequisiteError } from './refuseRules'
+import {
+  applyShared, cloudConfigured, cloudPushDebounced, cloudPushNow, sharedFrom, startCloudSync,
+} from './cloud'
 
 export class ClaveRuleError extends Error {
   constructor(message: string) {
@@ -79,14 +83,16 @@ export interface LiveSyncState {
   caseId: string | null
   /** Audit action of the remote change, when there was one. */
   action: AuditAction | null
-  /** Whether cross-tab sync is available in this browser. */
+  /** Whether cross-tab and/or cloud sync is available. */
   connected: boolean
+  /** local = same browser only; cloud = shared Supabase store across devices. */
+  mode: 'local' | 'cloud'
   /** Increments on every remote update (handy as a React key to replay an animation). */
   seq: number
 }
 
 export const useLiveSync = create<LiveSyncState>(() => ({
-  lastRemoteAt: null, caseId: null, action: null, connected: false, seq: 0,
+  lastRemoteAt: null, caseId: null, action: null, connected: false, mode: 'local', seq: 0,
 }))
 
 interface SyncMessage { type: 'state'; from: string; state: AppState; caseId: string | null; action: AuditAction | null }
@@ -95,10 +101,36 @@ let channel: BroadcastChannel | null = null
 
 function receive(msg: SyncMessage) {
   if (!msg || msg.type !== 'state' || msg.from === TAB_ID || msg.state?.version !== STATE_VERSION) return
-  // The language is a per-tab view preference: the citizen phone and the officer desk can differ.
-  const lang = useClave.getState().lang
-  useClave.setState({ ...msg.state, lang }, true)
+  // Per-device session: language, officer sign-in and citizen sign-in stay on this tab/device.
+  // Same-browser BroadcastChannel still shares the full world; we only protect session fields
+  // so a citizen action never signs the officer out (and the reverse).
+  const local = useClave.getState()
+  useClave.setState({
+    ...msg.state,
+    lang: local.lang,
+    officerId: local.officerId,
+    activeCitizenCaseId: local.activeCitizenCaseId,
+  }, true)
   useLiveSync.setState(s => ({ lastRemoteAt: Date.now(), caseId: msg.caseId, action: msg.action, seq: s.seq + 1 }))
+}
+
+/** Apply a shared cloud snapshot without echoing back to Supabase. */
+function receiveCloudShared(shared: ReturnType<typeof sharedFrom>) {
+  const local = useClave.getState()
+  const next = applyShared(shared, local)
+  useClave.setState(next, true)
+  save(next)
+  const last = next.audit[next.audit.length - 1]
+  useLiveSync.setState(s => ({
+    lastRemoteAt: Date.now(),
+    caseId: last?.caseId ?? null,
+    action: last?.action ?? null,
+    seq: s.seq + 1,
+    connected: true,
+    mode: 'cloud',
+  }))
+  // Tell other tabs on this same browser.
+  try { channel?.postMessage({ type: 'state', from: TAB_ID, state: next, caseId: last?.caseId ?? null, action: last?.action ?? null } satisfies SyncMessage) } catch { /* ignore */ }
 }
 
 if (typeof window !== 'undefined') {
@@ -117,13 +149,31 @@ if (typeof window !== 'undefined') {
     })
     useLiveSync.setState({ connected: true })
   }
+
+  if (cloudConfigured()) {
+    void startCloudSync({
+      writerId: TAB_ID,
+      onRemote: receiveCloudShared,
+    }).then(async status => {
+      if (status === 'seeded') {
+        // First device (or version bump): publish the local seed/world so others join it.
+        const ok = await cloudPushNow(sharedFrom(useClave.getState()), TAB_ID)
+        if (ok) useLiveSync.setState({ connected: true, mode: 'cloud' })
+        return
+      }
+      if (status === 'ready' || status === 'error') {
+        useLiveSync.setState({ connected: true, mode: status === 'ready' ? 'cloud' : useLiveSync.getState().mode })
+      }
+    })
+  }
 }
 
-/** Single write path: replace state, persist, broadcast. Receivers never re-broadcast (no echo). */
+/** Single write path: replace state, persist, broadcast (tabs + optional cloud). Receivers never re-broadcast. */
 function commit(next: AppState, caseId: string | null = null, action: AuditAction | null = null) {
   useClave.setState(next, true)
   save(next)
   try { channel?.postMessage({ type: 'state', from: TAB_ID, state: next, caseId, action } satisfies SyncMessage) } catch { /* ignore */ }
+  if (cloudConfigured()) cloudPushDebounced(sharedFrom(next), TAB_ID)
 }
 
 /* -------------------------------------------------------------- helpers */
@@ -987,8 +1037,11 @@ export const actions: ClaveActions = {
     const s = useClave.getState()
     const fresh = freshState(new Date())
     const ev = audit(null, SYSTEM_ACTOR, 'demo_reset', 'Data reset to the initial state.')
-    // Keep the per-tab language, the signed-in officer and staff job details so the presenter is not logged out.
-    commit({ ...fresh, lang: s.lang, officerId: s.officerId, officerProfiles: s.officerProfiles ?? {}, audit: [...fresh.audit, ev] }, null, 'demo_reset')
+    // Keep the per-device language and signed-in officer so the presenter is not logged out.
+    // Shared world (cases, accounts, audit) goes back to the seed; cloud push is immediate so every device follows.
+    const next = { ...fresh, lang: s.lang, officerId: s.officerId, activeCitizenCaseId: null, officerProfiles: s.officerProfiles ?? {}, audit: [...fresh.audit, ev] }
+    commit(next, null, 'demo_reset')
+    if (cloudConfigured()) void cloudPushNow(sharedFrom(next), TAB_ID)
   },
   resetCase(caseId) {
     const c = getCase(caseId)

@@ -6,7 +6,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, Minus } from 'lucide-react'
 import { Button, Dialog, DialogClose, GovPage, cn, toast } from '@/ui'
-import { actions } from '@/core/store'
+import { actions, useLiveSync } from '@/core/store'
+import { cloudConfigured } from '@/core/cloud'
 import type { Bilingual } from '@/contract/types'
 import {
   DOCUMENTS, KEY_RULE, LEVEL_LABELS, PENDING_FACT_CHECKS, POLICY_PROPOSALS, REFERENCE_FIGURES, ROUTES, ROUTE_ORDER, STATUSES, STATUS_ORDER,
@@ -400,22 +401,30 @@ export function PrivacyPage() {
   const { tr } = useTr()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const cloud = useLiveSync(s => s.mode === 'cloud') || cloudConfigured()
   return (
     <GovPage
       title={tr(b('Privacy', 'Privacidad'))}
-      subtitle={tr(b('Your data stays in this browser.', 'Tus datos se quedan en este navegador.'))}
+      subtitle={tr(cloud
+        ? b('Demo data is shared across devices for the live presentation.', 'Los datos de la demo se comparten entre dispositivos para la presentación en directo.')
+        : b('Your data stays in this browser.', 'Tus datos se quedan en este navegador.'))}
       breadcrumb={[{ to: '/', label: tr(b('Home', 'Inicio')) }, { label: tr(b('Privacy', 'Privacidad')) }]}
       width="max-w-[960px]"
     >
       <div className="space-y-10" data-testid="privacy-page">
         <Section title={tr(b('What we store and where', 'Qué guardamos y dónde'))}>
+          <p>{tr(cloud
+            ? b(
+              'Accounts, applications, decisions and the audit trail are kept in a shared demo store so a phone and a laptop show the same world live. Sign-in sessions (citizen or officer) and the language stay on each device. This is only for the academic prototype: do not type real personal data.',
+              'Las cuentas, solicitudes, resoluciones y el registro de auditoría se guardan en un almacén compartido de la demo para que un móvil y un portátil muestren el mismo mundo en directo. Las sesiones (ciudadano u oficial) y el idioma se quedan en cada dispositivo. Solo es para el prototipo académico: no escribas datos personales reales.',
+            )
+            : b(
+              'Accounts, applications, decisions and the audit trail are saved only in this browser’s local storage. They are shared between tabs and windows of the same browser, so the staff console can see an application live, and they are never sent to a server.',
+              'Las cuentas, solicitudes, resoluciones y el registro de auditoría se guardan solo en el almacenamiento local de este navegador. Se comparten entre pestañas y ventanas del mismo navegador, para que la consola del personal vea una solicitud en directo, y nunca se envían a un servidor.',
+            ))}</p>
           <p>{tr(b(
-            'Accounts, applications, decisions and the audit trail are saved only in this browser’s local storage. They are shared between tabs and windows of the same browser, so the staff console can see an application live, and they are never sent to a server.',
-            'Las cuentas, solicitudes, resoluciones y el registro de auditoría se guardan solo en el almacenamiento local de este navegador. Se comparten entre pestañas y ventanas del mismo navegador, para que la consola del personal vea una solicitud en directo, y nunca se envían a un servidor.',
-          ))}</p>
-          <p>{tr(b(
-            'There are no cookies, no analytics and no requests to other websites: even the fonts are part of the platform.',
-            'No hay cookies, ni analítica, ni peticiones a otras webs: incluso las tipografías forman parte de la plataforma.',
+            'There are no cookies and no analytics. Fonts are part of the platform.',
+            'No hay cookies ni analítica. Las tipografías forman parte de la plataforma.',
           ))}</p>
         </Section>
         <Section title={tr(b('What you should never type', 'Qué no debes escribir nunca'))}>
@@ -424,13 +433,18 @@ export function PrivacyPage() {
             'Nunca escribas un número de documento real ni una contraseña que uses en otro sitio. Al crear tu cuenta, la plataforma te asigna un número de solicitante ficticio; las contraseñas se guardan solo como una huella sencilla, que no es lo bastante segura para una contraseña real.',
           ))}</p>
         </Section>
-        <Section title={tr(b('Delete your data', 'Borrar tus datos'))}>
-          <p>{tr(b(
-            'You can delete everything saved in this browser at any time. Accounts you created are removed and every application goes back to its starting point.',
-            'Puedes borrar en cualquier momento todo lo guardado en este navegador. Se eliminan las cuentas que creaste y cada solicitud vuelve a su punto de partida.',
-          ))}</p>
+        <Section title={tr(b('Reset the demo', 'Reiniciar la demo'))}>
+          <p>{tr(cloud
+            ? b(
+              'Reset puts every application back to the starting seed on all devices that share this demo. Citizen sessions are cleared; the officer signed in on this device stays signed in.',
+              'Reiniciar deja todas las solicitudes en el punto de partida del seed en todos los dispositivos que comparten esta demo. Se cierran las sesiones de ciudadano; el oficial conectado en este dispositivo sigue conectado.',
+            )
+            : b(
+              'You can delete everything saved in this browser at any time. Accounts you created are removed and every application goes back to its starting point.',
+              'Puedes borrar en cualquier momento todo lo guardado en este navegador. Se eliminan las cuentas que creaste y cada solicitud vuelve a su punto de partida.',
+            ))}</p>
           <Button variant="secondary" onClick={() => setOpen(true)} data-testid="privacy-delete">
-            {tr(b('Delete the data in this browser', 'Borrar los datos de este navegador'))}
+            {tr(b('Reset the demo', 'Reiniciar la demo'))}
           </Button>
         </Section>
       </div>
@@ -438,8 +452,10 @@ export function PrivacyPage() {
         open={open}
         onOpenChange={setOpen}
         tone="danger"
-        title={tr(b('Delete the data in this browser?', '¿Borrar los datos de este navegador?'))}
-        description={tr(b('This signs everyone out and cannot be undone.', 'Se cierran todas las sesiones y no se puede deshacer.'))}
+        title={tr(b('Reset the demo?', '¿Reiniciar la demo?'))}
+        description={tr(cloud
+          ? b('All shared applications go back to the start. This cannot be undone.', 'Todas las solicitudes compartidas vuelven al inicio. No se puede deshacer.')
+          : b('This signs everyone out and cannot be undone.', 'Se cierran todas las sesiones y no se puede deshacer.'))}
         footer={
           <>
             <DialogClose asChild><Button variant="secondary">{tr(b('Cancel', 'Cancelar'))}</Button></DialogClose>
@@ -448,11 +464,11 @@ export function PrivacyPage() {
               onClick={() => {
                 try { actions.resetDemo() } catch (e) { console.warn('[privacy] reset', e) }
                 setOpen(false)
-                toast.success(tr(b('Data deleted', 'Datos borrados')))
+                toast.success(tr(b('Demo reset', 'Demo reiniciada')))
                 navigate('/')
               }}
             >
-              {tr(b('Delete', 'Borrar'))}
+              {tr(b('Reset', 'Reiniciar'))}
             </Button>
           </>
         }

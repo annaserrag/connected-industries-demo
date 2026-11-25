@@ -9,9 +9,13 @@ import { useClave, useLiveSync } from './store'
 export function LiveIndicator({ caseId, className = '' }: { caseId?: string; className?: string }) {
   const lang = useClave(s => s.lang)
   const connected = useLiveSync(s => s.connected)
+  const mode = useLiveSync(s => s.mode)
   const flashing = useRecentRemote(caseId, 2500)
   const es = lang === 'es'
-  const label = flashing ? (es ? 'Actualizado en directo' : 'Updated live') : es ? 'En directo' : 'Live'
+  const idle = mode === 'cloud'
+    ? (es ? 'En directo (todos los dispositivos)' : 'Live (all devices)')
+    : (es ? 'En directo' : 'Live')
+  const label = flashing ? (es ? 'Actualizado en directo' : 'Updated live') : idle
   return (
     <span
       role="status"

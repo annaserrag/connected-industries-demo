@@ -14,7 +14,7 @@ npm run demo
 
 Then open http://localhost:4173. Fonts (Nunito Sans, Merriweather) are bundled with the app; nothing is loaded from the internet at runtime.
 
-**Citizen and staff side by side:** open http://localhost:4173/#/citizen and http://localhost:4173/#/officer in two windows of the *same browser* (live sync uses BroadcastChannel + localStorage). To start over, use **Privacy → Delete the data in this browser** (`/#/privacy`): it removes accounts created on the form, signs everyone out and puts the eight personas back at the start.
+**Citizen and staff side by side:** open http://localhost:4173/#/citizen and http://localhost:4173/#/officer. Same browser works out of the box (BroadcastChannel + localStorage). To sync a **phone and a laptop**, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`), run `supabase/schema.sql` once in your Supabase project, then restart `npm run dev` / redeploy. To start over, use **Privacy → Reset the demo** (`/#/privacy`): every application goes back to the seed (on all devices when cloud sync is on).
 
 Pages: `/` home · `/citizen` sign in / create account (gateway-style method cards) · `/officer` staff console · `/dashboard` service statistics (linked from the menu only) · `/help` · `/about` · `/accessibility` · `/legal` · `/privacy`.
 
@@ -30,7 +30,7 @@ The app is a static site (relative paths, hash routing), so it runs as a Hugging
    ```
 
    The script builds the app, creates the Space (public, SDK "static") if it does not exist, and uploads the build. Run it again after every change to redeploy. The token is read from the environment only; it is never saved to disk or committed.
-3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.static.hf.space`), so both windows share the same browser storage: `…static.hf.space/#/citizen` and `…static.hf.space/#/officer`.
+3. Share `https://huggingface.co/spaces/<your-user>/get-your-clave`. For the side-by-side recording, use the direct link shown at the end of the script (`https://<your-user>-get-your-clave.static.hf.space`). With Supabase configured at **build** time, phone and laptop on that URL share the same demo world; without it, use two windows of the same browser.
 
 ## How the prototype decides
 
